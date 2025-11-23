@@ -1,0 +1,387 @@
+import React, { useState } from 'react';
+import { Camera, Upload, X, Check, Plus, Minus } from 'lucide-react';
+import { api } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+
+interface RecognizedItem {
+    name: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number;
+}
+
+interface AnalysisResult {
+    recognized_items: RecognizedItem[];
+    total_calories: number;
+    total_protein: number;
+    total_fat: number;
+    total_carbohydrates: number;
+}
+
+const FoodLogPage: React.FC = () => {
+    const navigate = useNavigate();
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [analyzing, setAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+    const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                setError('Файл слишком большой. Максимум 10MB.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                setSelectedImage(base64);
+                analyzeImage(base64);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleCameraCapture = () => {
+        // Create input for camera
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment';
+        input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64 = reader.result as string;
+                    setSelectedImage(base64);
+                    analyzeImage(base64);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click();
+    };
+
+    const analyzeImage = async (imageBase64: string) => {
+        setAnalyzing(true);
+        setError(null);
+        setAnalysisResult(null);
+
+        try {
+            const result = await api.recognizeFood(imageBase64);
+
+            if (result.recognized_items && result.recognized_items.length > 0) {
+                setAnalysisResult(result);
+                // Select all items by default
+                setSelectedItems(new Set(result.recognized_items.map((_: any, i: number) => i)));
+            } else {
+                setError('Не удалось распознать еду на фото. Попробуйте другое изображение.');
+            }
+        } catch (err: any) {
+            console.error('Analysis failed:', err);
+            setError(err.message || 'Ошибка при анализе фото');
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    const toggleItemSelection = (index: number) => {
+        const newSelected = new Set(selectedItems);
+        if (newSelected.has(index)) {
+            newSelected.delete(index);
+        } else {
+            newSelected.add(index);
+        }
+        setSelectedItems(newSelected);
+    };
+
+    const getMealTypeByTime = (): string => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 11) return 'BREAKFAST';
+        if (hour >= 11 && hour < 16) return 'LUNCH';
+        if (hour >= 16 && hour < 22) return 'DINNER';
+        return 'SNACK';
+    };
+
+    const getMealTypeLabel = (type: string): string => {
+        const labels: Record<string, string> = {
+            'BREAKFAST': 'Завтрак',
+            'LUNCH': 'Обед',
+            'DINNER': 'Ужин',
+            'SNACK': 'Перекус'
+        };
+        return labels[type] || type;
+    };
+
+    const getSelectedTotals = () => {
+        if (!analysisResult) return { calories: 0, protein: 0, fat: 0, carbohydrates: 0 };
+
+        let totals = { calories: 0, protein: 0, fat: 0, carbohydrates: 0 };
+
+        analysisResult.recognized_items.forEach((item, index) => {
+            if (selectedItems.has(index)) {
+                totals.calories += item.calories;
+                totals.protein += item.protein;
+                totals.fat += item.fat;
+                totals.carbohydrates += item.carbohydrates;
+            }
+        });
+
+        return {
+            calories: Math.round(totals.calories),
+            protein: Math.round(totals.protein * 10) / 10,
+            fat: Math.round(totals.fat * 10) / 10,
+            carbohydrates: Math.round(totals.carbohydrates * 10) / 10
+        };
+    };
+
+    const handleSaveMeal = async () => {
+        if (!analysisResult || selectedItems.size === 0) return;
+
+        setSaving(true);
+        setError(null);
+
+        try {
+            // 1. Create Meal
+            const mealData = {
+                date: new Date().toISOString().split('T')[0],
+                meal_type: getMealTypeByTime()
+            };
+            const meal = await api.createMeal(mealData);
+
+            // 2. Add selected Food Items
+            const promises = analysisResult.recognized_items
+                .filter((_, index) => selectedItems.has(index))
+                .map(item => api.addFoodItem(meal.id, {
+                    name: item.name,
+                    grams: item.grams,
+                    calories: item.calories,
+                    protein: item.protein,
+                    fat: item.fat,
+                    carbohydrates: item.carbohydrates
+                }));
+
+            await Promise.all(promises);
+
+            // Success - show message and redirect
+            const tg = window.Telegram?.WebApp;
+            if (tg?.showAlert) {
+                tg.showAlert('Приём пищи сохранён!', () => {
+                    navigate('/client');
+                });
+            } else {
+                alert('Приём пищи сохранён!');
+                navigate('/client');
+            }
+        } catch (err: any) {
+            console.error('Save error:', err);
+            setError(err.message || 'Ошибка при сохранении');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const resetState = () => {
+        setSelectedImage(null);
+        setAnalysisResult(null);
+        setSelectedItems(new Set());
+        setError(null);
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-24">
+            <div className="max-w-lg mx-auto">
+                <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Дневник питания</h1>
+
+                {!selectedImage && !analysisResult ? (
+                    /* Initial state - show capture options */
+                    <div className="space-y-6">
+                        <p className="text-center text-gray-500">
+                            Сфотографируйте или загрузите фото еды для анализа
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={handleCameraCapture}
+                                className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
+                            >
+                                <Camera size={48} className="mb-3" />
+                                <span className="font-semibold">Камера</span>
+                            </button>
+
+                            <label className="aspect-square bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
+                                <Upload size={48} className="mb-3" />
+                                <span className="font-semibold">Галерея</span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleFileSelect}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                            <p className="text-blue-800 text-sm text-center">
+                                💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    /* Image selected or analyzing */
+                    <div className="space-y-6">
+                        {/* Image preview */}
+                        <div className="relative rounded-3xl overflow-hidden shadow-xl">
+                            <img
+                                src={selectedImage || ''}
+                                alt="Food"
+                                className="w-full h-64 object-cover"
+                            />
+                            <button
+                                onClick={resetState}
+                                className="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full hover:bg-black/80 transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+
+                            {/* Meal type badge */}
+                            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                                <span className="text-sm font-medium text-gray-800">
+                                    {getMealTypeLabel(getMealTypeByTime())}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Error message */}
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                                <p className="text-red-600 text-center">{error}</p>
+                                <button
+                                    onClick={resetState}
+                                    className="w-full mt-3 bg-red-100 text-red-700 py-2 rounded-xl font-medium"
+                                >
+                                    Попробовать снова
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Analyzing state */}
+                        {analyzing && (
+                            <div className="bg-white rounded-3xl p-8 shadow-lg text-center">
+                                <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                                <p className="text-gray-600 font-medium">Анализируем фото...</p>
+                                <p className="text-gray-400 text-sm mt-2">Это может занять несколько секунд</p>
+                            </div>
+                        )}
+
+                        {/* Results */}
+                        {analysisResult && !analyzing && (
+                            <div className="space-y-4">
+                                {/* Items list */}
+                                <div className="bg-white rounded-3xl p-5 shadow-lg">
+                                    <h2 className="text-lg font-bold text-gray-900 mb-4">
+                                        Распознанные блюда ({analysisResult.recognized_items.length})
+                                    </h2>
+
+                                    <div className="space-y-3">
+                                        {analysisResult.recognized_items.map((item, index) => (
+                                            <div
+                                                key={index}
+                                                onClick={() => toggleItemSelection(index)}
+                                                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${selectedItems.has(index)
+                                                        ? 'border-blue-500 bg-blue-50'
+                                                        : 'border-gray-200 bg-gray-50'
+                                                    }`}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <p className="font-semibold text-gray-900">{item.name}</p>
+                                                        <p className="text-sm text-gray-500">{item.grams}г</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-bold text-orange-600">
+                                                            {Math.round(item.calories)} ккал
+                                                        </span>
+                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${selectedItems.has(index)
+                                                                ? 'bg-blue-500 text-white'
+                                                                : 'bg-gray-200 text-gray-400'
+                                                            }`}>
+                                                            {selectedItems.has(index) ? <Check size={16} /> : <Plus size={16} />}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Mini macros */}
+                                                <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                                                    <span>Б: {item.protein.toFixed(1)}г</span>
+                                                    <span>Ж: {item.fat.toFixed(1)}г</span>
+                                                    <span>У: {item.carbohydrates.toFixed(1)}г</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Totals */}
+                                {selectedItems.size > 0 && (
+                                    <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-3xl p-5 text-white">
+                                        <p className="text-white/80 text-sm mb-2">Итого выбрано:</p>
+                                        <div className="flex items-baseline gap-2 mb-3">
+                                            <span className="text-3xl font-bold">{getSelectedTotals().calories}</span>
+                                            <span className="text-white/80">ккал</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <div className="bg-white/20 rounded-xl p-2 text-center">
+                                                <p className="text-white/70">Белки</p>
+                                                <p className="font-bold">{getSelectedTotals().protein}г</p>
+                                            </div>
+                                            <div className="bg-white/20 rounded-xl p-2 text-center">
+                                                <p className="text-white/70">Жиры</p>
+                                                <p className="font-bold">{getSelectedTotals().fat}г</p>
+                                            </div>
+                                            <div className="bg-white/20 rounded-xl p-2 text-center">
+                                                <p className="text-white/70">Углеводы</p>
+                                                <p className="font-bold">{getSelectedTotals().carbohydrates}г</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Save button */}
+                                <button
+                                    onClick={handleSaveMeal}
+                                    disabled={selectedItems.size === 0 || saving}
+                                    className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${selectedItems.size === 0
+                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg active:scale-95'
+                                        }`}
+                                >
+                                    {saving ? (
+                                        <>
+                                            <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                                            <span>Сохраняем...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check size={24} />
+                                            <span>Добавить в дневник</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default FoodLogPage;

@@ -1,0 +1,104 @@
+# FoodMind - Unified Docker Compose for all services
+# Production-ready configuration for Backend, Bot, and Frontend
+
+version: "3.9"
+
+services:
+  # PostgreSQL Database (shared by backend and bot)
+  db:
+    image: postgres:15
+    container_name: fm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-foodmind}
+      POSTGRES_USER: ${POSTGRES_USER:-foodmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supersecret}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-foodmind} -d ${POSTGRES_DB:-foodmind}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fm-backend
+    command: >
+      sh -c "
+        python manage.py migrate --settings=config.settings.production &&
+        python manage.py collectstatic --noinput --settings=config.settings.production &&
+        gunicorn --config gunicorn_config.py config.wsgi:application
+      "
+    volumes:
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
+      - ./backend/logs:/app/logs
+
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Telegram Bot
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: fm-bot
+    env_file:
+      - ./bot/.env
+    environment:
+      - ENVIRONMENT=production
+    depends_on:
+      - backend
+      - db
+    networks:
+      - backend-net
+    restart: unless-stopped
+    volumes:
+      - ./bot/logs:/app/logs
+
+  # React Frontend (Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fm-frontend
+    ports:
+      - "80:80"
+    env_file:
+      - ./frontend/.env
+    networks:
+      - backend-net
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    labels:
+      - "com.foodmind.service=frontend"
+
+networks:
+  backend-net:
+    driver: bridge
+
+volumes:
+  db-data:
