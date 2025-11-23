@@ -78,6 +78,9 @@ urlpatterns = [
     path("api/v1/billing/", include("apps.billing.urls")),
     path("api/v1/ai/", include("apps.ai.urls")),
     path("api/v1/telegram/", include("apps.telegram.urls")),
+    
+    # Trainer panel auth endpoint
+    path("api/v1/trainer-panel/", include("apps.telegram.trainer_urls")),
 
     # API Schema and Documentation (protected with Basic Auth)
     path("api/schema/", basic_auth_required(SpectacularAPIView.as_view()), name="schema"),
