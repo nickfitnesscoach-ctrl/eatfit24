@@ -158,13 +158,14 @@ jobs:
 
       - name: Send notification
         if: always()
+        continue-on-error: true
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_ADMIN_ID }}
           token: ${{ secrets.TELEGRAM_NOTIFICATION_TOKEN }}
           message: |
             🤖 Bot Deployment Status: ${{ job.status }}
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
