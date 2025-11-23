@@ -2,16 +2,21 @@
 Хендлеры команд для запуска опроса Personal Plan.
 """
 
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
 from app.config import settings
-from app.states import SurveyStates
-from app.texts.survey import WELCOME_MESSAGE, GENDER_QUESTION
-from app.keyboards import get_start_survey_keyboard, get_gender_keyboard, get_admin_start_keyboard, get_open_webapp_keyboard
+from app.keyboards import (
+    get_admin_start_keyboard,
+    get_gender_keyboard,
+    get_open_webapp_keyboard,
+    get_start_survey_keyboard,
+)
 from app.services.events import log_survey_started
+from app.states import SurveyStates
+from app.texts.survey import GENDER_QUESTION, WELCOME_MESSAGE
 from app.utils.logger import logger
 
 router = Router(name="survey_commands")
@@ -29,7 +34,7 @@ async def cmd_start(message: Message, state: FSMContext):
         logger.info(f"User {user_id} IS ADMIN - showing admin keyboard")
         admin_url = f"{settings.WEB_APP_URL}/admin"
         logger.info(f"Admin URL will be: {admin_url}")
-        
+
         # Для админа показываем кнопку открытия Mini App
         await message.answer(
             "👋 <b>Привет, Админ!</b>\n\n"
@@ -85,9 +90,9 @@ async def start_survey(callback: CallbackQuery, state: FSMContext):
     """Начало опроса после нажатия кнопки."""
     user_id = callback.from_user.id
     log_survey_started(user_id)
-    
+
     logger.info(f"User {user_id} started survey")
-    
+
     # Переходим к первому вопросу - выбор пола
     await state.set_state(SurveyStates.waiting_for_gender)
     await callback.message.answer(

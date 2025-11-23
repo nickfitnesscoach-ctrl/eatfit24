@@ -2,20 +2,21 @@
 OpenRouter API клиент для генерации персональных планов.
 """
 
+from typing import Any, Dict, Optional
+
 import httpx
-from typing import Dict, Any, Optional
 from tenacity import (
+    RetryError,
+    before_sleep_log,
     retry,
+    retry_if_exception,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    retry_if_exception,
-    before_sleep_log,
-    RetryError
 )
 
 from app.config import settings
-from app.prompts.personal_plan import get_system_prompt, build_user_message, get_prompt_version
+from app.prompts.personal_plan import build_user_message, get_prompt_version, get_system_prompt
 from app.utils.logger import logger
 
 
@@ -195,7 +196,7 @@ class OpenRouterClient:
                 "error": error_msg
             }
 
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException:
             error_msg = f"Request timeout after {self.timeout}s"
             logger.error(f"OpenRouter API timeout: {error_msg}")
             return {

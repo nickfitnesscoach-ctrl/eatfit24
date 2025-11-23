@@ -3,21 +3,30 @@
 Включает: возраст, рост, вес, целевой вес.
 """
 
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
+from app.keyboards import get_activity_keyboard, get_empty_keyboard, get_target_weight_keyboard
+from app.services.events import log_survey_step_completed
 from app.states import SurveyStates
 from app.texts.survey import (
-    AGE_INVALID, AGE_CONFIRMED, HEIGHT_QUESTION,
-    HEIGHT_INVALID, HEIGHT_CONFIRMED, WEIGHT_QUESTION,
-    WEIGHT_INVALID, WEIGHT_CONFIRMED, TARGET_WEIGHT_QUESTION,
-    TARGET_WEIGHT_INVALID, TARGET_WEIGHT_CONFIRMED, ACTIVITY_QUESTION,
-    TARGET_WEIGHT_SKIPPED
+    ACTIVITY_QUESTION,
+    AGE_CONFIRMED,
+    AGE_INVALID,
+    HEIGHT_CONFIRMED,
+    HEIGHT_INVALID,
+    HEIGHT_QUESTION,
+    TARGET_WEIGHT_CONFIRMED,
+    TARGET_WEIGHT_INVALID,
+    TARGET_WEIGHT_QUESTION,
+    TARGET_WEIGHT_SKIPPED,
+    WEIGHT_CONFIRMED,
+    WEIGHT_INVALID,
+    WEIGHT_QUESTION,
 )
-from app.keyboards import get_empty_keyboard, get_target_weight_keyboard, get_activity_keyboard
-from app.validators import validate_age, validate_height, validate_weight, validate_target_weight
-from app.services.events import log_survey_step_completed
+from app.validators import validate_age, validate_height, validate_target_weight, validate_weight
+
 from .helpers import _safe_delete_message
 
 router = Router(name="survey_metrics")

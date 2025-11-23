@@ -2,15 +2,16 @@
 Хендлер выбора уровня активности в опросе Personal Plan.
 """
 
-from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
-from app.states import SurveyStates
-from app.texts.survey import TRAINING_LEVEL_QUESTION
 from app.keyboards import get_training_level_keyboard
 from app.services.events import log_survey_step_completed
+from app.states import SurveyStates
+from app.texts.survey import TRAINING_LEVEL_QUESTION
 from app.utils.logger import logger
+
 from .helpers import _safe_delete_message
 
 router = Router(name="survey_activity")

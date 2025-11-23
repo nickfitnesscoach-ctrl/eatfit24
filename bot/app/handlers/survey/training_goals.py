@@ -1,22 +1,22 @@
 """Хендлеры для уровня тренированности и целей по телу."""
-from aiogram import Bot, Router, F
-from aiogram.types import CallbackQuery
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
-from app.states import SurveyStates
-from app.texts.survey import (
-    TRAINING_LEVEL_LABELS,
-    TRAINING_LEVEL_SAVED,
-    BODY_GOALS_LABELS,
-    BODY_GOALS_QUESTION,
-    BODY_GOALS_SELECTED_TEMPLATE,
-    BODY_GOALS_MIN_WARNING,
-    HEALTH_LIMITATIONS_QUESTION,
-    HEALTH_LIMITATIONS_SELECTED_TEMPLATE,
-    HEALTH_LIMITATIONS_LABELS,
-)
 from app.keyboards import get_body_goals_keyboard, get_health_limitations_keyboard
 from app.services.events import log_survey_step_completed
+from app.states import SurveyStates
+from app.texts.survey import (
+    BODY_GOALS_LABELS,
+    BODY_GOALS_MIN_WARNING,
+    BODY_GOALS_QUESTION,
+    BODY_GOALS_SELECTED_TEMPLATE,
+    HEALTH_LIMITATIONS_LABELS,
+    HEALTH_LIMITATIONS_QUESTION,
+    HEALTH_LIMITATIONS_SELECTED_TEMPLATE,
+    TRAINING_LEVEL_LABELS,
+    TRAINING_LEVEL_SAVED,
+)
 
 router = Router(name="survey_training_goals")
 

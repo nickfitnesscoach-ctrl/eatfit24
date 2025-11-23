@@ -2,10 +2,11 @@
 Модели для опроса Personal Plan.
 """
 
-from sqlalchemy import BigInteger, String, Integer, Numeric, Text, ForeignKey, CheckConstraint, TIMESTAMP, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
+
+from sqlalchemy import JSON, TIMESTAMP, BigInteger, CheckConstraint, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 

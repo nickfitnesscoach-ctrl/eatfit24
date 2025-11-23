@@ -3,23 +3,29 @@
 """
 
 import asyncio
-from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
 from app.config import settings
-from app.states import SurveyStates
-from app.texts.survey import (
-    GENERATING_PLAN, PLAN_GENERATION_ERROR, PLAN_GENERATED_HEADER,
-    RETURN_TO_TRACKING, CONTACT_TRAINER_CTA, GENDER_QUESTION
-)
 from app.keyboards import get_contact_trainer_keyboard, get_gender_keyboard
 from app.services.ai import openrouter_client
-from app.validators import validate_ai_response
-from app.services.database import async_session_maker, UserRepository, SurveyRepository, PlanRepository
-from app.services.events import log_survey_completed, log_plan_generated, log_ai_error
+from app.services.database import PlanRepository, SurveyRepository, UserRepository, async_session_maker
 from app.services.django_integration import send_test_results_to_django
+from app.services.events import log_ai_error, log_plan_generated, log_survey_completed
+from app.states import SurveyStates
+from app.texts.survey import (
+    CONTACT_TRAINER_CTA,
+    GENDER_QUESTION,
+    GENERATING_PLAN,
+    PLAN_GENERATED_HEADER,
+    PLAN_GENERATION_ERROR,
+    RETURN_TO_TRACKING,
+)
 from app.utils.logger import logger
+from app.validators import validate_ai_response
+
 from .helpers import _plans_word
 
 router = Router(name="survey_confirmation")
@@ -174,7 +180,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                 )
 
                 # Сохранить план
-                plan = await PlanRepository.create_plan(
+                await PlanRepository.create_plan(
                     session,
                     user_id=user.id,
                     survey_answer_id=survey.id,

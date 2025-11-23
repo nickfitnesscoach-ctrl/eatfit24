@@ -2,8 +2,8 @@
 Системные промпты для генерации персональных планов через OpenRouter API.
 """
 
-import json
-from typing import Dict, Any
+from typing import Any, Dict
+
 from app.constants import BODY_DESCRIPTIONS
 from app.texts.survey import HEALTH_LIMITATIONS_LABELS
 

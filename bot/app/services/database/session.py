@@ -2,13 +2,12 @@
 Управление сессиями базы данных.
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from typing import AsyncGenerator
 
-from app.config import settings
-from app.models.base import Base
-from app.utils.logger import logger
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
+from app.utils.logger import logger
 
 # Создать async engine
 engine = create_async_engine(
@@ -48,7 +47,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db():
     """Инициализация базы данных (создание таблиц)."""
-    async with engine.begin() as conn:
+    async with engine.begin():
         # В production используйте Alembic миграции вместо create_all
         # await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized (use Alembic for migrations in production)")

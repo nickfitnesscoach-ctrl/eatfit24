@@ -1,20 +1,21 @@
 """Хендлеры для шага ограничений по здоровью и питанию в опросе Personal Plan."""
 
-from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
-from app.states import SurveyStates
-from app.texts.survey import (
-    HEALTH_LIMITATIONS_QUESTION,
-    HEALTH_LIMITATIONS_LABELS,
-    HEALTH_LIMITATIONS_SELECTED_TEMPLATE,
-    HEALTH_LIMITATIONS_MIN_WARNING,
-    BODY_NOW_QUESTION_HEADER,
-)
 from app.keyboards import get_health_limitations_keyboard
 from app.services.events import log_survey_step_completed
 from app.services.image_sender import image_sender
+from app.states import SurveyStates
+from app.texts.survey import (
+    BODY_NOW_QUESTION_HEADER,
+    HEALTH_LIMITATIONS_LABELS,
+    HEALTH_LIMITATIONS_MIN_WARNING,
+    HEALTH_LIMITATIONS_QUESTION,
+    HEALTH_LIMITATIONS_SELECTED_TEMPLATE,
+)
+
 from .helpers import _safe_delete_message
 
 router = Router(name="survey_health_limitations")

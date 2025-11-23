@@ -2,12 +2,13 @@
 Репозиторий для работы с базой данных.
 """
 
-from datetime import datetime, date
-from typing import Optional, Dict, Any
-from sqlalchemy import select, func
+from datetime import date, datetime
+from typing import Any, Dict, Optional
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User, SurveyAnswer, Plan
+from app.models import Plan, SurveyAnswer, User
 from app.utils.logger import logger
 
 

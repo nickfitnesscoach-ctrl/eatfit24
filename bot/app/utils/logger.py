@@ -4,8 +4,8 @@
 
 import logging
 import sys
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from app.config import settings
 from app.utils.secret_filter import apply_secret_filter_to_logger

@@ -2,16 +2,16 @@
 Клавиатуры для опроса Personal Plan.
 """
 
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.config import settings
 from app.constants import ACTIVITY_LEVELS, POPULAR_TIMEZONES
 from app.texts.survey import (
-    TRAINING_LEVEL_LABELS,
     BODY_GOALS_LABELS,
     HEALTH_LIMITATIONS_LABELS,
+    TRAINING_LEVEL_LABELS,
 )
-from app.config import settings
 
 
 def get_gender_keyboard() -> InlineKeyboardMarkup:
@@ -182,9 +182,9 @@ def get_open_webapp_keyboard() -> InlineKeyboardMarkup:
     Клавиатура для КЛИЕНТА - открывает / (КБЖУ трекер на главной).
     """
     from aiogram.types import WebAppInfo
-    
+
     builder = InlineKeyboardBuilder()
-    
+
     if settings.WEB_APP_URL:
         # Клиенты идут на главную / - там КБЖУ трекер
         builder.row(
@@ -193,14 +193,14 @@ def get_open_webapp_keyboard() -> InlineKeyboardMarkup:
                 web_app=WebAppInfo(url=settings.WEB_APP_URL)
             )
         )
-    
+
     builder.row(
         InlineKeyboardButton(
             text="✉️ Написать тренеру",
             url=f"https://t.me/{settings.TRAINER_USERNAME}"
         )
     )
-    
+
     return builder.as_markup()
 
 
@@ -209,9 +209,9 @@ def get_admin_start_keyboard() -> InlineKeyboardMarkup:
     Клавиатура для АДМИНА - открывает /admin (панель тренера).
     """
     from aiogram.types import WebAppInfo
-    
+
     builder = InlineKeyboardBuilder()
-    
+
     if settings.WEB_APP_URL:
         # Админ идёт на /admin - панель тренера
         admin_url = f"{settings.WEB_APP_URL}/admin"
@@ -221,16 +221,16 @@ def get_admin_start_keyboard() -> InlineKeyboardMarkup:
                 web_app=WebAppInfo(url=admin_url)
             )
         )
-    
+
     builder.row(
         InlineKeyboardButton(text="🚀 Начать опрос (тест)", callback_data="survey:start")
     )
-    
+
     builder.row(
         InlineKeyboardButton(
             text="✉️ Написать тренеру",
             url=f"https://t.me/{settings.TRAINER_USERNAME}"
         )
     )
-    
+
     return builder.as_markup()

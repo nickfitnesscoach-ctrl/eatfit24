@@ -2,11 +2,11 @@
 Сервис для логирования событий в БД (опционально).
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from app.utils.logger import logger
-from app.utils.pii_masking import mask_user_id, mask_payload
+from app.utils.pii_masking import mask_payload, mask_user_id
 
 
 class EventLogger:
@@ -43,7 +43,7 @@ class EventLogger:
         # Маскирование PII в payload
         masked_payload = mask_payload(payload) if payload else {}
 
-        log_data = {
+        {
             "user_id": masked_user_id,
             "event": event,
             "timestamp": datetime.now().isoformat(),

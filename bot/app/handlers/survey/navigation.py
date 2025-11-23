@@ -3,43 +3,43 @@
 Включает: отмена опроса, возврат к предыдущему шагу.
 """
 
-from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
+from app.keyboards import (
+    get_activity_keyboard,
+    get_body_goals_keyboard,
+    get_gender_keyboard,
+    get_health_limitations_keyboard,
+    get_target_weight_keyboard,
+    get_timezone_keyboard,
+    get_training_level_keyboard,
+)
+from app.services.events import log_survey_cancelled
+from app.services.image_sender import image_sender
 from app.states import SurveyStates
 from app.texts.survey import (
-    SURVEY_CANCELLED,
-    GENDER_QUESTION,
-    AGE_QUESTION,
-    HEIGHT_QUESTION,
-    WEIGHT_QUESTION,
-    TARGET_WEIGHT_QUESTION,
     ACTIVITY_QUESTION,
-    TRAINING_LEVEL_QUESTION,
+    AGE_QUESTION,
+    BODY_GOALS_LABELS,
     BODY_GOALS_QUESTION,
     BODY_GOALS_SELECTED_TEMPLATE,
-    BODY_GOALS_LABELS,
-    TRAINING_LEVEL_LABELS,
-    TRAINING_LEVEL_SAVED,
+    BODY_IDEAL_QUESTION_HEADER,
+    BODY_NOW_QUESTION_HEADER,
+    GENDER_QUESTION,
+    HEALTH_LIMITATIONS_LABELS,
     HEALTH_LIMITATIONS_QUESTION,
     HEALTH_LIMITATIONS_SELECTED_TEMPLATE,
-    HEALTH_LIMITATIONS_LABELS,
+    HEIGHT_QUESTION,
+    SURVEY_CANCELLED,
+    TARGET_WEIGHT_QUESTION,
+    TRAINING_LEVEL_LABELS,
+    TRAINING_LEVEL_QUESTION,
+    TRAINING_LEVEL_SAVED,
     TZ_QUESTION,
-    BODY_NOW_QUESTION_HEADER,
-    BODY_IDEAL_QUESTION_HEADER,
+    WEIGHT_QUESTION,
 )
-from app.keyboards import (
-    get_gender_keyboard,
-    get_target_weight_keyboard,
-    get_activity_keyboard,
-    get_training_level_keyboard,
-    get_body_goals_keyboard,
-    get_health_limitations_keyboard,
-    get_timezone_keyboard,
-)
-from app.services.image_sender import image_sender
-from app.services.events import log_survey_cancelled
 
 router = Router(name="survey_navigation")
 

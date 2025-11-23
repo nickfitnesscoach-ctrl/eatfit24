@@ -3,29 +3,28 @@
 """
 
 import logging
-import httpx
 import re
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
+import httpx
 from pydantic import ValidationError
 from tenacity import (
+    RetryError,
+    before_sleep_log,
     retry,
+    retry_if_exception,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    retry_if_exception,
-    before_sleep_log,
-    RetryError
 )
 
 from app.config import settings
-from app.utils.logger import logger
 from app.schemas.django_api import (
     SaveTestRequest,
     SaveTestResponse,
-    DjangoAPIError,
     TestAnswers,
 )
+from app.utils.logger import logger
 
 
 def _is_retryable_http_error(exception: Exception) -> bool:
@@ -87,7 +86,7 @@ async def _make_django_request(url: str, payload: SaveTestRequest) -> SaveTestRe
 def parse_range_value(value) -> Optional[float]:
     """
     Извлекает среднее значение из диапазона или возвращает само значение.
-    
+
     Примеры:
         "[20-29]" -> 24.5
         "[170-180]" -> 175.0
@@ -96,11 +95,11 @@ def parse_range_value(value) -> Optional[float]:
     """
     if not value:
         return None
-    
+
     # Если это уже число
     if isinstance(value, (int, float)):
         return float(value)
-    
+
     # Если это строка с диапазоном [min-max]
     value_str = str(value)
     match = re.match(r'\[(\d+)-(\d+)\]', value_str)
@@ -108,7 +107,7 @@ def parse_range_value(value) -> Optional[float]:
         min_val = float(match.group(1))
         max_val = float(match.group(2))
         return (min_val + max_val) / 2
-    
+
     # Попытка преобразовать в число
     try:
         return float(value_str)

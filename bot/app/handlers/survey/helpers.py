@@ -3,11 +3,11 @@
 """
 
 from aiogram import Bot
-from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 
-from app.texts.survey import *
 from app.keyboards import *
+from app.texts.survey import *
 from app.utils.logger import logger
 
 

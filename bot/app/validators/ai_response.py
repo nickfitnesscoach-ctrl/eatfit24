@@ -3,7 +3,7 @@
 """
 
 import re
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 def validate_ai_response(text: str) -> Dict[str, Any]:

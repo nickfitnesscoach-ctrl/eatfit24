@@ -2,14 +2,14 @@
 Хендлер выбора пола в опросе Personal Plan.
 """
 
-from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
-from app.states import SurveyStates
-from app.texts.survey import AGE_QUESTION
 from app.keyboards import get_empty_keyboard
 from app.services.events import log_survey_step_completed
+from app.states import SurveyStates
+from app.texts.survey import AGE_QUESTION
 from app.utils.logger import logger
 
 router = Router(name="survey_gender")

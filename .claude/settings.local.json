@@ -3,7 +3,14 @@
     "allow": [
       "Bash(git commit:*)",
       "Bash(git rm:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(git push:*)",
+      "Bash(gh run list:*)",
+      "Bash(yamllint backend.yml)",
+      "Bash(npm run type-check:*)",
+      "Bash(pip install:*)",
+      "Bash(ruff check:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

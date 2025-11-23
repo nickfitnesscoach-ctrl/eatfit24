@@ -3,19 +3,16 @@
 Включает: текущий и идеальный тип фигуры.
 """
 
-from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
-from app.states import SurveyStates
-from app.texts.survey import (
-    BODY_NOW_SELECTED, BODY_IDEAL_QUESTION_HEADER,
-    BODY_IDEAL_SELECTED, TZ_QUESTION
-)
-from app.keyboards import get_timezone_keyboard
 from app.constants import BODY_LABELS
-from app.services.image_sender import image_sender
+from app.keyboards import get_timezone_keyboard
 from app.services.events import log_survey_step_completed
+from app.services.image_sender import image_sender
+from app.states import SurveyStates
+from app.texts.survey import BODY_IDEAL_QUESTION_HEADER, BODY_IDEAL_SELECTED, BODY_NOW_SELECTED, TZ_QUESTION
 from app.utils.logger import logger
 
 router = Router(name="survey_body_types")

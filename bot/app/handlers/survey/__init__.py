@@ -16,16 +16,16 @@
 from aiogram import Router
 
 from . import (
-    commands,
-    gender,
-    metrics,
     activity,
-    training_goals,
-    health,
     body_types,
-    timezone,
+    commands,
     confirmation,
-    navigation
+    gender,
+    health,
+    metrics,
+    navigation,
+    timezone,
+    training_goals,
 )
 
 # Создать главный роутер для опроса Personal Plan

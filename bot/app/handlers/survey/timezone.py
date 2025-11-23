@@ -2,16 +2,17 @@
 Хендлеры выбора часового пояса в опросе Personal Plan.
 """
 
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
-from app.states import SurveyStates
-from app.texts.survey import TZ_MANUAL_INPUT, TZ_INVALID
-from app.validators import validate_and_normalize_timezone
 from app.services.events import log_survey_step_completed
+from app.states import SurveyStates
+from app.texts.survey import TZ_INVALID, TZ_MANUAL_INPUT
 from app.utils.logger import logger
-from .helpers import show_confirmation, _safe_delete_message
+from app.validators import validate_and_normalize_timezone
+
+from .helpers import show_confirmation
 
 router = Router(name="survey_timezone")
 

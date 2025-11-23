@@ -3,10 +3,10 @@ Pydantic схемы для валидации данных.
 """
 
 from .django_api import (
-    TestAnswers,
+    DjangoAPIError,
     SaveTestRequest,
     SaveTestResponse,
-    DjangoAPIError,
+    TestAnswers,
 )
 
 __all__ = [

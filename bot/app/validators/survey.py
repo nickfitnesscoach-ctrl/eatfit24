@@ -3,10 +3,11 @@
 """
 
 import re
-import pytz
 from typing import Optional
 
-from app.constants import VALIDATION_LIMITS, UTC_TO_IANA_MAPPING
+import pytz
+
+from app.constants import UTC_TO_IANA_MAPPING, VALIDATION_LIMITS
 
 # Маппинг популярных регионов, стран и городов на IANA timezones
 COUNTRY_CITY_TO_IANA = {

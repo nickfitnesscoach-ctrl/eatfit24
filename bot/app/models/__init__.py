@@ -3,8 +3,8 @@
 """
 
 from .base import Base, TimestampMixin
+from .survey import Plan, SurveyAnswer
 from .user import User
-from .survey import SurveyAnswer, Plan
 
 __all__ = [
     "Base",

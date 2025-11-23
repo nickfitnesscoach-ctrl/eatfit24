@@ -3,9 +3,9 @@
 """
 
 from .paths import (
-    get_body_image_path,
-    get_absolute_body_image_path,
     ensure_assets_directory_exists,
+    get_absolute_body_image_path,
+    get_body_image_path,
     validate_image_file_exists,
 )
 

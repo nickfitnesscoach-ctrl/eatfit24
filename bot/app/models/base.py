@@ -2,10 +2,11 @@
 Базовые модели SQLAlchemy для всех таблиц.
 """
 
+from datetime import datetime
+
+from sqlalchemy import TIMESTAMP, func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import BigInteger, TIMESTAMP, func
-from datetime import datetime
 
 
 class Base(AsyncAttrs, DeclarativeBase):

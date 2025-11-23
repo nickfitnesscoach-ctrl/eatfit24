@@ -2,8 +2,9 @@
 Pydantic схемы для валидации Django API запросов и ответов.
 """
 
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TestAnswers(BaseModel):

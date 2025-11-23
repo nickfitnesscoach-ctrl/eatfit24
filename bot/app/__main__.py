@@ -4,15 +4,15 @@ import asyncio
 import sys
 
 from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramConflictError
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import settings
-from app.utils.logger import logger
 from app.handlers import register_all_handlers
-from app.services.database import init_db, close_db
+from app.services.database import close_db
+from app.utils.logger import logger
 
 
 async def on_startup():
@@ -23,8 +23,8 @@ async def on_startup():
     logger.info(f"Personal Plan feature: {'ENABLED' if settings.is_personal_plan_enabled else 'DISABLED'}")
 
     # Проверка наличия изображений body types
-    from app.utils.paths import validate_image_file_exists
     from app.constants import BODY_COUNTS
+    from app.utils.paths import validate_image_file_exists
 
     missing_images = []
     for gender in ["male", "female"]:

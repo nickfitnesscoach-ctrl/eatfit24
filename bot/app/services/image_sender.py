@@ -4,16 +4,15 @@
 
 import asyncio
 from typing import List, Optional
-from pathlib import Path
 
 from aiogram import Bot
-from aiogram.types import FSInputFile, Message
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import FSInputFile
 
-from app.constants import BODY_LABELS, BODY_COUNTS
-from app.utils.paths import get_absolute_body_image_path
+from app.constants import BODY_COUNTS, BODY_LABELS
 from app.keyboards import get_body_type_keyboard
 from app.utils.logger import logger
+from app.utils.paths import get_absolute_body_image_path
 
 
 class ImageSender:
