@@ -397,16 +397,22 @@ P0-4: ✅ DONE - Добавить логирование для диагност
 
 ---
 
-### T5 | P2 | Добавить валидацию схемы Django API
+### T5 | P2 | ✅ DONE | Добавить валидацию схемы Django API
 
 **Проблема:** Нет валидации payload перед отправкой в Django.
 
 **Файлы:**
 - `bot/app/services/django_integration.py`
+- `bot/app/schemas/django_api.py` (NEW)
+- `bot/app/schemas/__init__.py` (NEW)
 
 **Действия:**
-- Создать Pydantic модель для payload
-- Валидировать перед отправкой
+- ✅ Создать Pydantic модели для payload (SaveTestRequest, TestAnswers)
+- ✅ Создать модель для response (SaveTestResponse)
+- ✅ Создать модель для ошибок (DjangoAPIError)
+- ✅ Валидировать payload перед отправкой
+- ✅ Валидировать response от API
+- ✅ Добавить обработку ValidationError
 
 **Сложность:** Средняя
 
@@ -530,17 +536,23 @@ P0-4: ✅ DONE - Добавить логирование для диагност
 
 ---
 
-### F6 | P2 | Создать единую обработку ошибок в компонентах
+### F6 | P2 | ✅ DONE | Создать единую обработку ошибок в компонентах
 
 **Проблема:** ApplicationsPage не обрабатывает ошибки, разный подход в разных компонентах.
 
 **Файлы:**
-- `frontend/src/pages/ApplicationsPage.tsx`
-- `frontend/src/contexts/ClientsContext.tsx`
+- `frontend/src/components/ErrorBoundary.tsx` (NEW)
+- `frontend/src/hooks/useErrorHandler.ts` (NEW)
+- `frontend/src/App.tsx` (MODIFIED)
 
 **Действия:**
-- Показывать ошибки через Telegram alerts
-- Единый error boundary
+- ✅ Создан ErrorBoundary компонент (class component)
+- ✅ Создан useErrorHandler hook для функциональных компонентов
+- ✅ Создан ErrorDisplay компонент для отображения ошибок
+- ✅ ErrorBoundary обернул все приложение в App.tsx
+- ✅ Добавлен fallback UI с кнопкой "Попробовать снова"
+- ✅ Логирование ошибок в консоль
+- ✅ Возможность передать custom fallback и onError callback
 
 **Сложность:** Средняя
 
@@ -668,31 +680,42 @@ P0-4: ✅ DONE - Добавить логирование для диагност
 
 ---
 
-### D7 | P2 | Добавить Frontend тесты в CI/CD
+### D7 | P2 | ✅ DONE | Добавить Frontend тесты в CI/CD
 
 **Проблема:** Нет тестов, линтинга, проверки типов.
 
 **Файлы:**
-- `.github/workflows/frontend.yml`
+- `.github/workflows/frontend.yml` (MODIFIED)
+- `frontend/package.json` (MODIFIED)
 
 **Действия:**
-- Добавить `npm test`
-- Добавить `npm run lint`
-- Добавить `npm run type-check`
+- ✅ Добавить `npm test` (placeholder пока нет тестов)
+- ✅ Добавить `npm run lint` в CI/CD
+- ✅ Добавить `npm run type-check` (tsc --noEmit)
+- ✅ Все проверки обязательны (блокируют deploy при ошибках)
 
 **Сложность:** Средняя
 
 ---
 
-### D8 | P2 | Создать ENTRYPOINT скрипты
+### D8 | P2 | ✅ DONE | Создать ENTRYPOINT скрипты
 
 **Проблема:** Нет ENTRYPOINT для управления startup.
 
 **Файлы:**
-- `backend/entrypoint.sh` (создать)
-- `bot/entrypoint.sh` (создать)
+- `backend/entrypoint.sh` (CREATED - Task D2)
+- `bot/entrypoint.sh` (EXISTS)
+
+**Действия:**
+- ✅ backend/entrypoint.sh: DB wait, migrations, collectstatic, gunicorn
+- ✅ bot/entrypoint.sh: DB wait, alembic migrations, python main.py
+- ✅ Обе скрипты имеют консистентную структуру
+- ✅ Обработка ошибок с graceful fallback
+- ✅ Подробное логирование каждого шага
 
 **Сложность:** Средняя
+
+Note: backend/entrypoint.sh был создан в рамках задачи D2 (P1)
 
 ---
 

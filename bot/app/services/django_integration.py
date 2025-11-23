@@ -7,6 +7,7 @@ import httpx
 import re
 from typing import Optional, Dict, Any
 
+from pydantic import ValidationError
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -19,6 +20,12 @@ from tenacity import (
 
 from app.config import settings
 from app.utils.logger import logger
+from app.schemas.django_api import (
+    SaveTestRequest,
+    SaveTestResponse,
+    DjangoAPIError,
+    TestAnswers,
+)
 
 
 def _is_retryable_http_error(exception: Exception) -> bool:
@@ -48,29 +55,33 @@ def _is_retryable_http_error(exception: Exception) -> bool:
     before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True
 )
-async def _make_django_request(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def _make_django_request(url: str, payload: SaveTestRequest) -> SaveTestResponse:
     """
-    HTTP POST запрос к Django API с автоматическим retry.
+    HTTP POST запрос к Django API с автоматическим retry и валидацией.
 
     Args:
         url: URL для POST запроса
-        payload: JSON данные
+        payload: Валидированные данные запроса (Pydantic модель)
 
     Returns:
-        JSON ответ от API
+        Валидированный ответ от API (Pydantic модель)
 
     Raises:
         httpx.HTTPStatusError: При HTTP ошибках (после всех retry попыток)
         httpx.TimeoutException: При таймауте запроса
+        ValidationError: При невалидном ответе от API
     """
     async with httpx.AsyncClient() as client:
         response = await client.post(
             url,
-            json=payload,
+            json=payload.model_dump(exclude_none=False),
             timeout=settings.DJANGO_API_TIMEOUT
         )
         response.raise_for_status()
-        return response.json()
+
+        # Валидация ответа через Pydantic
+        response_data = response.json()
+        return SaveTestResponse.model_validate(response_data)
 
 
 def parse_range_value(value) -> Optional[float]:
@@ -113,7 +124,7 @@ async def send_test_results_to_django(
     survey_data: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     """
-    Отправляет результаты AI теста в Django API.
+    Отправляет результаты AI теста в Django API с Pydantic валидацией.
 
     Args:
         telegram_id: ID пользователя в Telegram
@@ -156,38 +167,44 @@ async def send_test_results_to_django(
     activity_value = survey_data.get("activity", "moderate")
     mapped_activity = activity_mapping.get(activity_value, "medium")
 
-    # Преобразуем данные опроса в формат Django
-    answers = {
-        "age": int(age) if age else None,
-        "gender": survey_data.get("gender"),
-        "weight": float(weight_kg) if weight_kg else 0,
-        "height": int(height_cm) if height_cm else 0,
-        "activity_level": mapped_activity,
-        "goal": survey_data.get("goal", "maintenance"),
-        "target_weight": float(target_weight_kg) if target_weight_kg else None,
-        "timezone": survey_data.get("tz"),
-        "training_level": survey_data.get("training_level"),
-        "goals": survey_data.get("body_goals", []),
-        "health_restrictions": survey_data.get("health_limitations", []),
-        "current_body_type": survey_data.get("body_now_id"),
-        "ideal_body_type": survey_data.get("body_ideal_id")
-    }
-
-    payload = {
-        "telegram_id": telegram_id,
-        "first_name": first_name,
-        "last_name": last_name or "",
-        "username": username or "",
-        "answers": answers
-    }
-
     try:
+        # Создаем и валидируем payload через Pydantic
+        payload = SaveTestRequest(
+            telegram_id=telegram_id,
+            first_name=first_name,
+            last_name=last_name or "",
+            username=username or "",
+            answers=TestAnswers(
+                age=int(age) if age else None,
+                gender=survey_data.get("gender"),
+                weight=float(weight_kg) if weight_kg else 0,
+                height=int(height_cm) if height_cm else 0,
+                activity_level=mapped_activity,
+                goal=survey_data.get("goal", "maintenance"),
+                target_weight=float(target_weight_kg) if target_weight_kg else None,
+                timezone=survey_data.get("tz"),
+                training_level=survey_data.get("training_level"),
+                goals=survey_data.get("body_goals", []),
+                health_restrictions=survey_data.get("health_limitations", []),
+                current_body_type=survey_data.get("body_now_id"),
+                ideal_body_type=survey_data.get("body_ideal_id")
+            )
+        )
+
+        # Отправляем валидированный payload
         result = await _make_django_request(url, payload)
         logger.info(
             f"✅ Test results saved to Django: "
-            f"telegram_id={telegram_id}, user_id={result.get('user_id')}"
+            f"telegram_id={telegram_id}, user_id={result.user_id}"
         )
-        return result
+        return result.model_dump()
+
+    except ValidationError as e:
+        logger.error(
+            f"❌ Payload validation error for telegram_id={telegram_id}: {e}",
+            exc_info=True
+        )
+        return None
 
     except RetryError as e:
         original_exception = e.last_attempt.exception()

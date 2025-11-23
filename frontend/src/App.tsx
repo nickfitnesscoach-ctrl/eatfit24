@@ -14,6 +14,7 @@ import FoodLogPage from './pages/FoodLogPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import ProfilePage from './pages/ProfilePage';
 import SubscribersPage from './pages/SubscribersPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   useEffect(() => {
@@ -22,30 +23,32 @@ function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <ClientsProvider>
-        <Router>
-          <Routes>
-            {/* Client Routes - КБЖУ трекер на главной (для всех) */}
-            <Route path="/" element={<ClientLayout />}>
-              <Route index element={<ClientDashboard />} />
-              <Route path="log" element={<FoodLogPage />} />
-              <Route path="subscription" element={<SubscriptionPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-            </Route>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ClientsProvider>
+          <Router>
+            <Routes>
+              {/* Client Routes - КБЖУ трекер на главной (для всех) */}
+              <Route path="/" element={<ClientLayout />}>
+                <Route index element={<ClientDashboard />} />
+                <Route path="log" element={<FoodLogPage />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
 
-            {/* Admin Routes - панель тренера /admin */}
-            <Route path="/admin" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="applications" element={<ApplicationsPage />} />
-              <Route path="clients" element={<ClientsPage />} />
-              <Route path="invite-client" element={<InviteClientPage />} />
-              <Route path="subscribers" element={<SubscribersPage />} />
-            </Route>
-          </Routes>
-        </Router>
-      </ClientsProvider>
-    </AuthProvider>
+              {/* Admin Routes - панель тренера /admin */}
+              <Route path="/admin" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="applications" element={<ApplicationsPage />} />
+                <Route path="clients" element={<ClientsPage />} />
+                <Route path="invite-client" element={<InviteClientPage />} />
+                <Route path="subscribers" element={<SubscribersPage />} />
+              </Route>
+            </Routes>
+          </Router>
+        </ClientsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
