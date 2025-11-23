@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import time
 from functools import wraps
 from typing import Dict, Optional
@@ -22,6 +23,9 @@ except Exception:  # pragma: no cover - DRF may not be installed in some context
 
         def has_permission(self, request, view):  # pragma: no cover - fallback
             return False
+
+
+logger = logging.getLogger(__name__)
 
 
 def _forbidden_response():
@@ -44,34 +48,56 @@ def validate_init_data(
     Returns:
         Parsed initData dict without the ``hash`` key if signature is valid, else ``None``.
     """
+    
+    logger.debug("[validate_init_data] Starting validation")
+    logger.debug("[validate_init_data] raw_init_data length: %d", len(raw_init_data) if raw_init_data else 0)
+    logger.debug("[validate_init_data] bot_token present: %s", bool(bot_token))
 
     if not raw_init_data or not bot_token:
+        logger.warning("[validate_init_data] Missing raw_init_data or bot_token")
         return None
 
     parsed_data = dict(parse_qsl(raw_init_data, keep_blank_values=True))
+    logger.debug("[validate_init_data] Parsed data keys: %s", list(parsed_data.keys()))
 
     received_hash = parsed_data.pop("hash", None)
     if not received_hash:
+        logger.warning("[validate_init_data] No hash in initData")
         return None
+    
+    logger.debug("[validate_init_data] Received hash: %s...", received_hash[:10])
 
     if max_age_seconds:
         try:
             auth_date = int(parsed_data.get("auth_date", "0"))
-            if auth_date and time.time() - auth_date > max_age_seconds:
+            current_time = time.time()
+            age = current_time - auth_date
+            logger.debug("[validate_init_data] auth_date: %d, age: %.2f seconds", auth_date, age)
+            
+            if auth_date and age > max_age_seconds:
+                logger.warning("[validate_init_data] initData expired (age: %.2f seconds, max: %d)", age, max_age_seconds)
                 return None
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as e:
+            logger.error("[validate_init_data] Invalid auth_date: %s", e)
             return None
 
     data_check_string = "\n".join(
         f"{key}={value}" for key, value in sorted(parsed_data.items(), key=lambda item: item[0])
     )
+    logger.debug("[validate_init_data] data_check_string length: %d", len(data_check_string))
 
     secret_key = hashlib.sha256(bot_token.encode()).digest()
     calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    
+    logger.debug("[validate_init_data] Calculated hash: %s...", calculated_hash[:10])
 
     if not hmac.compare_digest(calculated_hash, received_hash):
+        logger.warning("[validate_init_data] Hash mismatch")
+        logger.debug("[validate_init_data] Expected: %s", calculated_hash)
+        logger.debug("[validate_init_data] Received: %s", received_hash)
         return None
 
+    logger.info("[validate_init_data] Validation successful")
     return parsed_data
 
 

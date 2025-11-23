@@ -81,12 +81,11 @@ urlpatterns = [
     path("api/v1/ai/", include("apps.ai.urls")),
     path("api/v1/telegram/", include("apps.telegram.urls")),
     
-    # Trainer panel auth endpoint
+    # Trainer panel (includes auth endpoint)
     path("api/v1/trainer-panel/", include("apps.telegram.trainer_urls")),
-
-    # Trainer panel WebApp auth (Telegram-only)
-    path("api/v1/trainer-panel/auth/", telegram_views.trainer_panel_auth, name="trainer-panel-auth"),
-    path("api/trainer-panel/auth/", telegram_views.trainer_panel_auth),  # legacy alias
+    
+    # Legacy alias for old frontend versions
+    path("api/trainer-panel/auth/", telegram_views.trainer_panel_auth),
 
     # API Schema and Documentation (protected with Basic Auth)
     path("api/schema/", basic_auth_required(SpectacularAPIView.as_view()), name="schema"),

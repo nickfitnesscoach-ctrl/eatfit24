@@ -47,6 +47,11 @@ def trainer_admin_panel(request):
 @permission_classes([AllowAny])
 def trainer_panel_auth(request):
     """Validate Telegram WebApp initData and ensure the user is an admin."""
+    
+    logger.info("[TrainerPanel] ===== AUTH REQUEST START =====")
+    logger.info("[TrainerPanel] Request method: %s", request.method)
+    logger.info("[TrainerPanel] Request path: %s", request.path)
+    logger.info("[TrainerPanel] Request data keys: %s", list(request.data.keys()))
 
     raw_init_data = (
         request.data.get("init_data")
@@ -56,11 +61,17 @@ def trainer_panel_auth(request):
     )
 
     if not raw_init_data:
+        logger.warning("[TrainerPanel] No initData found in request")
         return Response({"detail": "Нет доступа"}, status=status.HTTP_403_FORBIDDEN)
+    
+    logger.info("[TrainerPanel] initData received (length: %d)", len(raw_init_data))
 
     parsed_data = validate_init_data(raw_init_data, settings.TELEGRAM_BOT_TOKEN)
     if not parsed_data:
+        logger.warning("[TrainerPanel] initData validation failed")
         return Response({"detail": "Нет доступа"}, status=status.HTTP_403_FORBIDDEN)
+    
+    logger.info("[TrainerPanel] initData validation successful")
 
     telegram_user_raw = parsed_data.get("user")
     user_id = None
@@ -68,23 +79,33 @@ def trainer_panel_auth(request):
         try:
             telegram_user = json.loads(telegram_user_raw)
             user_id = int(telegram_user["id"])
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            logger.info("[TrainerPanel] Extracted user_id: %s", user_id)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
+            logger.error("[TrainerPanel] Failed to extract user_id: %s", e)
             user_id = None
 
     admins_str = os.getenv("TELEGRAM_ADMINS", "")
     bot_admin_id = os.getenv("BOT_ADMIN_ID")
+    
+    logger.info("[TrainerPanel] TELEGRAM_ADMINS env: %s", admins_str)
+    logger.info("[TrainerPanel] BOT_ADMIN_ID env: %s", bot_admin_id)
 
     admins = set()
     if admins_str:
         for value in admins_str.split(","):
             if value.strip():
-                admins.add(int(value.strip()))
+                try:
+                    admins.add(int(value.strip()))
+                except ValueError as e:
+                    logger.error("[TrainerPanel] Invalid admin ID: %s (%s)", value, e)
 
     if bot_admin_id:
-        admins.add(int(bot_admin_id))
+        try:
+            admins.add(int(bot_admin_id))
+        except ValueError as e:
+            logger.error("[TrainerPanel] Invalid BOT_ADMIN_ID: %s (%s)", bot_admin_id, e)
 
-    logger.info("[TrainerPanel] Telegram user_id=%s", user_id)
-    logger.info("[TrainerPanel] Admins from env=%s", admins)
+    logger.info("[TrainerPanel] Parsed admin IDs: %s", admins)
 
     if not admins:
         logger.warning("[TrainerPanel] Admin list is empty; allowing access to everyone temporarily")
@@ -93,13 +114,15 @@ def trainer_panel_auth(request):
                 "ok": True,
                 "user_id": user_id,
                 "role": "admin",
+                "warning": "admin_list_empty",
             }
         )
 
     if user_id is None or user_id not in admins:
-        logger.warning("[TrainerPanel] Access denied for user_id=%s", user_id)
+        logger.warning("[TrainerPanel] Access denied for user_id=%s (admins: %s)", user_id, admins)
         return Response({"detail": "Нет доступа"}, status=status.HTTP_403_FORBIDDEN)
 
+    logger.info("[TrainerPanel] Access granted for user_id=%s", user_id)
     return Response(
         {
             "ok": True,

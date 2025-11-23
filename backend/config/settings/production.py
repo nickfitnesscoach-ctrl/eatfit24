@@ -84,5 +84,10 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "apps.telegram": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",  # Detailed logging for Telegram auth debugging
+            "propagate": False,
+        },
     },
 }
