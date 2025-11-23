@@ -34,6 +34,8 @@ services:
       dockerfile: Dockerfile
     container_name: fm-backend
     # entrypoint.sh handles: DB wait, migrations, collectstatic, gunicorn start
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/staticfiles:/app/staticfiles
       - ./backend/media:/app/media
