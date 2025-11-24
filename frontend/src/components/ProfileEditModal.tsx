@@ -49,7 +49,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                 gender: formData.gender,
                 birth_date: formData.birth_date,
                 activity_level: formData.activity_level,
-                goal_type: formData.goal_type_type,
+                goal_type: formData.goal_type,
             };
 
             // Add numeric fields only if they have valid values
@@ -182,10 +182,10 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all appearance-none"
                         >
                             <option value="sedentary">Сидячий образ жизни</option>
-                            <option value="light">Легкая активность (1-3 раза/нед)</option>
-                            <option value="moderate">Средняя активность (3-5 раз/нед)</option>
-                            <option value="active">Высокая активность (6-7 раз/нед)</option>
-                            <option value="very_active">Экстремальная активность</option>
+                            <option value="lightly_active">Легкая активность (1-3 раза/нед)</option>
+                            <option value="moderately_active">Средняя активность (3-5 раз/нед)</option>
+                            <option value="very_active">Высокая активность (6-7 раз/нед)</option>
+                            <option value="extra_active">Экстремальная активность</option>
                         </select>
                     </div>
 
@@ -199,7 +199,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                             {[
                                 { value: 'weight_loss', label: 'Похудение', color: 'text-green-600 bg-green-50 border-green-200' },
                                 { value: 'maintenance', label: 'Поддержание формы', color: 'text-blue-600 bg-blue-50 border-blue-200' },
-                                { value: 'muscle_gain', label: 'Набор массы', color: 'text-orange-600 bg-orange-50 border-orange-200' }
+                                { value: 'weight_gain', label: 'Набор массы', color: 'text-orange-600 bg-orange-50 border-orange-200' }
                             ].map((option) => (
                                 <button
                                     key={option.value}

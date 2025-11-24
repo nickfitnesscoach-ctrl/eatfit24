@@ -45,7 +45,8 @@
       "Bash(ssh root@85.198.81.133 \"docker exec fm-db psql -U foodmind -l\")",
       "Bash(ssh root@85.198.81.133 \"docker exec fm-db psql -U foodmind -d foodmind -c \"\"\\dt\"\" | head -50\")",
       "Bash(ssh root@85.198.81.133 \"docker exec fm-db psql -U foodmind -d foodmind -c \"\"\nSELECT \n    schemaname, \n    tablename, \n    n_live_tup as row_count\nFROM pg_stat_user_tables\nORDER BY n_live_tup DESC;\n\"\"\")",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []
