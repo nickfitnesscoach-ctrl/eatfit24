@@ -16,7 +16,7 @@ from .validators import validate_email_domain, validate_email_not_exists
 class ProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for Profile model.
-    Включает все поля для онбординга и is_complete для проверки заполненности.
+    Uses backend format for all fields - frontend should adapt.
     """
     age = serializers.ReadOnlyField()
     bmi = serializers.ReadOnlyField()
@@ -66,7 +66,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'profile']
-        read_only_fields = ['id', 'email']  # email нельзя менять, username можно
+        read_only_fields = ['id', 'email']
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -97,7 +97,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         """
         Validate email domain and check for disposable emails.
         """
-        # Validate domain and disposable email check
         validated_email = validate_email_domain(value)
         return validated_email
 
@@ -114,7 +113,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Create new user with hashed password.
-        Email is NOT verified initially - verification email will be sent.
         """
         validated_data.pop('password_confirm')
         user = User.objects.create_user(
@@ -122,20 +120,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             password=validated_data['password']
         )
-        # Profile is created automatically via signal
-        # email_verified defaults to False
         return user
 
 
 class UserLoginSerializer(serializers.Serializer):
     """
     Serializer for user login with progressive rate limiting.
-
-    SECURITY FEATURES:
-    - Validates credentials
-    - Tracks failed login attempts
-    - Returns user-friendly error messages
-    - No timing attack vulnerabilities (same error for user not found vs wrong password)
     """
     email = serializers.EmailField(required=True)
     password = serializers.CharField(
@@ -147,32 +137,20 @@ class UserLoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         """
         Validate credentials and authenticate user.
-
-        Raises:
-            ValidationError: If credentials are invalid or account is locked
         """
         email = attrs.get('email')
         password = attrs.get('password')
 
-        # Check for account lockout (via throttling)
-        # Note: Actual throttling is done in LoginThrottle, but we provide
-        # user-friendly error messages here
-
-        # Find user by email
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            # SECURITY: Same error message as wrong password to prevent user enumeration
             raise serializers.ValidationError({
                 "detail": "Неверный email или пароль."
             })
 
-        # Authenticate with username and password
         authenticated_user = authenticate(username=user.username, password=password)
 
         if authenticated_user is None:
-            # Record failed attempt for progressive rate limiting
-            # IP address will be tracked in the view
             raise serializers.ValidationError({
                 "detail": "Неверный email или пароль."
             })

@@ -20,12 +20,12 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
     useEffect(() => {
         if (isOpen && profile) {
             setFormData({
-                gender: profile.gender || 'male',
+                gender: profile.gender || 'M',
                 birth_date: profile.birth_date || '',
                 height: profile.height || undefined,
                 weight: profile.weight || undefined,
                 activity_level: profile.activity_level || 'sedentary',
-                goal: profile.goal || 'maintenance',
+                goal_type: profile.goal_type || 'maintenance',
                 timezone: profile.timezone || undefined,
             });
             setError(null);
@@ -49,7 +49,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                 gender: formData.gender,
                 birth_date: formData.birth_date,
                 activity_level: formData.activity_level,
-                goal: formData.goal,
+                goal_type: formData.goal_type_type,
             };
 
             // Add numeric fields only if they have valid values
@@ -103,8 +103,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
-                                onClick={() => handleChange('gender', 'male')}
-                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'male'
+                                onClick={() => handleChange('gender', 'M')}
+                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'M'
                                         ? 'border-blue-500 bg-blue-50 text-blue-700'
                                         : 'border-gray-200 hover:border-blue-200 text-gray-600'
                                     }`}
@@ -113,8 +113,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                             </button>
                             <button
                                 type="button"
-                                onClick={() => handleChange('gender', 'female')}
-                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'female'
+                                onClick={() => handleChange('gender', 'F')}
+                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'F'
                                         ? 'border-pink-500 bg-pink-50 text-pink-700'
                                         : 'border-gray-200 hover:border-pink-200 text-gray-600'
                                     }`}
@@ -204,8 +204,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
                                 <button
                                     key={option.value}
                                     type="button"
-                                    onClick={() => handleChange('goal', option.value)}
-                                    className={`p-3 rounded-xl border-2 text-left transition-all ${formData.goal === option.value
+                                    onClick={() => handleChange('goal_type', option.value)}
+                                    className={`p-3 rounded-xl border-2 text-left transition-all ${formData.goal_type === option.value
                                             ? `${option.color} border-current`
                                             : 'border-gray-100 hover:bg-gray-50 text-gray-600'
                                         }`}
