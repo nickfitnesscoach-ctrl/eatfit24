@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Target, TrendingUp, Settings, LogOut, Edit2, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import ProfileEditModal, { Profile } from '../components/ProfileEditModal';
 
 interface UserGoals {
     calories: number;
@@ -23,6 +24,7 @@ const ProfilePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [profile, setProfile] = useState<Profile | null>(null);
 
     // Generate week days array
     const getWeekDays = () => {
@@ -46,7 +48,17 @@ const ProfilePage: React.FC = () => {
     useEffect(() => {
         loadGoals();
         loadWeeklyStats();
+        loadProfile();
     }, []);
+
+    const loadProfile = async () => {
+        try {
+            const data = await api.getProfile();
+            setProfile(data);
+        } catch (error) {
+            console.error('Failed to load profile:', error);
+        }
+    };
 
     const loadGoals = async () => {
         try {
@@ -176,6 +188,12 @@ const ProfilePage: React.FC = () => {
         } catch (error) {
             console.error('Failed to load weekly stats:', error);
         }
+    };
+
+    const handleProfileUpdate = (updatedProfile: Profile) => {
+        setProfile(updatedProfile);
+        // Optionally reload goals if they depend on profile (e.g. weight change affects BMR)
+        loadGoals();
     };
 
     const handleLogout = () => {
@@ -461,6 +479,13 @@ const ProfilePage: React.FC = () => {
                     <span>Выйти из аккаунта</span>
                 </button>
             </div>
+
+            <ProfileEditModal
+                isOpen={isEditing}
+                onClose={() => setIsEditing(false)}
+                profile={profile}
+                onProfileUpdated={handleProfileUpdate}
+            />
         </div>
     );
 };

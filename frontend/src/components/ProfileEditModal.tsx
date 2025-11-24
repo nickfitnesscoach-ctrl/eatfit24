@@ -1,0 +1,233 @@
+import React, { useState, useEffect } from 'react';
+import { X, Save, Activity, Calendar, Ruler, Weight, Target, User } from 'lucide-react';
+import { api } from '../services/api';
+
+export interface Profile {
+    gender?: 'male' | 'female';
+    birth_date?: string;
+    height?: number;
+    weight?: number;
+    activity_level?: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+    goal?: 'weight_loss' | 'maintenance' | 'muscle_gain';
+    [key: string]: any;
+}
+
+interface ProfileEditModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    profile: Profile | null;
+    onProfileUpdated: (updatedProfile: Profile) => void;
+}
+
+const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, profile, onProfileUpdated }) => {
+    const [formData, setFormData] = useState<Profile>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (profile) {
+            setFormData({
+                gender: profile.gender || 'male',
+                birth_date: profile.birth_date || '',
+                height: profile.height || 0,
+                weight: profile.weight || 0,
+                activity_level: profile.activity_level || 'sedentary',
+                goal: profile.goal || 'maintenance',
+            });
+        }
+    }, [profile, isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleChange = (field: keyof Profile, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        try {
+            const payload = {
+                ...formData,
+                height: Number(formData.height),
+                weight: Number(formData.weight),
+            };
+
+            const updated = await api.updateProfile(payload);
+            onProfileUpdated(updated);
+            onClose();
+        } catch (err: any) {
+            console.error('Failed to update profile:', err);
+            setError(err.message || 'Ошибка при сохранении профиля');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-gray-900">Редактировать профиль</h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                    {error && (
+                        <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Gender */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <User size={18} className="text-blue-500" />
+                            Пол
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => handleChange('gender', 'male')}
+                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'male'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                        : 'border-gray-200 hover:border-blue-200 text-gray-600'
+                                    }`}
+                            >
+                                Мужской
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleChange('gender', 'female')}
+                                className={`p-3 rounded-xl border-2 transition-all font-medium ${formData.gender === 'female'
+                                        ? 'border-pink-500 bg-pink-50 text-pink-700'
+                                        : 'border-gray-200 hover:border-pink-200 text-gray-600'
+                                    }`}
+                            >
+                                Женский
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Date of Birth */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Calendar size={18} className="text-purple-500" />
+                            Дата рождения
+                        </label>
+                        <input
+                            type="date"
+                            value={formData.birth_date}
+                            onChange={(e) => handleChange('birth_date', e.target.value)}
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Height */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Ruler size={18} className="text-indigo-500" />
+                                Рост (см)
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.height}
+                                onChange={(e) => handleChange('height', e.target.value)}
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                placeholder="175"
+                            />
+                        </div>
+
+                        {/* Weight */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Weight size={18} className="text-orange-500" />
+                                Вес (кг)
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.weight}
+                                onChange={(e) => handleChange('weight', e.target.value)}
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                                placeholder="70"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Activity Level */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Activity size={18} className="text-green-500" />
+                            Уровень активности
+                        </label>
+                        <select
+                            value={formData.activity_level}
+                            onChange={(e) => handleChange('activity_level', e.target.value)}
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all appearance-none"
+                        >
+                            <option value="sedentary">Сидячий образ жизни</option>
+                            <option value="light">Легкая активность (1-3 раза/нед)</option>
+                            <option value="moderate">Средняя активность (3-5 раз/нед)</option>
+                            <option value="active">Высокая активность (6-7 раз/нед)</option>
+                            <option value="very_active">Экстремальная активность</option>
+                        </select>
+                    </div>
+
+                    {/* Goal */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Target size={18} className="text-red-500" />
+                            Цель
+                        </label>
+                        <div className="grid grid-cols-1 gap-2">
+                            {[
+                                { value: 'weight_loss', label: 'Похудение', color: 'text-green-600 bg-green-50 border-green-200' },
+                                { value: 'maintenance', label: 'Поддержание формы', color: 'text-blue-600 bg-blue-50 border-blue-200' },
+                                { value: 'muscle_gain', label: 'Набор массы', color: 'text-orange-600 bg-orange-50 border-orange-200' }
+                            ].map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => handleChange('goal', option.value)}
+                                    className={`p-3 rounded-xl border-2 text-left transition-all ${formData.goal === option.value
+                                            ? `${option.color} border-current`
+                                            : 'border-gray-100 hover:bg-gray-50 text-gray-600'
+                                        }`}
+                                >
+                                    <span className="font-medium">{option.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-4">
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <Save size={20} />
+                                    Сохранить изменения
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default ProfileEditModal;
