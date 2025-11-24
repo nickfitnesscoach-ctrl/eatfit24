@@ -357,22 +357,27 @@ class DailyGoalView(generics.RetrieveUpdateAPIView):
         }
     )
     def put(self, request, *args, **kwargs):
-        logger.debug("DailyGoalView.put called by user=%s, data=%s", request.user, request.data)
+        logger.info("[DailyGoal] PUT called by user=%s (authenticated=%s)", request.user, request.user.is_authenticated)
+        logger.info("[DailyGoal] Request data=%s", request.data)
+        logger.info("[DailyGoal] Request headers: X-Telegram-Init-Data=%s", request.META.get('HTTP_X_TELEGRAM_INIT_DATA', 'NOT SET'))
+
         obj = self.get_object()
         if obj is None:
+            logger.info("[DailyGoal] No existing goal found, creating new one")
             # Create new goal if none exists
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             try:
                 serializer.save()
-                logger.info("Created new DailyGoal for user=%s", request.user)
+                logger.info("[DailyGoal] Created new DailyGoal for user=%s", request.user)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as exc:
-                logger.exception("Failed to create DailyGoal for user=%s: %s", request.user, exc)
+                logger.exception("[DailyGoal] Failed to create DailyGoal for user=%s: %s", request.user, exc)
                 return Response(
                     {"error": "Не удалось создать дневную цель", "detail": str(exc)},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
+        logger.info("[DailyGoal] Updating existing goal id=%s", obj.id)
         return super().put(request, *args, **kwargs)
 
     @extend_schema(

@@ -162,12 +162,14 @@ export function buildTelegramHeaders(): HeadersInit {
     if (!_telegramAuthData) {
         // В DEV режиме пробуем синхронно инициализировать
         if (isDevMode && skipTelegramAuth) {
+            console.warn('[Telegram] Auth data not initialized, using DEV mode');
             _telegramAuthData = {
                 initData: DEV_INIT_DATA,
                 user: DEV_USER,
             };
         } else {
             console.error('[Telegram] Headers requested but not initialized!');
+            console.error('[Telegram] Stack trace:', new Error().stack);
             // Возвращаем пустые headers вместо throw - для graceful degradation
             return {
                 'Content-Type': 'application/json',
@@ -176,6 +178,8 @@ export function buildTelegramHeaders(): HeadersInit {
     }
 
     const { initData, user } = _telegramAuthData;
+
+    console.log('[Telegram] Building headers with user ID:', user.id);
 
     return {
         'Content-Type': 'application/json',
