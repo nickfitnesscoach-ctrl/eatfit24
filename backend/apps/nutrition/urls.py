@@ -9,10 +9,10 @@ Public endpoints:
 - GET/PUT/PATCH/DELETE /api/v1/meals/{meal_id}/items/{id}/ - food item CRUD (nested)
 
 Goals endpoints (internal):
-- GET /api/v1/nutrition/goals/ - get current goal
-- POST /api/v1/nutrition/goals/calculate/ - calculate goal
-- POST /api/v1/nutrition/goals/set-auto/ - set auto goal
-- PUT/PATCH /api/v1/nutrition/goals/ - update goal manually
+- GET /api/v1/goals/ - get current goal
+- POST /api/v1/goals/calculate/ - calculate goal
+- POST /api/v1/goals/set-auto/ - set auto goal
+- PUT/PATCH /api/v1/goals/ - update goal manually
 """
 
 from django.urls import path

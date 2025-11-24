@@ -33,9 +33,9 @@ const URLS = {
     subscribers: `${API_BASE}/telegram/subscribers/`,
     // Nutrition endpoints
     meals: `${API_BASE}/meals/`,
-    goals: `${API_BASE}/nutrition/goals/`,
-    calculateGoals: `${API_BASE}/nutrition/goals/calculate/`,
-    setAutoGoals: `${API_BASE}/nutrition/goals/set-auto/`,
+    goals: `${API_BASE}/goals/`,
+    calculateGoals: `${API_BASE}/goals/calculate/`,
+    setAutoGoals: `${API_BASE}/goals/set-auto/`,
     // User endpoints
     profile: `${API_BASE}/users/profile/`,
     // Billing endpoints
@@ -421,35 +421,64 @@ export const api = {
     },
 
     async updateGoals(data: any) {
-        log('Updating goals: ' + JSON.stringify(data));
+        const requestData = {
+            calories: data.calories,
+            protein: data.protein,
+            fat: data.fat,
+            carbohydrates: data.carbohydrates,
+            source: 'MANUAL',
+            is_active: true,
+        };
+
+        log('[Goals] Updating goals with data: ' + JSON.stringify(requestData));
+        log('[Goals] Target URL: ' + URLS.goals);
+
+        const headers = getHeaders();
+        log('[Goals] Headers: ' + JSON.stringify({
+            ...headers,
+            'X-Telegram-Init-Data': (headers as any)['X-Telegram-Init-Data'] ? '[SET]' : '[NOT SET]'
+        }));
 
         try {
             const response = await fetchWithRetry(URLS.goals, {
                 method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify({
-                    calories: data.calories,
-                    protein: data.protein,
-                    fat: data.fat,
-                    carbohydrates: data.carbohydrates,
-                    source: 'MANUAL',
-                    is_active: true,
-                }),
+                headers: headers,
+                body: JSON.stringify(requestData),
             });
 
-            log('Response status: ' + response.status);
+            log('[Goals] Response status: ' + response.status);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                log('Update goals error: ' + JSON.stringify(errorData));
-                throw new Error(errorData.error || errorData.detail || 'Failed to update goals');
+                const errorText = await response.text();
+                let errorData: any = {};
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { raw: errorText };
+                }
+
+                log('[Goals] Update error: ' + JSON.stringify(errorData));
+
+                // Provide detailed error messages
+                if (response.status === 401) {
+                    throw new Error('401: Не авторизован. Откройте приложение через Telegram бота заново.');
+                } else if (response.status === 403) {
+                    throw new Error('403: Доступ запрещён. Проверьте права доступа.');
+                } else if (response.status === 400) {
+                    const detailMsg = errorData.detail || errorData.error || JSON.stringify(errorData);
+                    throw new Error('400: Некорректные данные - ' + detailMsg);
+                } else if (response.status === 500) {
+                    throw new Error('500: Ошибка сервера. ' + (errorData.detail || errorData.error || ''));
+                } else {
+                    throw new Error(`${response.status}: ${errorData.error || errorData.detail || 'Failed to update goals'}`);
+                }
             }
 
             const result = await response.json();
-            log('Goals updated successfully');
+            log('[Goals] Updated successfully: ' + JSON.stringify(result));
             return result;
         } catch (error) {
-            console.error('Error updating goals:', error);
+            console.error('[Goals] Error updating goals:', error);
             throw error;
         }
     },

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, TelegramProfile } from '../services/api';
+import { api } from '../services/api';
+import { TelegramProfile } from '../services/mockData';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useProfile = () => {

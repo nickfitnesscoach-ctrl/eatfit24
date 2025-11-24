@@ -173,9 +173,8 @@ const FoodLogPage: React.FC = () => {
             // Success - show message and redirect
             const tg = window.Telegram?.WebApp;
             if (tg?.showAlert) {
-                tg.showAlert('Приём пищи сохранён!', () => {
-                    navigate('/client');
-                });
+                tg.showAlert('Приём пищи сохранён!');
+                navigate('/client');
             } else {
                 alert('Приём пищи сохранён!');
                 navigate('/client');
