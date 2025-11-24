@@ -365,57 +365,88 @@ Endpoint `/api/v1/telegram/save-test/`:
 
 ---
 
-### Этап 2: Дизайн и реализация унифицированного endpoint `/api/v1/webapp/auth/`
+### Этап 2: Дизайн и реализация унифицированного endpoint `/api/v1/webapp/auth/` ✅ (DONE)
+
+**Статус**: ✅ **ЗАВЕРШЁН** (24.11.2025)
 
 **Цель**: Создать единый endpoint для авторизации WebApp, который возвращает полную информацию о пользователе и состоянии профиля.
 
 **Затрагиваемые файлы**:
-- `backend/apps/telegram/views.py` (новый view `webapp_auth`)
-- `backend/apps/telegram/urls.py` (добавить route)
-- `backend/apps/telegram/serializers.py` (новые serializers)
-- `frontend/src/services/api.ts` (обновить метод `authenticate`)
+- ✅ `backend/apps/telegram/views.py` (новый view `webapp_auth`)
+- ✅ `backend/apps/telegram/urls.py` (добавлен route)
+- ✅ `backend/apps/telegram/serializers.py` (новые serializers)
+- ⏳ `frontend/src/services/api.ts` (требуется обновить метод `authenticate`)
 
-**Задачи**:
-1. Создать serializer для ответа:
+**Реализованные задачи**:
+1. ✅ Создан serializer для ответа:
    ```python
    class WebAppAuthResponseSerializer(serializers.Serializer):
-       user = TelegramUserSerializer()
+       user = WebAppAuthUserSerializer()
        profile = ProfileSerializer()
        goals = DailyGoalSerializer(allow_null=True)
        is_admin = serializers.BooleanField()
    ```
 
-2. Создать view `webapp_auth`:
-   - Валидировать `initData` через `TelegramWebAppAuthentication`
-   - Получить или создать пользователя
-   - Проверить полноту профиля (`is_complete`)
-   - Вернуть профиль + цели + флаг is_admin
+2. ✅ Создан view `webapp_auth`:
+   - Валидирует `initData` через `TelegramWebAppAuthentication`
+   - Получает или создаёт пользователя + `TelegramUser` + `Profile`
+   - Определяет статус администратора из `TELEGRAM_ADMINS`
+   - Возвращает профиль + цели + флаг `is_admin`
 
-3. Добавить свойство `is_complete` в модель `Profile`:
+3. ✅ Добавлено свойство `is_complete` в модель `Profile`:
    ```python
    @property
-   def is_complete(self):
+   def is_complete(self) -> bool:
        return all([
-           self.gender,
-           self.birth_date,
-           self.height,
-           self.weight,
-           self.goal_type
+           bool(self.gender),
+           bool(self.birth_date),
+           bool(self.height),
+           bool(self.weight),
+           bool(self.goal_type),
        ])
    ```
 
-4. Обновить `frontend/src/services/api.ts`:
-   - Метод `authenticate()` должен вызывать `/api/v1/webapp/auth/`
-   - Сохранять `user`, `profile`, `goals` в контекст
+4. ✅ Обновлён `ProfileSerializer`:
+   - Добавлены поля: `target_weight`, `timezone`, `is_complete`
+   - Все read-only поля корректно настроены
 
-**Риски**:
-- Breaking change для существующего кода, если WebApp уже использует `/api/v1/telegram/auth/`
-- Решение: сохранить старый endpoint для совместимости, но новый код использует `/api/v1/webapp/auth/`
+**Тестирование**:
+- ✅ Без `initData`: возвращает HTTP 401 Unauthorized
+- ✅ С валидным `initData` (обычный пользователь):
+  ```json
+  {
+    "user": {"id": 62, "telegram_id": 999889599, ...},
+    "profile": {"is_complete": false, ...},
+    "goals": null,
+    "is_admin": false
+  }
+  ```
+- ✅ С валидным `initData` (админ): `is_admin: true`
+- ✅ Профиль и `TelegramUser` создаются в БД
+- ✅ Логи чистые, ошибок нет
+
+**Endpoint URL**: `POST /api/v1/telegram/webapp/auth/`
+
+**Примеры использования**:
+```bash
+# С заголовком
+curl -X POST https://api.foodmind.ru/api/v1/telegram/webapp/auth/ \
+  -H "X-Telegram-Init-Data: <initData>"
+
+# Или в теле запроса
+curl -X POST https://api.foodmind.ru/api/v1/telegram/webapp/auth/ \
+  -H "Content-Type: application/json" \
+  -d '{"init_data": "<initData>"}'
+```
+
+**Следующие шаги**:
+- ⏳ Обновить frontend для использования нового endpoint
+- ⏳ Переходить к **Этапу 3**: реализация `PATCH /api/v1/profile/`
 
 **Критерии готовности**:
-- ✅ Endpoint `/api/v1/webapp/auth/` работает
+- ✅ Endpoint `/api/v1/telegram/webapp/auth/` работает
 - ✅ Возвращает корректный JSON с `is_complete`
-- ✅ WebApp успешно авторизуется и получает профиль
+- ⏳ WebApp успешно авторизуется и получает профиль (требуется обновление frontend)
 
 ---
 
