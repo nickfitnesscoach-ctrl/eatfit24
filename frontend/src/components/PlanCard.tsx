@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export type PlanId = "free" | "pro_monthly" | "pro_yearly";
 
@@ -81,7 +81,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isCurrent, isLoading, onSelec
                 `}
             >
                 {isLoading ? (
-                    <Loader2 className="animate-spin" size={20} />
+                    <span className="animate-pulse">Загрузка...</span>
                 ) : isCurrent ? (
                     "Текущий план"
                 ) : (
