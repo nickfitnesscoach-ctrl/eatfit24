@@ -29,13 +29,6 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isCurrent, isLoading, onSelec
         ? "bg-white text-gray-900 border border-gray-200"
         : "bg-gradient-to-b from-gray-900 to-gray-800 text-white border border-gray-700";
 
-    const buttonClasses = isFree
-        ? "bg-gray-100 text-gray-400 cursor-not-allowed" // Disabled style for current free plan
-        : "bg-white text-black hover:bg-gray-100 active:scale-95";
-
-    const activeProButtonClasses = "bg-white text-black hover:bg-gray-100 active:scale-95";
-    const disabledButtonClasses = "bg-gray-700 text-gray-400 cursor-not-allowed";
-
     return (
         <div className={`relative rounded-3xl p-6 shadow-lg overflow-hidden flex flex-col h-full ${cardClasses}`}>
             {/* Badge */}

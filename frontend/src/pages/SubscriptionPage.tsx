@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PlanCard, { Plan, PlanId } from '../components/PlanCard';
-import { api } from '../services/api';
+// import { api } from '../services/api';
 
 const PLANS: Plan[] = [
     {
