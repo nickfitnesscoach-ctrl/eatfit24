@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PlanCard, { Plan, PlanId } from '../components/PlanCard';
-// import { api } from '../services/api';
+import { api } from '../services/api';
 
 const PLANS: Plan[] = [
     {
@@ -69,19 +69,30 @@ const SubscriptionPage: React.FC = () => {
             return;
         }
 
+        // Check if running in Telegram Mini App
+        const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
+
         try {
             setLoadingPlanId(planId);
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // TODO: Call backend to create checkout session
-            // const { checkoutUrl } = await api.createCheckout(planId);
-            // window.location.href = checkoutUrl;
+            // Map PlanId to BillingPlanCode
+            const planCode = planId === 'pro_monthly' ? 'MONTHLY' : 'YEARLY';
 
-            showToast("Откроется оформление подписки для плана " + planId);
+            // Call backend to create payment
+            const { confirmation_url } = await api.createPayment({ plan_code: planCode });
+
+            // Open payment URL
+            if (isTMA && window.Telegram) {
+                // Telegram Mini App: use WebApp API
+                window.Telegram.WebApp.openLink(confirmation_url);
+            } else {
+                // Regular browser: redirect
+                window.location.href = confirmation_url;
+            }
         } catch (error) {
             console.error("Subscription error:", error);
-            showToast("Ошибка при оформлении подписки");
+            const errorMessage = error instanceof Error ? error.message : "Ошибка при оформлении подписки";
+            showToast(errorMessage);
         } finally {
             setLoadingPlanId(null);
         }
