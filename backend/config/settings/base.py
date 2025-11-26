@@ -473,7 +473,9 @@ CORS_PREFLIGHT_MAX_AGE = 3600
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "http://localhost:8000")
 OPENROUTER_SITE_NAME = os.environ.get("OPENROUTER_SITE_NAME", "FoodMind AI")
-OPENROUTER_MODEL = "openai/gpt-5-image-mini"  # GPT-5 Image Mini with $10 credits
+# Changed from openai/gpt-5-image-mini due to geographic restrictions (403 error in Russia)
+# Google Gemini 2.0 Flash works globally without restrictions
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # AI Recognition Settings
