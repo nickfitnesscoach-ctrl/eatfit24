@@ -16,29 +16,20 @@ export interface MifflinTargets {
  * Activity level multipliers for TDEE calculation
  */
 const ACTIVITY_MULTIPLIERS: Record<string, number> = {
-    sedentary: 1.2,          // Минимальная активность
-    lightly_active: 1.375,   // Легкая активность
-    moderately_active: 1.55, // Умеренная активность
-    very_active: 1.725,      // Высокая активность
-    extra_active: 1.9,       // Очень высокая активность
+    sedentary: 1.2,          // low
+    lightly_active: 1.375,   // moderate
+    moderately_active: 1.55, // high
+    very_active: 1.725,      // very_high
+    extra_active: 1.725,     // same as very_active
 };
 
 /**
  * Goal type caloric adjustments
  */
-const GOAL_MULTIPLIERS: Record<string, number> = {
-    weight_loss: 0.8,    // 20% дефицит
-    maintenance: 1.0,    // Поддержание веса
-    weight_gain: 1.15,   // 15% профицит
-};
-
-/**
- * Macronutrient distribution (percentage of total calories)
- */
-const MACRO_DISTRIBUTION = {
-    protein: 0.30,  // 30% калорий из белка
-    fat: 0.25,      // 25% калорий из жиров
-    carbs: 0.45,    // 45% калорий из углеводов
+const GOAL_ADJUSTMENTS: Record<string, number> = {
+    weight_loss: -0.15,   // -15%
+    maintenance: 0.0,     // 0%
+    weight_gain: +0.15,   // +15%
 };
 
 /**
@@ -51,12 +42,17 @@ const CALORIES_PER_GRAM = {
 };
 
 /**
- * Minimum daily caloric intake by gender
+ * Minimum daily caloric intake by gender (calorie floor)
  */
-const MIN_CALORIES = {
-    M: 1400, // Мужчины
-    F: 1200, // Женщины
+const CAL_FLOOR = {
+    M: 1600, // Мужчины
+    F: 1300, // Женщины
 };
+
+/**
+ * Minimum fat intake for females (grams)
+ */
+const MIN_FAT_FEMALE = 40;
 
 /**
  * Calculate age from birth date
@@ -104,6 +100,37 @@ function roundToNearest5(value: number): number {
 }
 
 /**
+ * Calculate BMI (Body Mass Index)
+ */
+function calculateBMI(weightKg: number, heightCm: number): number {
+    const heightM = heightCm / 100.0;
+    return weightKg / (heightM * heightM);
+}
+
+/**
+ * Calculate Ideal Body Weight (IBW) at BMI 25
+ */
+function calculateIBW(heightCm: number): number {
+    const heightM = heightCm / 100.0;
+    return 25.0 * (heightM * heightM);
+}
+
+/**
+ * Calculate Adjusted Body Weight (ABW) for obesity
+ * ABW = IBW + 0.4 * (TBW - IBW)
+ */
+function calculateABW(weightKg: number, ibw: number): number {
+    return ibw + 0.4 * (weightKg - ibw);
+}
+
+/**
+ * Clamp value between min and max
+ */
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+/**
  * Check if profile has all required fields for calculation
  */
 export function hasRequiredProfileData(profile: Profile | null): boolean {
@@ -139,6 +166,7 @@ export function getMissingProfileFields(profile: Profile | null): string[] {
 
 /**
  * Calculate daily caloric and macronutrient targets using Mifflin-St Jeor formula
+ * with goal-specific protein/fat/carb distribution and minimums
  *
  * @param profile - User profile with gender, birth_date, height, weight, activity_level
  * @returns Calculated targets for calories, protein, fat, and carbohydrates
@@ -168,34 +196,106 @@ export function calculateMifflinTargets(profile: Profile): MifflinTargets {
     const tdee = bmr * activityMultiplier;
 
     // Apply goal adjustment
-    const goalMultiplier = goal_type ? GOAL_MULTIPLIERS[goal_type] : 1.0;
-    let targetCalories = tdee * goalMultiplier;
+    const goalAdjustment = goal_type ? GOAL_ADJUSTMENTS[goal_type] : 0.0;
+    let targetCalories = tdee * (1 + goalAdjustment);
 
-    // Apply minimum caloric threshold
-    const minCalories = MIN_CALORIES[gender!];
-    if (targetCalories < minCalories) {
-        targetCalories = minCalories;
+    // Calculate obesity indicators for weight loss
+    const bmi = calculateBMI(weight!, height!);
+    const ibw = calculateIBW(height!);
+    const useABW = bmi >= 30.0 || weight! > ibw * 1.2;
+    const baseWeightLoss = useABW ? calculateABW(weight!, ibw) : weight!;
+
+    let proteins: number;
+    let fats: number;
+    let carbs: number;
+
+    // Goal-specific macronutrient calculations
+    if (goal_type === 'weight_gain') {
+        // НАБОР МАССЫ
+        // Белок: 2 г/кг от текущего веса
+        proteins = Math.round(weight! * 2.0);
+
+        // Жиры: таргет 1 г/кг, кламп 0.9-1.1 г/кг и 20-35% ккал
+        const fatsTarget = weight! * 1.0;
+        const fatsLoGkg = weight! * 0.9;
+        const fatsHiGkg = weight! * 1.1;
+        const fatsLoPct = (targetCalories * 0.20) / 9.0;
+        const fatsHiPct = (targetCalories * 0.35) / 9.0;
+        fats = Math.round(clamp(fatsTarget, Math.max(fatsLoGkg, fatsLoPct), Math.min(fatsHiGkg, fatsHiPct)));
+
+        // Минимум жиров для женщин
+        if (gender === 'F' && fats < MIN_FAT_FEMALE) {
+            fats = MIN_FAT_FEMALE;
+        }
+
+        // Углеводы: остаток, но >= 4 г/кг
+        carbs = Math.round((targetCalories - proteins * 4 - fats * 9) / 4);
+        const carbsMin = Math.round(weight! * 4.0);
+        if (carbs < carbsMin) {
+            carbs = carbsMin;
+            // Пересчитываем калории, если углеводов не хватало
+            targetCalories = proteins * 4 + fats * 9 + carbs * 4;
+        }
+
+    } else if (goal_type === 'weight_loss') {
+        // ПОХУДЕНИЕ
+        // Белок: женщины 1.5 г/кг, мужчины 2.0 г/кг (от ABW/TBW)
+        const proteinPerKg = gender === 'F' ? 1.5 : 2.0;
+        proteins = Math.round(baseWeightLoss * proteinPerKg);
+
+        // Жиры: таргет 0.75 г/кг, кламп 0.6-1.0 г/кг и 20-35% ккал
+        const fatsTarget = baseWeightLoss * 0.75;
+        const fatsLoGkg = baseWeightLoss * 0.6;
+        const fatsHiGkg = baseWeightLoss * 1.0;
+        const fatsLoPct = (targetCalories * 0.20) / 9.0;
+        const fatsHiPct = (targetCalories * 0.35) / 9.0;
+        fats = Math.round(clamp(fatsTarget, Math.max(fatsLoGkg, fatsLoPct), Math.min(fatsHiGkg, fatsHiPct)));
+
+        // Минимум жиров для женщин
+        if (gender === 'F' && fats < MIN_FAT_FEMALE) {
+            fats = MIN_FAT_FEMALE;
+        }
+
+        // Углеводы: остаток, но жёсткий минимум 120 г
+        carbs = Math.round((targetCalories - proteins * 4 - fats * 9) / 4);
+        const carbsMin = 120;
+        if (carbs < carbsMin) {
+            carbs = carbsMin;
+            targetCalories = proteins * 4 + fats * 9 + carbs * 4;
+        }
+
+        // Калорийный пол: 1600 муж / 1300 жен
+        const calFloor = CAL_FLOOR[gender!];
+        if (targetCalories < calFloor) {
+            const needCarbG = Math.ceil((calFloor - (proteins * 4 + fats * 9)) / 4);
+            carbs = Math.max(carbs, needCarbG);
+            targetCalories = proteins * 4 + fats * 9 + carbs * 4;
+        }
+
+    } else {
+        // ПОДДЕРЖАНИЕ (maintenance) или fallback
+        proteins = Math.round(weight! * 1.8);
+
+        const fatsTarget = weight! * 0.8;
+        const fatsLoPct = (targetCalories * 0.20) / 9.0;
+        const fatsHiPct = (targetCalories * 0.35) / 9.0;
+        fats = Math.round(clamp(fatsTarget, fatsLoPct, fatsHiPct));
+
+        // Минимум жиров для женщин
+        if (gender === 'F' && fats < MIN_FAT_FEMALE) {
+            fats = MIN_FAT_FEMALE;
+        }
+
+        carbs = Math.round((targetCalories - proteins * 4 - fats * 9) / 4);
     }
-
-    // Round to nearest 5
-    targetCalories = roundToNearest5(targetCalories);
-
-    // Calculate macronutrients in grams
-    const proteinCalories = targetCalories * MACRO_DISTRIBUTION.protein;
-    const fatCalories = targetCalories * MACRO_DISTRIBUTION.fat;
-    const carbCalories = targetCalories * MACRO_DISTRIBUTION.carbs;
-
-    const proteinGrams = proteinCalories / CALORIES_PER_GRAM.protein;
-    const fatGrams = fatCalories / CALORIES_PER_GRAM.fat;
-    const carbGrams = carbCalories / CALORIES_PER_GRAM.carbs;
 
     // Round to 2 decimal places
     const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
     return {
-        calories: targetCalories,
-        protein: roundTo2(proteinGrams),
-        fat: roundTo2(fatGrams),
-        carbohydrates: roundTo2(carbGrams),
+        calories: Math.round(targetCalories),
+        protein: roundTo2(proteins),
+        fat: roundTo2(fats),
+        carbohydrates: roundTo2(carbs),
     };
 }
