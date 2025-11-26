@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api, UnauthorizedError, ForbiddenError } from '../services/api';
 import { Profile } from '../types/profile';
 import ProfileEditModal from '../components/ProfileEditModal';
+import { calculateMifflinTargets, hasRequiredProfileData, getMissingProfileFields } from '../utils/mifflin';
 
 interface UserGoals {
     calories: number;
@@ -137,17 +138,32 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleAutoCalculate = async () => {
-        setLoading(true);
+    const handleAutoCalculate = () => {
         setError(null);
+
+        // Check if profile has required data
+        if (!hasRequiredProfileData(profile)) {
+            const missingFields = getMissingProfileFields(profile);
+            setError(
+                `Для расчёта необходимо заполнить следующие поля в профиле: ${missingFields.join(', ')}. ` +
+                'Пожалуйста, откройте редактирование профиля и заполните недостающие данные.'
+            );
+            return;
+        }
+
         try {
-            const calculated = await api.setAutoGoals();
-            setGoals(calculated);
-            setEditedGoals(calculated);
+            // Calculate targets using Mifflin-St Jeor formula on frontend
+            const targets = calculateMifflinTargets(profile!);
+
+            // Update the edited goals state with calculated values
+            setEditedGoals({
+                calories: targets.calories,
+                protein: targets.protein,
+                fat: targets.fat,
+                carbohydrates: targets.carbohydrates,
+            });
         } catch (err: any) {
-            setError(err.message || 'Не удалось рассчитать цели. Убедитесь, что заполнен профиль.');
-        } finally {
-            setLoading(false);
+            setError(err.message || 'Не удалось рассчитать цели. Проверьте данные профиля.');
         }
     };
 
