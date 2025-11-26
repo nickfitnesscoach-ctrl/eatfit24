@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ClientsProvider } from './contexts/ClientsContext';
+import { BillingProvider } from './contexts/BillingContext';
 import { initTelegramWebApp } from './lib/telegram';
 import { Dashboard } from './components/Dashboard';
 import ApplicationsPage from './pages/ApplicationsPage';
@@ -25,28 +26,30 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ClientsProvider>
-          <Router>
-            <Routes>
-              {/* Client Routes - КБЖУ трекер на главной (для всех) */}
-              <Route path="/" element={<ClientLayout />}>
-                <Route index element={<ClientDashboard />} />
-                <Route path="log" element={<FoodLogPage />} />
-                <Route path="subscription" element={<SubscriptionPage />} />
-                <Route path="profile" element={<ProfilePage />} />
-              </Route>
+        <BillingProvider>
+          <ClientsProvider>
+            <Router>
+              <Routes>
+                {/* Client Routes - КБЖУ трекер на главной (для всех) */}
+                <Route path="/" element={<ClientLayout />}>
+                  <Route index element={<ClientDashboard />} />
+                  <Route path="log" element={<FoodLogPage />} />
+                  <Route path="subscription" element={<SubscriptionPage />} />
+                  <Route path="profile" element={<ProfilePage />} />
+                </Route>
 
-              {/* Trainer Panel Routes - панель тренера /panel */}
-              <Route path="/panel" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="applications" element={<ApplicationsPage />} />
-                <Route path="clients" element={<ClientsPage />} />
-                <Route path="invite-client" element={<InviteClientPage />} />
-                <Route path="subscribers" element={<SubscribersPage />} />
-              </Route>
-            </Routes>
-          </Router>
-        </ClientsProvider>
+                {/* Trainer Panel Routes - панель тренера /panel */}
+                <Route path="/panel" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="applications" element={<ApplicationsPage />} />
+                  <Route path="clients" element={<ClientsPage />} />
+                  <Route path="invite-client" element={<InviteClientPage />} />
+                  <Route path="subscribers" element={<SubscribersPage />} />
+                </Route>
+              </Routes>
+            </Router>
+          </ClientsProvider>
+        </BillingProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

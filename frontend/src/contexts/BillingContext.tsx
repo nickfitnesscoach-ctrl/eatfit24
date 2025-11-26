@@ -10,6 +10,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { BillingState, BillingMe, BillingPlanCode } from '../types/billing';
+import { useAuth } from './AuthContext';
 
 interface BillingContextType extends BillingState {
     refresh: () => Promise<void>;
@@ -32,6 +33,10 @@ interface BillingProviderProps {
 }
 
 export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) => {
+    console.log('[BillingProvider] Mounting...');
+    const auth = useAuth();
+    console.log('[BillingProvider] auth.isInitialized:', auth.isInitialized);
+
     const [state, setState] = useState<BillingState>({
         data: null,
         loading: true,
@@ -42,6 +47,11 @@ export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) =>
      * Обновить данные подписки с сервера
      */
     const refresh = useCallback(async () => {
+        // Не загружаем, пока не авторизовались
+        if (!auth.isInitialized) {
+            return;
+        }
+
         try {
             setState(prev => ({ ...prev, loading: true, error: null }));
             const data = await api.getBillingMe();
@@ -52,34 +62,30 @@ export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) =>
             });
         } catch (error) {
             console.error('Failed to fetch billing data:', error);
-            setState(prev => ({
-                ...prev,
-                loading: false,
-                error: error instanceof Error ? error.message : 'Failed to load billing data',
-            }));
 
             // Fallback: устанавливаем FREE план с лимитом 3 при ошибке
-            if (!state.data) {
-                setState(prev => ({
-                    ...prev,
-                    data: {
-                        plan_code: 'FREE',
-                        plan_name: 'Бесплатный',
-                        expires_at: null,
-                        is_active: true,
-                        daily_photo_limit: 3,
-                        used_today: 0,
-                        remaining_today: 3,
-                    },
-                }));
-            }
+            setState({
+                loading: false,
+                error: error instanceof Error ? error.message : 'Failed to load billing data',
+                data: {
+                    plan_code: 'FREE',
+                    plan_name: 'Бесплатный',
+                    expires_at: null,
+                    is_active: true,
+                    daily_photo_limit: 3,
+                    used_today: 0,
+                    remaining_today: 3,
+                },
+            });
         }
-    }, [state.data]);
+    }, [auth.isInitialized]);
 
-    // Загрузка при монтировании
+    // Загрузка при инициализации авторизации
     useEffect(() => {
-        refresh();
-    }, []); // Запускаем только один раз
+        if (auth.isInitialized) {
+            refresh();
+        }
+    }, [auth.isInitialized, refresh]); // Запускаем когда авторизация готова
 
     // Вычисляемые значения
     const isLimitReached = state.data
