@@ -171,21 +171,51 @@ def handle_payment_succeeded(payment_object):
                 logger.error(f"Payment {payment.id} has no subscription or plan")
                 return
 
-            # Продлеваем подписку
-            subscription.extend_subscription(days=plan.duration_days)
+            # SECURITY: Prevent FREE plan activation through payment
+            # FREE plan should never be paid for
+            if plan.name == 'FREE' or plan.price <= 0:
+                logger.error(
+                    f"Attempted to activate FREE plan through payment {payment.id}. "
+                    f"Plan: {plan.name}, Price: {plan.price}. This should not happen!"
+                )
+                payment.error_message = "Cannot activate FREE plan through payment"
+                payment.save()
+
+                # SECURITY: Log suspicious activity
+                SecurityAuditLogger.log_security_event(
+                    user=payment.user,
+                    event_type='FREE_PLAN_PAYMENT_ATTEMPT',
+                    severity='high',
+                    details={
+                        'payment_id': str(payment.id),
+                        'plan_name': plan.name,
+                        'amount': float(payment.amount)
+                    }
+                )
+                return
+
+            # Используем новый сервис для активации/продления подписки
+            from .services import activate_or_extend_subscription
+            from django.conf import settings
+
+            # Определяем количество дней в зависимости от плана
+            duration_days = plan.duration_days if plan.duration_days > 0 else settings.BILLING_PLUS_DURATION_DAYS
+
+            # Активируем или продлеваем подписку
+            activate_or_extend_subscription(
+                user=payment.user,
+                plan_code=plan.name,
+                duration_days=duration_days
+            )
 
             # Сохраняем payment_method_id для автопродления
             if payment_method_id and payment.save_payment_method:
+                subscription = Subscription.objects.get(user=payment.user)
                 subscription.yookassa_payment_method_id = payment_method_id
                 subscription.auto_renew = True  # Автоматически включаем автопродление
                 subscription.save()
 
-            # Обновляем план подписки, если это первая оплата или смена плана
-            if subscription.plan != plan:
-                subscription.plan = plan
-                subscription.save()
-
-            logger.info(f"Payment {payment.id} succeeded. Subscription extended until {subscription.end_date}")
+            logger.info(f"Payment {payment.id} succeeded. Subscription updated for plan {plan.name}")
 
             # SECURITY: Log successful payment
             SecurityAuditLogger.log_payment_success(

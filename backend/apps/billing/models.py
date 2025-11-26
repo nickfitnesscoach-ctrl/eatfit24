@@ -37,10 +37,17 @@ class SubscriptionPlan(models.Model):
     duration_days = models.IntegerField('Длительность (дней)', default=0)
 
     # Features
+    daily_photo_limit = models.IntegerField(
+        'Лимит фото в день',
+        null=True,
+        blank=True,
+        help_text='Максимум фото в день. Null = безлимит'
+    )
+    # Legacy field - deprecated, use daily_photo_limit
     max_photos_per_day = models.IntegerField(
-        'Макс. фото в день',
+        'Макс. фото в день (legacy)',
         default=3,
-        help_text='-1 = неограниченно'
+        help_text='DEPRECATED: используйте daily_photo_limit. -1 = неограниченно'
     )
     history_days = models.IntegerField(
         'Хранение истории (дней)',
@@ -68,7 +75,8 @@ class SubscriptionPlan(models.Model):
     def get_features_dict(self):
         """Возвращает словарь с features для API response."""
         return {
-            'max_photos_per_day': self.max_photos_per_day,
+            'daily_photo_limit': self.daily_photo_limit,
+            'max_photos_per_day': self.max_photos_per_day,  # legacy
             'history_days': self.history_days,
             'ai_recognition': self.ai_recognition,
             'advanced_stats': self.advanced_stats,

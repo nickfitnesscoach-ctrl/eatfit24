@@ -7,6 +7,7 @@
 
 import { buildTelegramHeaders, getTelegramDebugInfo } from '../lib/telegram';
 import { Profile } from '../types/profile';
+import { BillingMe, CreatePaymentRequest, CreatePaymentResponse } from '../types/billing';
 
 export interface TrainerPanelAuthResponse {
     ok: boolean;
@@ -57,6 +58,8 @@ const URLS = {
     uploadAvatar: `${API_BASE}/users/profile/avatar/`,
     // Billing endpoints
     plan: `${API_BASE}/billing/plan`,
+    billingMe: `${API_BASE}/billing/me/`,
+    createPayment: `${API_BASE}/billing/create-payment/`,
     // AI endpoints
     recognize: `${API_BASE}/ai/recognize/`,
 };
@@ -638,6 +641,60 @@ export const api = {
         } catch (error) {
             console.error('Error fetching plan:', error);
             return null;
+        }
+    },
+
+    /**
+     * GET /api/v1/billing/me/
+     * Получение статуса подписки с лимитами и использованием
+     */
+    async getBillingMe(): Promise<BillingMe> {
+        log('Fetching billing status');
+        try {
+            const response = await fetchWithRetry(URLS.billingMe, {
+                headers: getHeaders(),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                log(`Billing status error: ${response.status}`);
+                throw new Error(errorData.detail || errorData.error || 'Failed to fetch billing status');
+            }
+
+            const data = await response.json();
+            log(`Billing status: plan=${data.plan_code}, limit=${data.daily_photo_limit}, used=${data.used_today}`);
+            return data;
+        } catch (error) {
+            console.error('Error fetching billing status:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * POST /api/v1/billing/create-payment/
+     * Создание платежа для подписки
+     */
+    async createPayment(request: CreatePaymentRequest): Promise<CreatePaymentResponse> {
+        log(`Creating payment for plan: ${request.plan_code}`);
+        try {
+            const response = await fetchWithRetry(URLS.createPayment, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(request),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                log(`Payment creation error: ${errorData.error?.code || response.status}`);
+                throw new Error(errorData.error?.message || errorData.detail || 'Failed to create payment');
+            }
+
+            const data = await response.json();
+            log(`Payment created: ${data.payment_id}`);
+            return data;
+        } catch (error) {
+            console.error('Error creating payment:', error);
+            throw error;
         }
     },
 

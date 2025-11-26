@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Camera, Upload, X, Check, Plus, Minus } from 'lucide-react';
+import { Camera, Upload, X, Check, Plus, CreditCard, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useBilling } from '../contexts/BillingContext';
 
 interface RecognizedItem {
     name: string;
@@ -22,6 +23,7 @@ interface AnalysisResult {
 
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
+    const billing = useBilling();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -30,6 +32,7 @@ const FoodLogPage: React.FC = () => {
     const [errorCode, setErrorCode] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
+    const [showLimitModal, setShowLimitModal] = useState(false);
     const MAX_RETRIES = 3;
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,6 +101,9 @@ const FoodLogPage: React.FC = () => {
                 setRetryCount(0); // Reset retry count on success
                 // Select all items by default
                 setSelectedItems(new Set(result.recognized_items.map((_: any, i: number) => i)));
+
+                // Обновляем billing данные после успешного анализа
+                await billing.refresh();
             } else {
                 // Empty result - no food detected
                 setErrorCode('NO_FOOD_DETECTED');
@@ -107,7 +113,15 @@ const FoodLogPage: React.FC = () => {
             console.error('Analysis failed:', err);
             const code = err.error || 'UNKNOWN_ERROR';
             setErrorCode(code);
-            setError(getErrorMessage(code, err.message || 'Ошибка при анализе фото'));
+
+            // Обработка DAILY_LIMIT_REACHED
+            if (code === 'DAILY_LIMIT_REACHED') {
+                setShowLimitModal(true);
+                // Обновляем billing данные, чтобы счетчик обновился
+                await billing.refresh();
+            } else {
+                setError(getErrorMessage(code, err.message || 'Ошибка при анализе фото'));
+            }
         } finally {
             setAnalyzing(false);
         }
@@ -215,6 +229,7 @@ const FoodLogPage: React.FC = () => {
         setError(null);
         setErrorCode(null);
         setRetryCount(0);
+        setShowLimitModal(false);
     };
 
     const retryAnalysis = () => {
@@ -240,7 +255,68 @@ const FoodLogPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-24">
             <div className="max-w-lg mx-auto">
-                <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Дневник питания</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center">Дневник питания</h1>
+
+                {/* Billing Info Banner */}
+                {billing.data && !billing.loading && (
+                    <div className={`mb-6 rounded-2xl p-4 ${
+                        billing.isPro
+                            ? 'bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-200'
+                            : billing.isLimitReached
+                                ? 'bg-red-50 border-2 border-red-200'
+                                : 'bg-blue-50 border-2 border-blue-200'
+                    }`}>
+                        {billing.isPro ? (
+                            <>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Check className="text-purple-600" size={18} />
+                                    <span className="font-semibold text-purple-900">
+                                        Ваш тариф: {billing.data.plan_name}
+                                    </span>
+                                </div>
+                                <p className="text-purple-700 text-sm">
+                                    Анализ фото — без ограничений ∞
+                                </p>
+                            </>
+                        ) : billing.isLimitReached ? (
+                            <>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle className="text-red-600" size={18} />
+                                    <span className="font-semibold text-red-900">
+                                        Лимит на сегодня исчерпан
+                                    </span>
+                                </div>
+                                <p className="text-red-700 text-sm mb-3">
+                                    Использовано: {billing.data.used_today} из {billing.data.daily_photo_limit} фото
+                                </p>
+                                <button
+                                    onClick={() => navigate('/subscription')}
+                                    className="w-full bg-red-600 text-white py-2 rounded-xl font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <CreditCard size={18} />
+                                    Оформить PRO
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold text-blue-900">
+                                        {billing.data.plan_name}
+                                    </span>
+                                    <button
+                                        onClick={() => navigate('/subscription')}
+                                        className="text-blue-600 text-sm font-medium hover:underline"
+                                    >
+                                        Обновить
+                                    </button>
+                                </div>
+                                <p className="text-blue-700 text-sm">
+                                    Сегодня: {billing.data.used_today} из {billing.data.daily_photo_limit} фото проанализировано
+                                </p>
+                            </>
+                        )}
+                    </div>
+                )}
 
                 {!selectedImage && !analysisResult ? (
                     /* Initial state - show capture options */
@@ -302,7 +378,7 @@ const FoodLogPage: React.FC = () => {
                         </div>
 
                         {/* Error message */}
-                        {error && (
+                        {error && !showLimitModal && (
                             <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
                                 <p className="text-red-600 text-center font-medium">{error}</p>
 
@@ -331,6 +407,38 @@ const FoodLogPage: React.FC = () => {
                                             Выбрать другое фото
                                         </button>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Limit Reached Modal */}
+                        {showLimitModal && (
+                            <div className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-red-300 rounded-3xl p-6 shadow-xl">
+                                <div className="text-center mb-4">
+                                    <AlertCircle className="text-red-500 mx-auto mb-3" size={48} />
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                        Лимит бесплатных фото на сегодня исчерпан
+                                    </h3>
+                                    <p className="text-gray-600">
+                                        Вы использовали свои {billing.data?.daily_photo_limit} бесплатных анализа.
+                                        Подключите PRO, чтобы отправлять фото без ограничений.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => navigate('/subscription')}
+                                        className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <CreditCard size={20} />
+                                        Оформить PRO
+                                    </button>
+                                    <button
+                                        onClick={resetState}
+                                        className="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+                                    >
+                                        Позже
+                                    </button>
                                 </div>
                             </div>
                         )}

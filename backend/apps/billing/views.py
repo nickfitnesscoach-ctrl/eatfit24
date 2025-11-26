@@ -263,3 +263,220 @@ def get_payment_history(request):
             'results': serializer.data
         }
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_payment(request):
+    """
+    POST /api/v1/billing/create-payment/
+    Универсальное создание платежа для любого тарифного плана.
+
+    Body:
+        {
+            "plan_code": "MONTHLY" | "YEARLY",
+            "return_url": "https://example.com/success"  // опционально
+        }
+
+    Response (201):
+        {
+            "payment_id": "uuid",
+            "yookassa_payment_id": "...",
+            "confirmation_url": "https://..."
+        }
+
+    Errors:
+        - 400: План не найден, невалиден или FREE
+        - 502: Ошибка создания платежа в YooKassa
+    """
+    from .services import create_subscription_payment
+
+    # Валидация входных данных
+    plan_code = request.data.get('plan_code')
+    if not plan_code:
+        return Response(
+            {
+                'error': {
+                    'code': 'MISSING_PLAN_CODE',
+                    'message': 'Укажите plan_code в теле запроса'
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Получаем кастомный return_url из body или используем дефолтный
+    return_url = request.data.get('return_url')
+
+    try:
+        # Создаем платеж
+        payment, confirmation_url = create_subscription_payment(
+            user=request.user,
+            plan_code=plan_code,
+            return_url=return_url
+        )
+
+        # SECURITY: Log payment creation
+        SecurityAuditLogger.log_payment_created(
+            user=request.user,
+            amount=float(payment.amount),
+            plan=plan_code,
+            request=request
+        )
+
+        return Response(
+            {
+                'payment_id': str(payment.id),
+                'yookassa_payment_id': payment.yookassa_payment_id,
+                'confirmation_url': confirmation_url,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    except ValueError as e:
+        return Response(
+            {
+                'error': {
+                    'code': 'INVALID_PLAN',
+                    'message': str(e)
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Create payment error: {str(e)}", exc_info=True)
+        return Response(
+            {
+                'error': {
+                    'code': 'PAYMENT_CREATE_FAILED',
+                    'message': 'Не удалось создать платеж. Попробуйте позже.'
+                }
+            },
+            status=status.HTTP_502_BAD_GATEWAY
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_plus_payment(request):
+    """
+    POST /api/v1/billing/create-plus-payment/
+    Создание платежа для подписки Pro (месячный план MONTHLY).
+
+    Body (опционально):
+        {
+            "return_url": "https://example.com/success"  // Кастомный URL возврата
+        }
+
+    Response:
+        {
+            "payment_id": "uuid",
+            "yookassa_payment_id": "...",
+            "confirmation_url": "https://..."
+        }
+    """
+    from .services import create_monthly_subscription_payment
+
+    # Получаем кастомный return_url из body или используем дефолтный
+    return_url = request.data.get('return_url')
+
+    try:
+        # Создаем платеж
+        payment, confirmation_url = create_monthly_subscription_payment(
+            user=request.user,
+            return_url=return_url
+        )
+
+        # SECURITY: Log payment creation
+        SecurityAuditLogger.log_payment_created(
+            user=request.user,
+            amount=float(payment.amount),
+            plan='MONTHLY',
+            request=request
+        )
+
+        return Response(
+            {
+                'payment_id': str(payment.id),
+                'yookassa_payment_id': payment.yookassa_payment_id,
+                'confirmation_url': confirmation_url,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    except ValueError as e:
+        return Response(
+            {
+                'error': {
+                    'code': 'PAYMENT_CREATE_FAILED',
+                    'message': str(e)
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Create plus payment error: {str(e)}", exc_info=True)
+        return Response(
+            {
+                'error': {
+                    'code': 'PAYMENT_CREATE_FAILED',
+                    'message': 'Не удалось создать платеж. Попробуйте позже.'
+                }
+            },
+            status=status.HTTP_502_BAD_GATEWAY
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_subscription_status(request):
+    """
+    GET /api/v1/billing/me/
+    Получение текущего статуса подписки пользователя с лимитами и использованием.
+
+    Response:
+        {
+            "plan_code": "FREE" | "MONTHLY" | "YEARLY",
+            "plan_name": "Бесплатный" | "Pro Месячный" | "Pro Годовой",
+            "expires_at": "2024-12-31T23:59:59Z" или null для FREE,
+            "is_active": true/false,
+            "daily_photo_limit": 3 или null (безлимит),
+            "used_today": 2,
+            "remaining_today": 1 или null (безлимит)
+        }
+    """
+    from .services import get_effective_plan_for_user
+    from .usage import DailyUsage
+
+    # Получаем действующий план пользователя
+    plan = get_effective_plan_for_user(request.user)
+
+    # Получаем использование на сегодня
+    usage = DailyUsage.objects.get_today(request.user)
+    used_today = usage.photo_ai_requests
+
+    # Вычисляем остаток
+    if plan.daily_photo_limit is not None:
+        remaining_today = max(0, plan.daily_photo_limit - used_today)
+    else:
+        remaining_today = None
+
+    # Получаем информацию о подписке (если есть)
+    try:
+        subscription = request.user.subscription
+        is_active = subscription.is_active and not subscription.is_expired()
+        expires_at = subscription.end_date.isoformat() if subscription.plan.name != 'FREE' else None
+    except Subscription.DoesNotExist:
+        is_active = True  # FREE план всегда активен
+        expires_at = None
+
+    response_data = {
+        'plan_code': plan.name,
+        'plan_name': plan.display_name,
+        'expires_at': expires_at,
+        'is_active': is_active,
+        'daily_photo_limit': plan.daily_photo_limit,
+        'used_today': used_today,
+        'remaining_today': remaining_today,
+    }
+
+    return Response(response_data)

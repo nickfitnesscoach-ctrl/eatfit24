@@ -5,6 +5,7 @@ Django Admin конфигурация для billing app.
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import SubscriptionPlan, Subscription, Payment, Refund
+from .usage import DailyUsage
 
 
 @admin.register(SubscriptionPlan)
@@ -16,6 +17,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
         'name',
         'price',
         'duration_days',
+        'daily_photo_limit',
         'max_photos_per_day',
         'history_days',
         'is_active',
@@ -34,6 +36,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
         }),
         ('Возможности плана', {
             'fields': (
+                'daily_photo_limit',
                 'max_photos_per_day',
                 'history_days',
                 'ai_recognition',
@@ -215,3 +218,43 @@ class RefundAdmin(admin.ModelAdmin):
         )
 
     get_status_display_colored.short_description = 'Статус'
+
+
+@admin.register(DailyUsage)
+class DailyUsageAdmin(admin.ModelAdmin):
+    """Админка для ежедневного использования."""
+
+    list_display = [
+        'user',
+        'date',
+        'photo_ai_requests',
+        'is_today_display',
+        'created_at',
+    ]
+    list_filter = ['date', 'created_at']
+    search_fields = ['user__email', 'user__username']
+    ordering = ['-date', '-created_at']
+    raw_id_fields = ['user']
+    date_hierarchy = 'date'
+
+    fieldsets = (
+        ('Пользователь и дата', {
+            'fields': ('user', 'date')
+        }),
+        ('Использование', {
+            'fields': ('photo_ai_requests',)
+        }),
+        ('Метаданные', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+    def is_today_display(self, obj):
+        """Отображение, является ли запись сегодняшней."""
+        if obj.is_today:
+            return format_html('<span style="color: green; font-weight: bold;">✓ Сегодня</span>')
+        return '-'
+
+    is_today_display.short_description = 'Сегодня?'

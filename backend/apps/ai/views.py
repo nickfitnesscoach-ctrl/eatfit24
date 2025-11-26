@@ -17,6 +17,8 @@ from .serializers import (
 )
 from .services import AIRecognitionService
 from .throttles import AIRecognitionPerMinuteThrottle, AIRecognitionPerDayThrottle
+from apps.billing.services import get_effective_plan_for_user
+from apps.billing.usage import DailyUsage
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,26 @@ class AIRecognitionView(APIView):
         image_data_url = serializer.validated_data['image']
         description = serializer.validated_data.get('description', '')
 
+        # Check daily photo limit based on user's subscription plan
+        plan = get_effective_plan_for_user(request.user)
+        usage = DailyUsage.objects.get_today(request.user)
+
+        if plan.daily_photo_limit is not None and usage.photo_ai_requests >= plan.daily_photo_limit:
+            logger.warning(
+                f"User {request.user.username} exceeded daily photo limit. "
+                f"Plan: {plan.name}, Limit: {plan.daily_photo_limit}, Used: {usage.photo_ai_requests}"
+            )
+            return Response(
+                {
+                    "error": "DAILY_LIMIT_REACHED",
+                    "detail": f"Превышен дневной лимит {plan.daily_photo_limit} фото. Обновите тариф для безлимитного распознавания.",
+                    "current_plan": plan.name,
+                    "daily_limit": plan.daily_photo_limit,
+                    "used_today": usage.photo_ai_requests
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         try:
             # Initialize AI service
             ai_service = AIRecognitionService()
@@ -85,6 +107,13 @@ class AIRecognitionView(APIView):
                 f"Found {len(result.get('recognized_items', []))} items"
             )
 
+            # Increment photo usage counter after successful recognition
+            DailyUsage.objects.increment_photo_requests(request.user)
+            logger.info(
+                f"Incremented photo counter for user {request.user.username}. "
+                f"Total today: {usage.photo_ai_requests + 1}"
+            )
+
             # Use serializer to add summary/totals
             response_serializer = AIRecognitionResponseSerializer(result)
             return Response(
@@ -96,7 +125,7 @@ class AIRecognitionView(APIView):
             logger.error(f"AI recognition validation error: {e}")
             return Response(
                 {
-                    "error": "Ошибка обработки изображения",
+                    "error": "INVALID_IMAGE",
                     "detail": "Проверьте формат изображения и попробуйте снова"
                 },
                 status=status.HTTP_400_BAD_REQUEST
@@ -106,8 +135,8 @@ class AIRecognitionView(APIView):
             logger.error(f"AI recognition unexpected error: {e}", exc_info=True)
             return Response(
                 {
-                    "error": "Ошибка AI распознавания",
-                    "detail": "Не удалось распознать изображение. Попробуйте ещё раз."
+                    "error": "AI_SERVICE_ERROR",
+                    "detail": "Сервис распознавания временно недоступен. Попробуйте позже"
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

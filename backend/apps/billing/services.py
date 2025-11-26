@@ -252,3 +252,246 @@ class YooKassaService:
         except Exception as e:
             logger.error(f"YooKassa webhook parsing error: {str(e)}")
             raise
+
+
+# ============================================================
+# Сервисы для создания платежей (без SDK)
+# ============================================================
+
+def create_subscription_payment(user, plan_code: str, return_url: str = None):
+    """
+    Универсальный сервис для создания платежа подписки.
+
+    Args:
+        user: Объект пользователя Django
+        plan_code: Код плана (MONTHLY, YEARLY, и т.д.)
+        return_url: URL для возврата после оплаты (опционально)
+
+    Returns:
+        Tuple (Payment, confirmation_url)
+
+    Raises:
+        ValueError: Если план не найден или невалиден
+        Exception: При ошибке создания платежа
+    """
+    from django.db import transaction
+    from django.utils import timezone
+    from datetime import timedelta
+    from .models import SubscriptionPlan, Payment, Subscription
+    from .yookassa_client import YooKassaClient, PaymentCreateError
+    from django.conf import settings
+
+    # Находим план
+    try:
+        plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        raise ValueError(f"Plan {plan_code} not found or not active")
+
+    # Проверяем, что это платный план
+    if plan.price <= 0:
+        raise ValueError(f"Cannot create payment for FREE plan")
+
+    # Определяем return_url
+    if not return_url:
+        return_url = settings.YOOKASSA_RETURN_URL
+
+    # Создаем запись платежа в БД
+    with transaction.atomic():
+        # Получаем текущую подписку пользователя (или создаем если нет)
+        subscription, _ = Subscription.objects.select_for_update().get_or_create(
+            user=user,
+            defaults={
+                'plan': SubscriptionPlan.objects.get(name='FREE'),
+                'start_date': timezone.now(),
+                'end_date': timezone.now() + timedelta(days=365 * 10),
+                'is_active': True
+            }
+        )
+
+        # Создаем Payment с статусом PENDING
+        payment = Payment.objects.create(
+            user=user,
+            subscription=subscription,
+            plan=plan,
+            amount=plan.price,
+            currency='RUB',
+            status='PENDING',
+            provider='YOOKASSA',
+            description=f'Подписка {plan.display_name}',
+            save_payment_method=True,
+        )
+
+        # Генерируем idempotence_key
+        idempotence_key = str(uuid.uuid4())
+
+        try:
+            # Создаем платеж через наш клиент (без SDK)
+            yookassa_client = YooKassaClient()
+            response = yookassa_client.create_payment(
+                user=user,
+                plan=plan,
+                idempotence_key=idempotence_key,
+                return_url=return_url,
+                save_payment_method=True
+            )
+
+            # Сохраняем данные от YooKassa
+            payment.yookassa_payment_id = response['id']
+            payment.metadata = {
+                'idempotence_key': idempotence_key,
+                'raw_request': {
+                    'plan_code': plan.name,
+                    'amount': str(plan.price),
+                    'return_url': return_url,
+                },
+                'raw_response': response,
+            }
+            payment.save()
+
+            # Извлекаем confirmation_url
+            confirmation_url = response['confirmation']['confirmation_url']
+
+            logger.info(
+                f"Payment {payment.id} created for user {user.username}. "
+                f"Plan: {plan_code}, YooKassa ID: {payment.yookassa_payment_id}"
+            )
+
+            return payment, confirmation_url
+
+        except PaymentCreateError as e:
+            # Помечаем платеж как неудачный
+            payment.status = 'FAILED'
+            payment.error_message = str(e)
+            payment.save()
+            raise
+
+        except Exception as e:
+            # Любая другая ошибка
+            payment.status = 'FAILED'
+            payment.error_message = f"Unexpected error: {str(e)}"
+            payment.save()
+            logger.error(f"Error creating payment: {str(e)}", exc_info=True)
+            raise
+
+
+def create_monthly_subscription_payment(user, return_url: str = None):
+    """
+    [DEPRECATED] Создает платеж для месячной подписки.
+    Используйте create_subscription_payment(user, 'MONTHLY', return_url) вместо этого.
+
+    Args:
+        user: Объект пользователя Django
+        return_url: URL для возврата после оплаты (опционально)
+
+    Returns:
+        Tuple (Payment, confirmation_url)
+    """
+    return create_subscription_payment(user, 'MONTHLY', return_url)
+
+
+def activate_or_extend_subscription(user, plan_code: str, duration_days: int):
+    """
+    Активирует или продлевает подписку пользователя.
+
+    Args:
+        user: Объект пользователя
+        plan_code: Код плана (FREE, MONTHLY, YEARLY)
+        duration_days: Количество дней продления
+
+    Returns:
+        Subscription: Обновленная подписка
+    """
+    from django.db import transaction
+    from django.utils import timezone
+    from datetime import timedelta
+    from .models import SubscriptionPlan, Subscription
+
+    with transaction.atomic():
+        # Находим план
+        try:
+            plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+        except SubscriptionPlan.DoesNotExist:
+            raise ValueError(f"Plan {plan_code} not found or not active")
+
+        # Получаем или создаем подписку
+        subscription, created = Subscription.objects.select_for_update().get_or_create(
+            user=user,
+            defaults={
+                'plan': plan,
+                'start_date': timezone.now(),
+                'end_date': timezone.now() + timedelta(days=duration_days),
+                'is_active': True,
+            }
+        )
+
+        if not created:
+            # Подписка существует - продлеваем
+            now = timezone.now()
+
+            if subscription.is_expired():
+                # Подписка истекла - начинаем с текущего момента
+                subscription.start_date = now
+                subscription.end_date = now + timedelta(days=duration_days)
+            else:
+                # Подписка активна - добавляем к текущей дате окончания
+                subscription.end_date += timedelta(days=duration_days)
+
+            # Обновляем план, если он изменился
+            if subscription.plan != plan:
+                subscription.plan = plan
+
+            subscription.is_active = True
+            subscription.save()
+
+        logger.info(
+            f"Subscription for user {user.username} activated/extended. "
+            f"Plan: {plan_code}, Expires: {subscription.end_date}"
+        )
+
+        return subscription
+
+
+def get_effective_plan_for_user(user):
+    """
+    Получает действующий тарифный план для пользователя.
+
+    Логика:
+    - Если есть активная подписка с неистекшим expires_at → возвращаем её план
+    - Иначе возвращаем бесплатный план (FREE)
+
+    Args:
+        user: Объект пользователя
+
+    Returns:
+        SubscriptionPlan: Действующий план пользователя
+    """
+    from .models import SubscriptionPlan, Subscription
+    from django.utils import timezone
+
+    try:
+        # Пытаемся получить подписку пользователя
+        subscription = Subscription.objects.select_related('plan').get(user=user)
+
+        # Проверяем, активна ли подписка
+        if subscription.is_active and not subscription.is_expired():
+            return subscription.plan
+
+    except Subscription.DoesNotExist:
+        pass
+
+    # Если нет активной подписки или подписка истекла - возвращаем FREE
+    try:
+        free_plan = SubscriptionPlan.objects.get(name='FREE', is_active=True)
+        return free_plan
+    except SubscriptionPlan.DoesNotExist:
+        # В крайнем случае, если FREE план не найден, создаем его на лету
+        logger.warning("FREE plan not found, creating default")
+        free_plan = SubscriptionPlan.objects.create(
+            name='FREE',
+            display_name='Бесплатный',
+            price=0,
+            duration_days=0,
+            daily_photo_limit=3,
+            is_active=True
+        )
+        return free_plan
