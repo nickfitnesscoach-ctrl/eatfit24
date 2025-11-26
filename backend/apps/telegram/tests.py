@@ -21,6 +21,7 @@ class PersonalPlanAPITestCase(TestCase):
         # Create test user
         self.user = User.objects.create_user(
             username='tg_123456789',
+            email='test_123456789@telegram.bot',
             first_name='Test User'
         )
 

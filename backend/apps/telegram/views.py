@@ -844,6 +844,7 @@ def get_user_or_create(request):
         # Создаём
         user = User.objects.create_user(
             username=f"tg_{telegram_id}",
+            email=f"tg_{telegram_id}@telegram.user",  # Unique email для каждого telegram пользователя
             first_name=full_name,
         )
 
@@ -923,6 +924,7 @@ def create_survey(request):
         # Создаём нового пользователя
         user = User.objects.create_user(
             username=f"tg_{telegram_id}",
+            email=f"tg_{telegram_id}@telegram.user",
         )
         telegram_user = TelegramUser.objects.create(
             user=user,
