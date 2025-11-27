@@ -23,6 +23,10 @@ function App() {
   useEffect(() => {
     // Инициализация Telegram WebApp через централизованный модуль
     initTelegramWebApp();
+
+    // DEBUG: Version marker
+    console.log('🚀 EATFIT_FRONT_VERSION = 42');
+    console.log('📦 Build timestamp:', new Date().toISOString());
   }, []);
 
   return (

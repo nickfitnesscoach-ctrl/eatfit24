@@ -55,7 +55,8 @@
       "Bash(node test-mifflin.js:*)",
       "Bash(node test-new-kbju.js:*)",
       "Bash(python manage.py migrate:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(mode=block\" always;\n        \n        # DEV MODE: Отключаем кеширование HTML\n        add_header Cache-Control \"no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0\" always;\n        add_header Pragma \"no-cache\" always;\n        expires -1;\n    }\n\n    # DEV MODE: Минимальное кэширование статических файлов (5 минут вместо 1 года)\n    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n        expires 5m;\n        add_header Cache-Control \"public, max-age=300\";\n    }\n\n    # Логирование\n    access_log /var/log/nginx/access.log;\n    error_log /var/log/nginx/error.log;\n}\nEOF\")"
     ],
     "deny": [],
     "ask": []
