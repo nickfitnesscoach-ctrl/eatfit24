@@ -763,16 +763,44 @@ export const api = {
     },
 
     /**
-     * Инициация привязки карты (аналогично createPayment, но для привязки)
+     * Инициация привязки карты
+     * Создает платёж для подписки, который автоматически сохраняет карту (backend всегда save_payment_method=true)
      */
     async addPaymentMethod() {
-        // Reuse createPayment or specific endpoint
-        // For now, assume it's a specific flow or just a "setup" intent
-        // This might need backend support.
-        // Let's assume we use createPayment with a specific flag or a new endpoint.
-        // For now, let's mock or use a placeholder if backend isn't ready.
-        // User asked for "Старт flow привязки карты".
-        return this.createPayment({ plan_code: 'MONTHLY' }); // Temporary: usually binding is 1 rub or specific intent
+        log('Initiating card attachment via payment flow');
+        try {
+            // Создаём обычный платёж MONTHLY - backend автоматически сохранит карту
+            // (в backend save_payment_method=True установлен по умолчанию для всех платежей)
+            const response = await fetchWithRetry(URLS.createPayment, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    plan_code: 'MONTHLY',
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                log(`Card attachment error: ${errorData.error?.code || response.status}`);
+                throw new Error(errorData.error?.message || errorData.detail || 'Не удалось запустить привязку карты');
+            }
+
+            const data = await response.json();
+            log(`Payment created for card attachment: ${data.payment_id}`);
+
+            // Открываем платёжную форму в Telegram WebApp или браузере
+            const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
+            if (isTMA && window.Telegram) {
+                window.Telegram.WebApp.openLink(data.confirmation_url);
+            } else {
+                window.location.href = data.confirmation_url;
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Error initiating card attachment:', error);
+            throw error;
+        }
     },
 
     /**

@@ -121,9 +121,10 @@ const SubscriptionPage: React.FC = () => {
         });
     };
 
-    // Determine State
-    const isPro = billing.isPro;
-    const expiresAt = billing.data?.expires_at ?? null;
+    // Determine State - Use new subscription format
+    const subscription = billing.subscription;
+    const isPro = subscription?.plan === 'pro' && subscription?.is_active;
+    const expiresAt = subscription?.expires_at ?? null;
     const isExpired = !isPro && !!expiresAt; // State C: Not Pro, but has expiration date (implies past)
 
     // Header Text
@@ -156,8 +157,10 @@ const SubscriptionPage: React.FC = () => {
                     let disabled = false;
                     let bottomContent: React.ReactNode | undefined;
 
-                    if (billing.data) {
-                        const userPlanCode = billing.data.plan_code;
+                    if (subscription) {
+                        // Map new subscription format to old plan codes for compatibility
+                        const userPlanCode = subscription.plan === 'free' ? 'FREE' :
+                                             subscription.plan === 'pro' ? 'MONTHLY' : 'FREE'; // Default to MONTHLY for pro
 
                         // FREE CARD
                         if (plan.id === 'free') {
@@ -179,10 +182,10 @@ const SubscriptionPage: React.FC = () => {
                             if (userPlanCode === planCode) {
                                 isCurrent = true;
 
-                                // State B: Active Pro
-                                const autoRenew = billing.data.auto_renew;
-                                const paymentMethod = billing.data.payment_method;
-                                const hasCard = !!paymentMethod;
+                                // State B: Active Pro - Use new subscription format
+                                const autoRenew = subscription.autorenew_enabled;
+                                const paymentMethod = subscription.payment_method;
+                                const hasCard = paymentMethod?.is_attached ?? false;
 
                                 bottomContent = (
                                     <div className="space-y-3">
@@ -203,7 +206,7 @@ const SubscriptionPage: React.FC = () => {
                                                         <span>Автопродление включено</span>
                                                     </div>
                                                     <p className="text-xs text-center text-gray-400">
-                                                        Карта •••• {paymentMethod.last4 || '****'}
+                                                        {paymentMethod.card_mask || 'Карта ••••'}
                                                     </p>
                                                     <button
                                                         onClick={() => navigate('/settings')}
