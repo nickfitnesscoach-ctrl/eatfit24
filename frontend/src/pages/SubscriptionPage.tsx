@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PlanCard, { Plan, PlanId } from '../components/PlanCard';
 import { api } from '../services/api';
 import { useBilling } from '../contexts/BillingContext';
+import { Loader2 } from 'lucide-react';
 
 const PLANS: Plan[] = [
     {
@@ -31,7 +33,7 @@ const PLANS: Plan[] = [
         priceText: '2490 ₽ / год',
         oldPriceText: '3588 ₽',
         priceSubtext: '≈ 208 ₽ / месяц',
-        tag: 'POPULAR', // Or 'Выбор большинства' / '-30%'
+        tag: 'POPULAR',
         features: [
             'Безлимитный анализ еды',
             'Персональные рекомендации',
@@ -43,10 +45,11 @@ const PLANS: Plan[] = [
 
 const SubscriptionPage: React.FC = () => {
     const billing = useBilling();
+    const navigate = useNavigate();
     const [loadingPlanId, setLoadingPlanId] = useState<PlanId | null>(null);
+    const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
 
     const showToast = (message: string) => {
-        // Placeholder for toast notification
         const tg = window.Telegram?.WebApp;
         if (tg?.showAlert) {
             tg.showAlert(message);
@@ -56,27 +59,18 @@ const SubscriptionPage: React.FC = () => {
     };
 
     const handleSelectPlan = async (planId: PlanId) => {
-        // Prevent selection if already loading or if plan is active (though button should be disabled)
         if (loadingPlanId) return;
 
-        // Check if running in Telegram Mini App
         const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
 
         try {
             setLoadingPlanId(planId);
-
-            // Map PlanId to BillingPlanCode
             const planCode = planId === 'pro_monthly' ? 'MONTHLY' : 'YEARLY';
-
-            // Call backend to create payment
             const { confirmation_url } = await api.createPayment({ plan_code: planCode });
 
-            // Open payment URL
             if (isTMA && window.Telegram) {
-                // Telegram Mini App: use WebApp API
                 window.Telegram.WebApp.openLink(confirmation_url);
             } else {
-                // Regular browser: redirect
                 window.location.href = confirmation_url;
             }
         } catch (error) {
@@ -85,6 +79,35 @@ const SubscriptionPage: React.FC = () => {
             showToast(errorMessage);
         } finally {
             setLoadingPlanId(null);
+        }
+    };
+
+    const handleToggleAutoRenew = async () => {
+        if (togglingAutoRenew) return;
+        try {
+            setTogglingAutoRenew(true);
+            // If currently ON, turn OFF. If OFF, turn ON.
+            // But here we only have "Enable" button in one case.
+            // Logic:
+            // If auto_renew is OFF, we want to turn it ON.
+            await billing.toggleAutoRenew(true);
+            showToast("Автопродление включено");
+        } catch (error) {
+            showToast("Не удалось изменить настройки автопродления");
+        } finally {
+            setTogglingAutoRenew(false);
+        }
+    };
+
+    const handleAddCard = async () => {
+        if (togglingAutoRenew) return;
+        try {
+            setTogglingAutoRenew(true);
+            await billing.addPaymentMethod();
+        } catch (error) {
+            showToast("Не удалось запустить привязку карты");
+        } finally {
+            setTogglingAutoRenew(false);
         }
     };
 
@@ -98,61 +121,173 @@ const SubscriptionPage: React.FC = () => {
         });
     };
 
+    // Determine State
+    const isPro = billing.isPro;
+    const expiresAt = billing.data?.expires_at ?? null;
+    const isExpired = !isPro && !!expiresAt; // State C: Not Pro, but has expiration date (implies past)
+
+    // Header Text
+    let headerTitle = "Премиум доступ";
+    let headerSubtitle = "Получи максимум от FoodMind AI";
+    let topStatusText = "Текущий тариф: Free";
+
+    if (isPro) {
+        topStatusText = `Текущий тариф: PRO до ${formatDate(expiresAt)}`;
+    } else if (isExpired) {
+        topStatusText = `Подписка закончилась ${formatDate(expiresAt)}`;
+    }
+
     return (
         <div className="p-4 pb-24 space-y-6">
+            {/* Top Status Bar */}
+            <div className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {topStatusText}
+            </div>
+
             <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold">Премиум доступ</h1>
-                <p className="text-gray-500">Получи максимум от FoodMind AI</p>
+                <h1 className="text-2xl font-bold">{headerTitle}</h1>
+                <p className="text-gray-500">{headerSubtitle}</p>
             </div>
 
             <div className="space-y-4">
                 {PLANS.map((plan) => {
-                    // Determine state for this card
                     let isCurrent = false;
                     let customButtonText: string | undefined;
                     let disabled = false;
+                    let bottomContent: React.ReactNode | undefined;
 
                     if (billing.data) {
                         const userPlanCode = billing.data.plan_code;
-                        const isPro = ['MONTHLY', 'YEARLY'].includes(userPlanCode);
 
+                        // FREE CARD
                         if (plan.id === 'free') {
                             if (userPlanCode === 'FREE') {
                                 isCurrent = true;
+                                customButtonText = "Базовый бесплатный тариф";
+                                disabled = true; // Always disabled if current
                             } else {
-                                // User is PRO, but looking at FREE card
+                                // User is PRO
                                 customButtonText = "Базовый бесплатный тариф";
                                 disabled = true;
                             }
-                        } else {
-                            // PRO plans
-                            // Map plan.id to code for comparison
+                        }
+                        // PRO CARDS
+                        else {
                             const planCode = plan.id === 'pro_monthly' ? 'MONTHLY' : 'YEARLY';
 
+                            // If this specific PRO plan is active
                             if (userPlanCode === planCode) {
                                 isCurrent = true;
-                                if (billing.data.expires_at) {
-                                    customButtonText = `Текущий план до ${formatDate(billing.data.expires_at)}`;
-                                }
-                                disabled = true;
-                            } else if (isPro) {
-                                // User has DIFFERENT PRO plan (e.g. Monthly vs Yearly)
-                                // Allow upgrade/downgrade? 
-                                // For now, per requirements, if PRO is active, we might want to disable others or handle switch.
-                                // Requirement says: "Если план Pro уже активен... Кнопку отключить (disabled)"
-                                // But specifically for the ACTIVE plan. 
-                                // Let's assume we allow switching if it's a different PRO plan, 
-                                // OR if the requirement implies disabling ALL payment buttons if ANY Pro is active.
-                                // "Если пользователь на Pro... На карточке PRO (месячный)... Сделать неактивную кнопку"
-                                // Let's follow the specific instruction for the active plan.
-                                // If user has Monthly, and looks at Yearly, usually we want to allow upgrade.
-                                // But the prompt says: "Итог: у пользователя на «Дневнике» — Pro, а в «Подписке» — как будто он всё ещё на Free."
-                                // And "Если план Pro уже активен, не пытаться снова создавать платеж по нажатию" - this likely refers to the active plan.
 
-                                // Let's keep it simple: if it's the current plan, disable it. 
-                                // If it's another PRO plan, leave it enabled (upgrade path), unless explicitly told otherwise.
-                                // Wait, the prompt says: "На карточке PRO (месячный): Вместо кнопки... Сделать неактивную кнопку... Кнопку отключить".
-                                // This applies if the user HAS that plan.
+                                // State B: Active Pro
+                                const autoRenew = billing.data.auto_renew;
+                                const paymentMethod = billing.data.payment_method;
+                                const hasCard = !!paymentMethod;
+
+                                bottomContent = (
+                                    <div className="space-y-3">
+                                        {/* Expiration Badge */}
+                                        <div className="bg-white/10 rounded-lg p-3 text-center">
+                                            <p className="text-sm font-medium text-white">
+                                                Текущий план до {formatDate(expiresAt)}
+                                            </p>
+                                        </div>
+
+                                        {/* Auto-renew Status */}
+                                        <div className="space-y-2">
+                                            {hasCard && autoRenew ? (
+                                                // Variant 1: Auto-renew ON
+                                                <>
+                                                    <div className="flex items-center justify-center gap-2 text-sm text-green-400">
+                                                        <span>🔄</span>
+                                                        <span>Автопродление включено</span>
+                                                    </div>
+                                                    <p className="text-xs text-center text-gray-400">
+                                                        Карта •••• {paymentMethod.last4 || '****'}
+                                                    </p>
+                                                    <button
+                                                        onClick={() => navigate('/settings')}
+                                                        className="w-full text-center text-sm text-gray-300 hover:text-white underline decoration-gray-500 hover:decoration-white transition-all"
+                                                    >
+                                                        Управлять автопродлением
+                                                    </button>
+                                                </>
+                                            ) : hasCard && !autoRenew ? (
+                                                // Variant 2: Auto-renew OFF
+                                                <>
+                                                    <div className="flex items-center justify-center gap-2 text-sm text-red-400">
+                                                        <span>⛔</span>
+                                                        <span>Автопродление выключено</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={handleToggleAutoRenew}
+                                                        disabled={togglingAutoRenew}
+                                                        className="w-full py-2 bg-white text-black rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        {togglingAutoRenew && <Loader2 className="animate-spin" size={14} />}
+                                                        Включить автопродление
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                // Variant 3: No Card
+                                                <>
+                                                    <div className="flex items-center justify-center gap-2 text-sm text-yellow-500">
+                                                        <span>❗</span>
+                                                        <span>Автопродление недоступно</span>
+                                                    </div>
+                                                    <p className="text-xs text-center text-gray-400">
+                                                        Привяжите карту
+                                                    </p>
+                                                    <button
+                                                        onClick={handleAddCard}
+                                                        disabled={togglingAutoRenew}
+                                                        className="w-full py-2 bg-white text-black rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        {togglingAutoRenew && <Loader2 className="animate-spin" size={14} />}
+                                                        Добавить карту
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            // If User is PRO but on DIFFERENT plan (e.g. Monthly vs Yearly)
+                            else if (isPro) {
+                                // Disable other pro plans while one is active?
+                                // User request: "Если план Pro уже активен... Кнопку отключить"
+                                // It seems they want to lock it down.
+                                disabled = true;
+                                customButtonText = "У вас уже активен PRO";
+                            }
+                            // State C: Expired Pro (User is Free now, but was Pro)
+                            else if (isExpired) {
+                                // Show "Return PRO" button
+                                // Logic: Standard button but with specific text?
+                                // Request: "Большая CTA-кнопка: «Вернуть PRO за 299 ₽ / месяц»"
+                                // Also "Плашка с текстом: Доступ к PRO закончился..."
+
+                                // We can use bottomContent here too to add the badge above the button
+                                bottomContent = (
+                                    <div className="space-y-3">
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+                                            <p className="text-sm font-medium text-red-400">
+                                                Доступ к PRO закончился {formatDate(expiresAt)}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleSelectPlan(plan.id)}
+                                            disabled={loadingPlanId === plan.id}
+                                            className="w-full py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {loadingPlanId === plan.id ? (
+                                                <span className="animate-pulse">Загрузка...</span>
+                                            ) : (
+                                                `Вернуть PRO за ${plan.priceText}`
+                                            )}
+                                        </button>
+                                    </div>
+                                );
                             }
                         }
                     }
@@ -166,6 +301,7 @@ const SubscriptionPage: React.FC = () => {
                             onSelect={handleSelectPlan}
                             customButtonText={customButtonText}
                             disabled={disabled}
+                            bottomContent={bottomContent}
                         />
                     );
                 })}

@@ -51,6 +51,20 @@ const ClientLayout: React.FC = () => {
                     <User size={24} />
                     <span className="text-xs font-medium">Профиль</span>
                 </NavLink>
+
+                {/* Settings Link - Hidden for normal users */}
+                {/* TODO: Implement proper admin check */}
+                {false && (
+                    <NavLink
+                        to="/settings"
+                        className={({ isActive }) =>
+                            `flex flex-col items-center gap-1 ${isActive ? 'text-blue-600' : 'text-gray-400'}`
+                        }
+                    >
+                        <User size={24} /> {/* Placeholder icon */}
+                        <span className="text-xs font-medium">Настройки</span>
+                    </NavLink>
+                )}
             </nav>
         </div>
     );

@@ -14,6 +14,7 @@ import ClientDashboard from './pages/ClientDashboard';
 import FoodLogPage from './pages/FoodLogPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
 import SubscribersPage from './pages/SubscribersPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -36,6 +37,7 @@ function App() {
                   <Route path="log" element={<FoodLogPage />} />
                   <Route path="subscription" element={<SubscriptionPage />} />
                   <Route path="profile" element={<ProfilePage />} />
+                  <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Trainer Panel Routes - панель тренера /panel */}

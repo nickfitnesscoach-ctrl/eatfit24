@@ -21,6 +21,7 @@ interface PlanCardProps {
     onSelect: (planId: PlanId) => void;
     customButtonText?: string;
     disabled?: boolean;
+    bottomContent?: React.ReactNode;
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({
@@ -29,7 +30,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
     isLoading,
     onSelect,
     customButtonText,
-    disabled
+    disabled,
+    bottomContent
 }) => {
     const isFree = plan.id === 'free';
 
@@ -77,30 +79,34 @@ const PlanCard: React.FC<PlanCardProps> = ({
                 ))}
             </ul>
 
-            {/* Button */}
-            <button
-                onClick={() => onSelect(plan.id)}
-                disabled={isCurrent || isLoading || disabled}
-                className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2
-                    ${disabled
-                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        : isCurrent
-                            ? (isFree ? "bg-gray-100 text-gray-400" : "bg-white/20 text-white/50")
-                            : (isFree ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100")
-                    }
-                    ${isLoading ? 'opacity-80 cursor-wait' : ''}
-                `}
-            >
-                {isLoading ? (
-                    <span className="animate-pulse">Загрузка...</span>
-                ) : customButtonText ? (
-                    customButtonText
-                ) : isCurrent ? (
-                    "Текущий план"
-                ) : (
-                    isFree ? "Использовать бесплатно" : (plan.id === 'pro_yearly' ? "Оформить годовую" : "Оформить подписку")
-                )}
-            </button>
+            {/* Button or Custom Bottom Content */}
+            {bottomContent ? (
+                bottomContent
+            ) : (
+                <button
+                    onClick={() => onSelect(plan.id)}
+                    disabled={isCurrent || isLoading || disabled}
+                    className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2
+                        ${disabled
+                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                            : isCurrent
+                                ? (isFree ? "bg-gray-100 text-gray-400" : "bg-white/20 text-white/50")
+                                : (isFree ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100")
+                        }
+                        ${isLoading ? 'opacity-80 cursor-wait' : ''}
+                    `}
+                >
+                    {isLoading ? (
+                        <span className="animate-pulse">Загрузка...</span>
+                    ) : customButtonText ? (
+                        customButtonText
+                    ) : isCurrent ? (
+                        "Текущий план"
+                    ) : (
+                        isFree ? "Использовать бесплатно" : (plan.id === 'pro_yearly' ? "Оформить годовую" : "Оформить подписку")
+                    )}
+                </button>
+            )}
         </div>
     );
 };

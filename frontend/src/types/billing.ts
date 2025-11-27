@@ -12,6 +12,12 @@ export interface BillingMe {
     daily_photo_limit: number | null;   // null = безлимит
     used_today: number;                // >= 0
     remaining_today: number | null;    // null = не считается (безлимит)
+    auto_renew: boolean;
+    payment_method: {
+        type: string; // 'bank_card' etc
+        last4?: string;
+        brand?: string; // 'visa', 'mastercard'
+    } | null;
 }
 
 export interface BillingState {

@@ -9,11 +9,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../services/api';
-import { BillingState, BillingMe } from '../types/billing';
+import { BillingState } from '../types/billing';
 import { useAuth } from './AuthContext';
 
 interface BillingContextType extends BillingState {
     refresh: () => Promise<void>;
+    toggleAutoRenew: (enable: boolean) => Promise<void>;
+    addPaymentMethod: () => Promise<void>;
     isLimitReached: boolean;
     isPro: boolean;
 }
@@ -91,6 +93,8 @@ export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) =>
                         daily_photo_limit: 3,
                         used_today: 0,
                         remaining_today: 3,
+                        auto_renew: false,
+                        payment_method: null,
                     },
                 });
             }
@@ -107,6 +111,43 @@ export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) =>
         }
     }, [auth.isInitialized, refresh]);
 
+    /**
+     * Toggle auto-renew status
+     */
+    const toggleAutoRenew = useCallback(async (enable: boolean) => {
+        try {
+            if (enable) {
+                await api.resumeSubscription();
+            } else {
+                await api.cancelSubscription();
+            }
+            // Optimistic update or refresh
+            await refresh();
+        } catch (error) {
+            console.error('[BillingContext] Failed to toggle auto-renew:', error);
+            throw error;
+        }
+    }, [refresh]);
+
+    /**
+     * Initiate add payment method flow
+     */
+    const addPaymentMethod = useCallback(async () => {
+        try {
+            const { confirmation_url } = await api.addPaymentMethod();
+            // Open URL
+            const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
+            if (isTMA && window.Telegram) {
+                window.Telegram.WebApp.openLink(confirmation_url);
+            } else {
+                window.location.href = confirmation_url;
+            }
+        } catch (error) {
+            console.error('[BillingContext] Failed to add payment method:', error);
+            throw error;
+        }
+    }, []);
+
     // Вычисляемые значения
     const isLimitReached = state.data
         ? state.data.daily_photo_limit !== null && state.data.used_today >= state.data.daily_photo_limit
@@ -117,9 +158,11 @@ export const BillingProvider: React.FC<BillingProviderProps> = ({ children }) =>
     const value = useMemo<BillingContextType>(() => ({
         ...state,
         refresh,
+        toggleAutoRenew,
+        addPaymentMethod,
         isLimitReached,
         isPro,
-    }), [state, refresh, isLimitReached, isPro]);
+    }), [state, refresh, toggleAutoRenew, addPaymentMethod, isLimitReached, isPro]);
 
     // Debug mount
     useEffect(() => {
