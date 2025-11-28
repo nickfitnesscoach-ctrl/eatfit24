@@ -630,6 +630,17 @@ def get_subscription_status(request):
         is_prod_mode = settings.YOOKASSA_MODE == 'prod'
         test_live_payment_available = is_admin and is_prod_mode
 
+        # DEBUG logging
+        logger.info(
+            f"[TEST_PAYMENT_BUTTON] user_id={request.user.id}, "
+            f"telegram_id={telegram_user.telegram_id}, "
+            f"telegram_admins={telegram_admins}, "
+            f"is_admin={is_admin}, "
+            f"yookassa_mode={settings.YOOKASSA_MODE}, "
+            f"is_prod_mode={is_prod_mode}, "
+            f"test_live_payment_available={test_live_payment_available}"
+        )
+
     response_data = {
         'plan_code': plan.name,
         'plan_name': plan.display_name,
