@@ -18,6 +18,7 @@ export interface BillingMe {
         last4?: string;
         brand?: string; // 'visa', 'mastercard'
     } | null;
+    test_live_payment_available?: boolean;
 }
 
 export interface BillingState {

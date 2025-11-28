@@ -155,7 +155,7 @@ const SubscriptionDetailsPage: React.FC = () => {
                 </div>
 
                 {/* ADMIN ONLY: Test Live Payment Button */}
-                {auth.isAdmin && (
+                {auth.isAdmin && billing.billingMe?.test_live_payment_available && (
                     <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl">
                         <div className="flex items-start gap-3 mb-3">
                             <TestTube size={20} className="text-yellow-600 mt-0.5" />
