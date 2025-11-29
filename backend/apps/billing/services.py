@@ -264,7 +264,7 @@ def create_subscription_payment(user, plan_code: str, return_url: str = None, sa
 
     Args:
         user: Объект пользователя Django
-        plan_code: Код плана (MONTHLY, YEARLY, и т.д.)
+        plan_code: Код плана (FREE, PRO_MONTHLY, PRO_YEARLY, и т.д.)
         return_url: URL для возврата после оплаты (опционально)
         save_payment_method: Сохранять ли способ оплаты для рекуррентных платежей (по умолчанию True)
 
@@ -282,11 +282,17 @@ def create_subscription_payment(user, plan_code: str, return_url: str = None, sa
     from .yookassa_client import YooKassaClient, PaymentCreateError
     from django.conf import settings
 
-    # Находим план
+    # Находим план по полю code (новое поведение) или name (legacy для обратной совместимости)
     try:
-        plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+        # Сначала пытаемся найти по code
+        plan = SubscriptionPlan.objects.get(code=plan_code, is_active=True)
     except SubscriptionPlan.DoesNotExist:
-        raise ValueError(f"Plan {plan_code} not found or not active")
+        # Fallback: пытаемся найти по name (для обратной совместимости)
+        try:
+            plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+            logger.warning(f"Plan found by legacy 'name' field ({plan_code}). Consider using 'code' field.")
+        except SubscriptionPlan.DoesNotExist:
+            raise ValueError(f"Plan {plan_code} not found or not active")
 
     # Проверяем, что это платный план
     if plan.price <= 0:
@@ -341,7 +347,7 @@ def create_subscription_payment(user, plan_code: str, return_url: str = None, sa
             payment.metadata = {
                 'idempotence_key': idempotence_key,
                 'raw_request': {
-                    'plan_code': plan.name,
+                    'plan_code': plan.code,
                     'amount': str(plan.price),
                     'return_url': return_url,
                 },
@@ -396,7 +402,7 @@ def activate_or_extend_subscription(user, plan_code: str, duration_days: int):
 
     Args:
         user: Объект пользователя
-        plan_code: Код плана (FREE, MONTHLY, YEARLY)
+        plan_code: Код плана (FREE, PRO_MONTHLY, PRO_YEARLY)
         duration_days: Количество дней продления
 
     Returns:
@@ -408,11 +414,16 @@ def activate_or_extend_subscription(user, plan_code: str, duration_days: int):
     from .models import SubscriptionPlan, Subscription
 
     with transaction.atomic():
-        # Находим план
+        # Находим план по полю code (новое поведение) или name (legacy)
         try:
-            plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+            plan = SubscriptionPlan.objects.get(code=plan_code, is_active=True)
         except SubscriptionPlan.DoesNotExist:
-            raise ValueError(f"Plan {plan_code} not found or not active")
+            # Fallback: пытаемся найти по name (для обратной совместимости)
+            try:
+                plan = SubscriptionPlan.objects.get(name=plan_code, is_active=True)
+                logger.warning(f"Plan found by legacy 'name' field ({plan_code}). Consider using 'code' field.")
+            except SubscriptionPlan.DoesNotExist:
+                raise ValueError(f"Plan {plan_code} not found or not active")
 
         # Получаем или создаем подписку
         subscription, created = Subscription.objects.select_for_update().get_or_create(
@@ -482,17 +493,24 @@ def get_effective_plan_for_user(user):
 
     # Если нет активной подписки или подписка истекла - возвращаем FREE
     try:
-        free_plan = SubscriptionPlan.objects.get(name='FREE', is_active=True)
+        # Пытаемся найти по code
+        free_plan = SubscriptionPlan.objects.get(code='FREE', is_active=True)
         return free_plan
     except SubscriptionPlan.DoesNotExist:
-        # В крайнем случае, если FREE план не найден, создаем его на лету
-        logger.warning("FREE plan not found, creating default")
-        free_plan = SubscriptionPlan.objects.create(
-            name='FREE',
-            display_name='Бесплатный',
-            price=0,
-            duration_days=0,
-            daily_photo_limit=3,
-            is_active=True
-        )
-        return free_plan
+        # Fallback: пытаемся найти по name
+        try:
+            free_plan = SubscriptionPlan.objects.get(name='FREE', is_active=True)
+            return free_plan
+        except SubscriptionPlan.DoesNotExist:
+            # В крайнем случае, если FREE план не найден, создаем его на лету
+            logger.warning("FREE plan not found, creating default")
+            free_plan = SubscriptionPlan.objects.create(
+                code='FREE',
+                name='FREE',
+                display_name='Бесплатный',
+                price=0,
+                duration_days=0,
+                daily_photo_limit=3,
+                is_active=True
+            )
+            return free_plan

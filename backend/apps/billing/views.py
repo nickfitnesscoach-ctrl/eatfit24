@@ -28,10 +28,68 @@ from .serializers import (
     PaymentMethodSerializer,
     AutoRenewToggleSerializer,
     PaymentHistoryItemSerializer,
+    SubscriptionPlanPublicSerializer,
 )
 from .services import YooKassaService
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_subscription_plans(request):
+    """
+    GET /api/v1/billing/plans/
+    Получение списка всех активных тарифных планов (публичный endpoint).
+
+    Response (200):
+        [
+            {
+                "code": "FREE",
+                "display_name": "Бесплатный",
+                "price": 0,
+                "duration_days": 0,
+                "daily_photo_limit": 3,
+                "history_days": 7,
+                "ai_recognition": true,
+                "advanced_stats": false,
+                "priority_support": false
+            },
+            {
+                "code": "PRO_MONTHLY",
+                "display_name": "PRO месяц",
+                "price": 299,
+                "duration_days": 30,
+                "daily_photo_limit": null,
+                "history_days": -1,
+                "ai_recognition": true,
+                "advanced_stats": true,
+                "priority_support": true
+            },
+            {
+                "code": "PRO_YEARLY",
+                "display_name": "PRO год",
+                "price": 2490,
+                "duration_days": 365,
+                "daily_photo_limit": null,
+                "history_days": -1,
+                "ai_recognition": true,
+                "advanced_stats": true,
+                "priority_support": true
+            }
+        ]
+
+    Доступ: AllowAny (публично, без авторизации)
+    """
+    # Получаем все активные планы (исключая тестовые)
+    plans = SubscriptionPlan.objects.filter(
+        is_active=True,
+        is_test=False
+    ).order_by('price')
+
+    serializer = SubscriptionPlanPublicSerializer(plans, many=True)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -277,9 +335,12 @@ def create_payment(request):
     POST /api/v1/billing/create-payment/
     Универсальное создание платежа для любого тарифного плана.
 
+    ВАЖНО: Сумма платежа берется с бэкенда из SubscriptionPlan.price,
+    а НЕ из фронтенда. Фронтенд отправляет только plan_code.
+
     Body:
         {
-            "plan_code": "MONTHLY" | "YEARLY",
+            "plan_code": "PRO_MONTHLY" | "PRO_YEARLY",  // Системный код тарифа
             "return_url": "https://example.com/success"  // опционально
         }
 
@@ -293,6 +354,11 @@ def create_payment(request):
     Errors:
         - 400: План не найден, невалиден или FREE
         - 502: Ошибка создания платежа в YooKassa
+
+    Примеры plan_code:
+        - "PRO_MONTHLY": Месячная подписка PRO (цена берется из БД)
+        - "PRO_YEARLY": Годовая подписка PRO (цена берется из БД)
+        - "MONTHLY", "YEARLY": Legacy коды (поддерживаются для обратной совместимости)
     """
     from .services import create_subscription_payment
 

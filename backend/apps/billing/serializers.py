@@ -202,3 +202,25 @@ class PaymentHistoryResponseSerializer(serializers.Serializer):
     """Сериализатор для ответа на GET /billing/payments/."""
 
     results = PaymentHistoryItemSerializer(many=True)
+
+
+class SubscriptionPlanPublicSerializer(serializers.ModelSerializer):
+    """
+    Публичный сериализатор для тарифных планов.
+    Используется в GET /api/v1/billing/plans/ (доступен без авторизации).
+    """
+
+    class Meta:
+        model = SubscriptionPlan
+        fields = [
+            'code',
+            'display_name',
+            'price',
+            'duration_days',
+            'daily_photo_limit',
+            'history_days',
+            'ai_recognition',
+            'advanced_stats',
+            'priority_support',
+        ]
+        read_only_fields = fields  # Все поля только для чтения

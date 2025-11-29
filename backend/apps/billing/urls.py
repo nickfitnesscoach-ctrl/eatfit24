@@ -8,6 +8,9 @@ from . import views, webhooks
 app_name = 'billing'
 
 urlpatterns = [
+    # Public endpoints
+    path('plans/', views.get_subscription_plans, name='subscription-plans'),  # NEW: Public API for all plans
+
     # Subscription management (legacy endpoints)
     path('plan', views.get_current_plan, name='current-plan'),
     path('me/', views.get_subscription_status, name='subscription-status'),

@@ -19,15 +19,29 @@ class SubscriptionPlan(models.Model):
     """
     PLAN_CHOICES = [
         ('FREE', 'Бесплатный'),
-        ('MONTHLY', 'Месячный'),
-        ('YEARLY', 'Годовой'),
+        ('PRO_MONTHLY', 'PRO месячный'),
+        ('PRO_YEARLY', 'PRO годовой'),
+        ('MONTHLY', 'Месячный (legacy)'),  # Deprecated, use PRO_MONTHLY
+        ('YEARLY', 'Годовой (legacy)'),    # Deprecated, use PRO_YEARLY
     ]
 
+    # System code for programmatic access (unique identifier)
+    code = models.CharField(
+        'Системный код',
+        max_length=50,
+        unique=True,
+        help_text='Уникальный код для API (например: FREE, PRO_MONTHLY, PRO_YEARLY)'
+    )
+
+    # Legacy name field - deprecated, use 'code' instead
     name = models.CharField(
-        'Название плана',
+        'Название плана (legacy)',
         max_length=50,
         choices=PLAN_CHOICES,
-        unique=True
+        unique=True,
+        blank=True,
+        null=True,
+        help_text='DEPRECATED: используйте поле code'
     )
     display_name = models.CharField('Отображаемое название', max_length=100)
     description = models.TextField('Описание', blank=True)

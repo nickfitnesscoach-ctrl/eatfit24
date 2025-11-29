@@ -10,46 +10,66 @@ from .usage import DailyUsage
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(admin.ModelAdmin):
-    """Админка для тарифных планов."""
+    """
+    Админка для тарифных планов.
+
+    ВАЖНО: Не создавайте новые планы через админку!
+    Редактируйте только существующие три плана: FREE, PRO_MONTHLY, PRO_YEARLY.
+    Поле 'code' доступно только для чтения.
+    """
 
     list_display = [
+        'code',
         'display_name',
-        'name',
         'price',
         'duration_days',
         'daily_photo_limit',
-        'max_photos_per_day',
         'history_days',
         'is_active',
+        'is_test',
         'created_at',
     ]
-    list_filter = ['name', 'is_active', 'created_at']
-    search_fields = ['display_name', 'description']
+    list_filter = ['is_active', 'is_test', 'created_at']
+    search_fields = ['code', 'display_name', 'description']
     ordering = ['price']
 
     fieldsets = (
         ('Основная информация', {
-            'fields': ('name', 'display_name', 'description', 'is_active')
+            'fields': ('code', 'display_name', 'description', 'is_active', 'is_test'),
+            'description': 'Поле "code" доступно только для чтения. Не изменяйте его!'
         }),
         ('Цены и длительность', {
-            'fields': ('price', 'duration_days')
+            'fields': ('price', 'duration_days'),
+            'description': 'Цены можно изменять через админку. Изменения сразу влияют на API.'
         }),
         ('Возможности плана', {
             'fields': (
                 'daily_photo_limit',
-                'max_photos_per_day',
                 'history_days',
                 'ai_recognition',
                 'advanced_stats',
                 'priority_support',
             )
         }),
+        ('Legacy поля (не используйте)', {
+            'fields': ('name', 'max_photos_per_day'),
+            'classes': ('collapse',),
+            'description': 'Устаревшие поля. Используйте code и daily_photo_limit.'
+        }),
         ('Даты', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['code', 'created_at', 'updated_at']
+
+    def has_add_permission(self, request):
+        """Запрещаем создание новых планов через админку."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Запрещаем удаление планов через админку."""
+        return False
 
 
 @admin.register(Subscription)
