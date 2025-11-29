@@ -7,7 +7,7 @@
 
 import { buildTelegramHeaders, getTelegramDebugInfo } from '../lib/telegram';
 import { Profile } from '../types/profile';
-import { BillingMe, CreatePaymentRequest, CreatePaymentResponse, SubscriptionDetails, PaymentMethod, PaymentHistory } from '../types/billing';
+import { BillingMe, CreatePaymentRequest, CreatePaymentResponse, SubscriptionDetails, PaymentMethod, PaymentHistory, SubscriptionPlan } from '../types/billing';
 
 export interface TrainerPanelAuthResponse {
     ok: boolean;
@@ -69,6 +69,7 @@ const URLS = {
     paymentMethodDetails: `${API_BASE}/billing/payment-method/`,
     paymentsHistory: `${API_BASE}/billing/payments/`,
     bindCardStart: `${API_BASE}/billing/bind-card/start/`,
+    plans: `${API_BASE}/billing/plans/`,
     // AI endpoints
     recognize: `${API_BASE}/ai/recognize/`,
 };
@@ -650,6 +651,23 @@ export const api = {
         } catch (error) {
             console.error('Error fetching plan:', error);
             return null;
+        }
+    },
+
+    /**
+     * GET /api/v1/billing/plans/
+     * Получение списка доступных тарифов
+     */
+    async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+        try {
+            const response = await fetchWithTimeout(URLS.plans, {
+                headers: getHeaders(),
+            });
+            if (!response.ok) throw new Error('Failed to fetch subscription plans');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching subscription plans:', error);
+            throw error;
         }
     },
 

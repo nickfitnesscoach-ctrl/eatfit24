@@ -27,9 +27,20 @@ export interface BillingState {
     error: string | null;
 }
 
+export interface SubscriptionPlan {
+    code: string;
+    display_name: string;
+    price: number;
+    duration_days: number;
+    features?: string[];
+    is_popular?: boolean; // Optional flag if backend supports it
+    old_price?: number;   // Optional for display
+}
+
 export interface CreatePaymentRequest {
-    plan_code: 'MONTHLY' | 'YEARLY';
+    plan_code: string;
     return_url?: string;
+    save_payment_method?: boolean;
 }
 
 export interface CreatePaymentResponse {

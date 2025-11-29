@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PlanCard, { Plan, PlanId } from '../components/PlanCard';
 import { api } from '../services/api';
@@ -6,43 +6,7 @@ import { useBilling } from '../contexts/BillingContext';
 import { Loader2 } from 'lucide-react';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 
-const PLANS: Plan[] = [
-    {
-        id: 'free',
-        name: 'Free',
-        priceText: '0 ₽',
-        features: [
-            'До 3 фото в день',
-            'Базовый анализ еды',
-            'Ограниченная история (7 дней)'
-        ]
-    },
-    {
-        id: 'pro_monthly',
-        name: 'PRO Plan',
-        priceText: '299 ₽ / месяц',
-        features: [
-            'Безлимитный анализ еды',
-            'Персональные рекомендации',
-            'История прогресса',
-            'Приоритетная поддержка'
-        ]
-    },
-    {
-        id: 'pro_yearly',
-        name: 'PRO Plan – Год',
-        priceText: '2490 ₽ / год',
-        oldPriceText: '3588 ₽',
-        priceSubtext: '≈ 208 ₽ / месяц',
-        tag: 'POPULAR',
-        features: [
-            'Безлимитный анализ еды',
-            'Персональные рекомендации',
-            'История прогресса',
-            'Приоритетная поддержка'
-        ]
-    }
-];
+
 
 const SubscriptionPage: React.FC = () => {
     const billing = useBilling();
@@ -50,6 +14,59 @@ const SubscriptionPage: React.FC = () => {
     const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
     const [loadingPlanId, setLoadingPlanId] = useState<PlanId | null>(null);
     const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
+    const [plans, setPlans] = useState<Plan[]>([]);
+    const [loadingPlans, setLoadingPlans] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                setLoadingPlans(true);
+                const apiPlans = await api.getSubscriptionPlans();
+                const uiPlans: Plan[] = apiPlans.map(p => {
+                    let id = p.code.toLowerCase();
+                    if (p.code === 'PRO_MONTHLY') id = 'pro_monthly';
+                    if (p.code === 'PRO_YEARLY') id = 'pro_yearly';
+                    if (p.code === 'FREE') id = 'free';
+
+                    let priceText = `${p.price} ₽`;
+                    if (p.code === 'PRO_MONTHLY') priceText = `${p.price} ₽ / месяц`;
+                    if (p.code === 'PRO_YEARLY') priceText = `${p.price} ₽ / год`;
+                    if (p.code === 'FREE') priceText = '0 ₽';
+
+                    return {
+                        id,
+                        code: p.code,
+                        name: p.display_name,
+                        priceText,
+                        features: p.features || [],
+                        oldPriceText: p.old_price ? `${p.old_price} ₽` : undefined,
+                        tag: p.is_popular ? 'POPULAR' : undefined,
+                        priceSubtext: p.code === 'PRO_YEARLY' ? `≈ ${Math.round(p.price / 12)} ₽ / месяц` : undefined
+                    };
+                });
+
+                // Sort: Free, Monthly, Yearly
+                const order = ['free', 'pro_monthly', 'pro_yearly'];
+                uiPlans.sort((a, b) => {
+                    const idxA = order.indexOf(a.id);
+                    const idxB = order.indexOf(b.id);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
+                });
+
+                setPlans(uiPlans);
+            } catch (e) {
+                console.error(e);
+                setError('Не удалось загрузить тарифы, попробуйте позже');
+            } finally {
+                setLoadingPlans(false);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     const showToast = (message: string) => {
         const tg = window.Telegram?.WebApp;
@@ -67,8 +84,13 @@ const SubscriptionPage: React.FC = () => {
 
         try {
             setLoadingPlanId(planId);
-            const planCode = planId === 'pro_monthly' ? 'MONTHLY' : 'YEARLY';
-            const { confirmation_url } = await api.createPayment({ plan_code: planCode });
+            const plan = plans.find(p => p.id === planId);
+            if (!plan) throw new Error("Plan not found");
+
+            const { confirmation_url } = await api.createPayment({
+                plan_code: plan.code,
+                save_payment_method: true
+            });
 
             if (isTMA && window.Telegram) {
                 window.Telegram.WebApp.openLink(confirmation_url);
@@ -188,7 +210,15 @@ const SubscriptionPage: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-                {PLANS.map((plan) => {
+                {loadingPlans ? (
+                    <div className="flex justify-center py-12">
+                        <Loader2 className="animate-spin text-blue-500" size={40} />
+                    </div>
+                ) : error ? (
+                    <div className="text-center text-red-500 py-8 bg-red-50 rounded-xl">
+                        {error}
+                    </div>
+                ) : plans.map((plan) => {
                     let isCurrent = false;
                     let customButtonText: string | undefined;
                     let disabled = false;
@@ -196,8 +226,8 @@ const SubscriptionPage: React.FC = () => {
 
                     if (subscription) {
                         // Map new subscription format to old plan codes for compatibility
-                        const userPlanCode = subscription.plan === 'free' ? 'FREE' :
-                                             subscription.plan === 'pro' ? 'MONTHLY' : 'FREE'; // Default to MONTHLY for pro
+                        const userPlanCode = billing.billingMe?.plan_code ||
+                            (subscription.plan === 'free' ? 'FREE' : 'MONTHLY');
 
                         // FREE CARD
                         if (plan.id === 'free') {

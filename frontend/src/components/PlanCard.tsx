@@ -1,10 +1,11 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 
-export type PlanId = "free" | "pro_monthly" | "pro_yearly";
+export type PlanId = string;
 
 export interface Plan {
     id: PlanId;
+    code: string; // Real API code
     name: string;
     priceText: string;
     oldPriceText?: string;
