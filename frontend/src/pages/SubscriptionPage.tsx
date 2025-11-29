@@ -23,28 +23,30 @@ const SubscriptionPage: React.FC = () => {
             try {
                 setLoadingPlans(true);
                 const apiPlans = await api.getSubscriptionPlans();
-                const uiPlans: Plan[] = apiPlans.map(p => {
-                    let id = p.code.toLowerCase();
-                    if (p.code === 'PRO_MONTHLY') id = 'pro_monthly';
-                    if (p.code === 'PRO_YEARLY') id = 'pro_yearly';
-                    if (p.code === 'FREE') id = 'free';
+                const uiPlans: Plan[] = apiPlans
+                    .filter(p => ['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'].includes(p.code))
+                    .map(p => {
+                        let id = p.code.toLowerCase();
+                        if (p.code === 'PRO_MONTHLY') id = 'pro_monthly';
+                        if (p.code === 'PRO_YEARLY') id = 'pro_yearly';
+                        if (p.code === 'FREE') id = 'free';
 
-                    let priceText = `${p.price} ₽`;
-                    if (p.code === 'PRO_MONTHLY') priceText = `${p.price} ₽ / месяц`;
-                    if (p.code === 'PRO_YEARLY') priceText = `${p.price} ₽ / год`;
-                    if (p.code === 'FREE') priceText = '0 ₽';
+                        let priceText = `${p.price} ₽`;
+                        if (p.code === 'PRO_MONTHLY') priceText = `${p.price} ₽ / месяц`;
+                        if (p.code === 'PRO_YEARLY') priceText = `${p.price} ₽ / год`;
+                        if (p.code === 'FREE') priceText = '0 ₽';
 
-                    return {
-                        id,
-                        code: p.code,
-                        name: p.display_name,
-                        priceText,
-                        features: p.features || [],
-                        oldPriceText: p.old_price ? `${p.old_price} ₽` : undefined,
-                        tag: p.is_popular ? 'POPULAR' : undefined,
-                        priceSubtext: p.code === 'PRO_YEARLY' ? `≈ ${Math.round(p.price / 12)} ₽ / месяц` : undefined
-                    };
-                });
+                        return {
+                            id,
+                            code: p.code,
+                            name: p.display_name,
+                            priceText,
+                            features: p.features || [],
+                            oldPriceText: p.old_price ? `${p.old_price} ₽` : undefined,
+                            tag: p.is_popular ? 'POPULAR' : undefined,
+                            priceSubtext: p.code === 'PRO_YEARLY' ? `≈ ${Math.round(p.price / 12)} ₽ / месяц` : undefined
+                        };
+                    });
 
                 // Sort: Free, Monthly, Yearly
                 const order = ['free', 'pro_monthly', 'pro_yearly'];
