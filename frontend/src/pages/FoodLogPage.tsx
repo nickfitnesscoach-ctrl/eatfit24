@@ -3,6 +3,7 @@ import { Camera, Upload, X, Check, Plus, CreditCard, AlertCircle } from 'lucide-
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
+import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 
 interface RecognizedItem {
     name: string;
@@ -24,6 +25,7 @@ interface AnalysisResult {
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
     const billing = useBilling();
+    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -251,6 +253,32 @@ const FoodLogPage: React.FC = () => {
         // Allow retry for service errors and empty results, but not for invalid image or auth errors
         return ['AI_SERVICE_ERROR', 'NO_FOOD_DETECTED', 'RATE_LIMIT_EXCEEDED'].includes(errorCode);
     };
+
+    // While WebApp is initializing
+    if (!isReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+            </div>
+        );
+    }
+
+    // WebApp is ready but we're not in Telegram
+    if (!webAppDetected) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">
+                    <h2 className="text-xl font-bold text-orange-900 mb-2">
+                        Откройте через Telegram
+                    </h2>
+                    <p className="text-orange-700">
+                        Это приложение работает только внутри Telegram.
+                        Пожалуйста, откройте бота и нажмите кнопку "Открыть приложение".
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-24">

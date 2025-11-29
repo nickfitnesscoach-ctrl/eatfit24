@@ -2,10 +2,7 @@ server {
     listen 80;
     server_name _;
     root /usr/share/nginx/html;
-
-    # Отключаем абсолютные редиректы
-    absolute_redirect off;
-    port_in_redirect off;
+    index index.html;
 
     # Включаем gzip сжатие
     gzip on;
@@ -39,48 +36,23 @@ server {
         }
     }
 
-    # Лендинг - главная страница
-    location = / {
-        try_files /landing/index.html =404;
-        add_header Cache-Control "public, max-age=3600";
-    }
-
-    # Лендинг - статические HTML страницы
-    location ~ ^/(offer|privacy|contacts)$ {
-        try_files /landing/$uri.html =404;
-        add_header Cache-Control "public, max-age=3600";
-    }
-
-    # Лендинг - CSS и изображения
-    location /landing/ {
-        try_files $uri =404;
-        add_header Cache-Control "public, max-age=86400";
-    }
-
-    # React приложение на /app/*
-    location /app/ {
-        alias /usr/share/nginx/html/app/;
-        try_files $uri $uri/ /app/index.html;
+    # SPA роутинг - все запросы отправляем на index.html
+    location / {
+        try_files $uri $uri/ /index.html;
 
         # Добавляем заголовки для безопасности
         add_header X-Frame-Options "SAMEORIGIN" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header X-XSS-Protection "1; mode=block" always;
 
-        # DEV MODE: Отключаем кеширование HTML
+        # DEV MODE: Отключаем кеширование HTML + Clear Site Data для принудительной очистки
         add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
         add_header Pragma "no-cache" always;
+        add_header Clear-Site-Data "\"cache\", \"storage\"" always;
         expires -1;
     }
 
-    # Статические файлы React приложения
-    location /app/assets/ {
-        alias /usr/share/nginx/html/app/assets/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # DEV MODE: Минимальное кэширование статических файлов
+    # DEV MODE: Минимальное кэширование статических файлов (5 минут вместо 1 года)
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 5m;
         add_header Cache-Control "public, max-age=300";

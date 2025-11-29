@@ -22,8 +22,15 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   useEffect(() => {
-    // Инициализация Telegram WebApp через централизованный модуль
-    initTelegramWebApp();
+    // Условная инициализация Telegram WebApp (только когда работаем как Telegram Mini App)
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      initTelegramWebApp();
+    } else if (import.meta.env.DEV) {
+      // В DEV режиме пытаемся инициализировать с фейковыми данными
+      initTelegramWebApp();
+    } else {
+      console.log('[App] Запуск вне Telegram WebApp - пропускаем инициализацию');
+    }
 
     // DEBUG: Version marker
     console.log('🚀 EATFIT_FRONT_VERSION = 42');
@@ -35,7 +42,7 @@ function App() {
       <AuthProvider>
         <BillingProvider>
           <ClientsProvider>
-            <Router>
+            <Router basename="/app">
               <Routes>
                 {/* Client Routes - КБЖУ трекер на главной (для всех) */}
                 <Route path="/" element={<ClientLayout />}>

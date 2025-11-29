@@ -4,6 +4,7 @@ import PlanCard, { Plan, PlanId } from '../components/PlanCard';
 import { api } from '../services/api';
 import { useBilling } from '../contexts/BillingContext';
 import { Loader2 } from 'lucide-react';
+import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 
 const PLANS: Plan[] = [
     {
@@ -46,6 +47,7 @@ const PLANS: Plan[] = [
 const SubscriptionPage: React.FC = () => {
     const billing = useBilling();
     const navigate = useNavigate();
+    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
     const [loadingPlanId, setLoadingPlanId] = useState<PlanId | null>(null);
     const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
 
@@ -145,6 +147,32 @@ const SubscriptionPage: React.FC = () => {
         topStatusText = `Текущий тариф: PRO до ${formatDate(expiresAt)}`;
     } else if (isExpired) {
         topStatusText = `Подписка закончилась ${formatDate(expiresAt)}`;
+    }
+
+    // While WebApp is initializing
+    if (!isReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+            </div>
+        );
+    }
+
+    // WebApp is ready but we're not in Telegram
+    if (!webAppDetected) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">
+                    <h2 className="text-xl font-bold text-orange-900 mb-2">
+                        Откройте через Telegram
+                    </h2>
+                    <p className="text-orange-700">
+                        Это приложение работает только внутри Telegram.
+                        Пожалуйста, откройте бота и нажмите кнопку "Открыть приложение".
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     return (

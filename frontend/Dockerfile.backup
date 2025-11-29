@@ -18,11 +18,8 @@ RUN npm run build
 # Этап 2: Production образ с nginx
 FROM nginx:alpine
 
-# Копируем собранное React приложение в подпапку /app
-COPY --from=builder /app/dist /usr/share/nginx/html/app
-
-# Копируем лендинг (статические HTML страницы)
-COPY public/landing /usr/share/nginx/html/landing
+# Копируем собранное приложение из builder
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Копируем конфигурацию nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
