@@ -15,6 +15,7 @@ def populate_code_field(apps, schema_editor):
         'MONTHLY': 'PRO_MONTHLY',
         'YEARLY': 'PRO_YEARLY',
         'TEST_LIVE': 'TEST_LIVE',
+        'MONTHLY_TEST': 'MONTHLY_TEST',  # Legacy test plan
     }
 
     for plan in SubscriptionPlan.objects.all():
@@ -22,6 +23,11 @@ def populate_code_field(apps, schema_editor):
             plan.code = name_to_code[plan.name]
             plan.save(update_fields=['code'])
             print(f"Updated plan {plan.name} -> code={plan.code}")
+        else:
+            # Для неизвестных планов используем name как code
+            plan.code = plan.name
+            plan.save(update_fields=['code'])
+            print(f"Updated unknown plan {plan.name} -> code={plan.code}")
 
 
 class Migration(migrations.Migration):
