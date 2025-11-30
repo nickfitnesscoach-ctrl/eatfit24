@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Camera, Upload, X, Check, Plus, CreditCard, AlertCircle } from 'lucide-react';
-import { api } from '../services/api';
+import { api, CreateMealRequest, CreateFoodItemRequest } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
@@ -145,7 +145,7 @@ const FoodLogPage: React.FC = () => {
         setSelectedItems(newSelected);
     };
 
-    const getMealTypeByTime = (): string => {
+    const getMealTypeByTime = (): 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' => {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 11) return 'BREAKFAST';
         if (hour >= 11 && hour < 16) return 'LUNCH';
@@ -186,23 +186,30 @@ const FoodLogPage: React.FC = () => {
     };
 
     const handleSaveMeal = async () => {
-        if (!analysisResult || selectedItems.size === 0) return;
+        if (!analysisResult || selectedItems.size === 0) {
+            console.warn('Cannot save meal: no analysis result or no items selected');
+            return;
+        }
 
         setSaving(true);
         setError(null);
 
         try {
+            console.log('[FoodLog] Starting meal save process...');
+
             // 1. Create Meal
-            const mealData = {
+            const mealData: CreateMealRequest = {
                 date: new Date().toISOString().split('T')[0],
                 meal_type: getMealTypeByTime()
             };
+            console.log('[FoodLog] Creating meal:', mealData);
             const meal = await api.createMeal(mealData);
+            console.log('[FoodLog] Meal created:', meal);
 
             // 2. Add selected Food Items
-            const promises = analysisResult.recognized_items
+            const selectedFoodItems = analysisResult.recognized_items
                 .filter((_, index) => selectedItems.has(index))
-                .map(item => api.addFoodItem(meal.id, {
+                .map((item): CreateFoodItemRequest => ({
                     name: item.name,
                     grams: item.grams,
                     calories: item.calories,
@@ -211,7 +218,12 @@ const FoodLogPage: React.FC = () => {
                     carbohydrates: item.carbohydrates
                 }));
 
-            await Promise.all(promises);
+            console.log(`[FoodLog] Adding ${selectedFoodItems.length} food items to meal ${meal.id}...`);
+
+            const promises = selectedFoodItems.map(item => api.addFoodItem(meal.id, item));
+            const addedItems = await Promise.all(promises);
+
+            console.log('[FoodLog] All food items added successfully:', addedItems);
 
             // Success - show message and redirect
             const tg = window.Telegram?.WebApp;
@@ -223,8 +235,15 @@ const FoodLogPage: React.FC = () => {
                 navigate('/client');
             }
         } catch (err: any) {
-            console.error('Save error:', err);
-            setError(err.message || 'Ошибка при сохранении');
+            console.error('[FoodLog] Save error:', err);
+            const errorMessage = err.message || 'Ошибка при сохранении приёма пищи';
+            setError(errorMessage);
+
+            // Show error in Telegram alert if available
+            const tg = window.Telegram?.WebApp;
+            if (tg?.showAlert) {
+                tg.showAlert(`Ошибка: ${errorMessage}`);
+            }
         } finally {
             setSaving(false);
         }
@@ -568,11 +587,18 @@ const FoodLogPage: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* Save error display */}
+                                {error && !analyzing && (
+                                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                                        <p className="text-red-600 text-center font-medium">{error}</p>
+                                    </div>
+                                )}
+
                                 {/* Save button */}
                                 <button
                                     onClick={handleSaveMeal}
                                     disabled={selectedItems.size === 0 || saving}
-                                    className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${selectedItems.size === 0
+                                    className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${selectedItems.size === 0 || saving
                                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg active:scale-95'
                                         }`}

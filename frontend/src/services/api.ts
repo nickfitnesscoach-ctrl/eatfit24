@@ -15,6 +15,53 @@ export interface TrainerPanelAuthResponse {
     role: 'admin';
 }
 
+// ============================================================
+// Nutrition Types
+// ============================================================
+
+export interface Meal {
+    id: number;
+    meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+    meal_type_display?: string;
+    date: string; // YYYY-MM-DD
+    created_at: string;
+    items?: FoodItem[];
+    total?: {
+        calories: number;
+        protein: number;
+        fat: number;
+        carbohydrates: number;
+    };
+}
+
+export interface FoodItem {
+    id: number;
+    name: string;
+    photo?: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface CreateMealRequest {
+    date: string; // YYYY-MM-DD
+    meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+}
+
+export interface CreateFoodItemRequest {
+    name: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number;
+    photo?: File;
+}
+
 // Custom error classes for better error handling
 export class UnauthorizedError extends Error {
     constructor(message: string = 'Unauthorized') {
@@ -397,33 +444,50 @@ export const api = {
         }
     },
 
-    async createMeal(data: any) {
+    async createMeal(data: CreateMealRequest): Promise<Meal> {
+        log(`Creating meal: ${data.meal_type} for ${data.date}`);
         try {
             const response = await fetchWithRetry(URLS.meals, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify(data),
             });
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || errorData.error || 'Failed to create meal');
+                const errorMsg = errorData.detail || errorData.error || `Failed to create meal (${response.status})`;
+                log(`Create meal error: ${errorMsg}`);
+                throw new Error(errorMsg);
             }
-            return await response.json();
+
+            const meal = await response.json();
+            log(`Meal created successfully: id=${meal.id}`);
+            return meal;
         } catch (error) {
             console.error('Error creating meal:', error);
             throw error;
         }
     },
 
-    async addFoodItem(mealId: number, data: any) {
+    async addFoodItem(mealId: number, data: CreateFoodItemRequest): Promise<FoodItem> {
+        log(`Adding food item "${data.name}" to meal ${mealId}`);
         try {
-            const response = await fetchWithTimeout(`${URLS.meals}${mealId}/items/`, {
+            const response = await fetchWithRetry(`${URLS.meals}${mealId}/items/`, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify(data),
             });
-            if (!response.ok) throw new Error('Failed to add food item');
-            return await response.json();
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errorMsg = errorData.detail || errorData.error || `Failed to add food item (${response.status})`;
+                log(`Add food item error: ${errorMsg}`);
+                throw new Error(errorMsg);
+            }
+
+            const foodItem = await response.json();
+            log(`Food item added successfully: id=${foodItem.id}`);
+            return foodItem;
         } catch (error) {
             console.error('Error adding food item:', error);
             throw error;
@@ -1017,21 +1081,14 @@ export const api = {
             console.log('RECOGNIZE OK', response.status, backendResult);
             log(`RAW AI response: ${JSON.stringify(backendResult)}`);
 
-            // Map backend response to frontend structure
-            // AI Proxy returns: { items: [{name, grams, kcal, protein, fat, carbs}], total: {kcal, protein, fat, carbs} }
+            // Backend returns: { recognized_items: [...], total_calories: ..., total_protein: ..., total_fat: ..., total_carbohydrates: ... }
+            // Items already have correct field names: name, grams, calories, protein, fat, carbohydrates
             const mappedResult = {
-                recognized_items: (backendResult.items || []).map((item: any) => ({
-                    name: item.name || "Unknown",
-                    grams: item.grams || 0,
-                    calories: item.kcal || 0,
-                    protein: item.protein || 0,
-                    fat: item.fat || 0,
-                    carbohydrates: item.carbs || 0
-                })),
-                total_calories: backendResult.total?.kcal || 0,
-                total_protein: backendResult.total?.protein || 0,
-                total_fat: backendResult.total?.fat || 0,
-                total_carbohydrates: backendResult.total?.carbs || 0
+                recognized_items: backendResult.recognized_items || [],
+                total_calories: backendResult.total_calories || 0,
+                total_protein: backendResult.total_protein || 0,
+                total_fat: backendResult.total_fat || 0,
+                total_carbohydrates: backendResult.total_carbohydrates || 0
             };
 
             log(`AI recognized ${mappedResult.recognized_items.length} items`);
