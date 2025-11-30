@@ -3,6 +3,7 @@ Views for AI app.
 """
 
 import logging
+import time
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import status
@@ -17,7 +18,7 @@ from .serializers import (
 )
 from .services import AIRecognitionService
 from apps.ai_proxy.service import AIProxyRecognitionService
-from apps.ai_proxy.exceptions import AIProxyError, AIProxyValidationError
+from apps.ai_proxy.exceptions import AIProxyError, AIProxyValidationError, AIProxyTimeoutError
 from .throttles import AIRecognitionPerMinuteThrottle, AIRecognitionPerDayThrottle
 from apps.billing.services import get_effective_plan_for_user
 from apps.billing.usage import DailyUsage
@@ -76,6 +77,9 @@ class AIRecognitionView(APIView):
     )
     def post(self, request):
         """Handle POST request for AI food recognition."""
+        view_start_time = time.time()
+        logger.info(f"AI recognition request START for user {request.user.username}")
+
         serializer = AIRecognitionRequestSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -113,16 +117,19 @@ class AIRecognitionView(APIView):
             ai_service = AIProxyRecognitionService()
 
             # Recognize food items
+            recognition_start = time.time()
             logger.info(f"Starting AI Proxy recognition for user {request.user.username}")
             result = ai_service.recognize_food(
                 image_data_url,
                 user_description=description,
                 user_comment=comment
             )
+            recognition_elapsed = time.time() - recognition_start
 
             logger.info(
                 f"AI recognition successful for user {request.user.username}. "
-                f"Found {len(result.get('recognized_items', []))} items"
+                f"Found {len(result.get('recognized_items', []))} items, "
+                f"recognition_time={recognition_elapsed:.2f}s"
             )
 
             # Increment photo usage counter after successful recognition
@@ -134,13 +141,39 @@ class AIRecognitionView(APIView):
 
             # Use serializer to add summary/totals
             response_serializer = AIRecognitionResponseSerializer(result)
+
+            view_total = time.time() - view_start_time
+            logger.info(
+                f"AI recognition request COMPLETED for user {request.user.username}, "
+                f"total_view_time={view_total:.2f}s"
+            )
+
             return Response(
                 response_serializer.data,
                 status=status.HTTP_200_OK
             )
 
+        except AIProxyTimeoutError as e:
+            view_total = time.time() - view_start_time
+            logger.error(
+                f"AI Proxy timeout for user {request.user.username}: {e}, "
+                f"total_view_time={view_total:.2f}s"
+            )
+            return Response(
+                {
+                    "error": "AI_SERVICE_TIMEOUT",
+                    "detail": "Сервис распознавания не ответил вовремя. Попробуйте позже или используйте фото меньшего размера.",
+                    "timeout": True
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
         except AIProxyValidationError as e:
-            logger.error(f"AI Proxy validation error: {e}")
+            view_total = time.time() - view_start_time
+            logger.error(
+                f"AI Proxy validation error for user {request.user.username}: {e}, "
+                f"total_view_time={view_total:.2f}s"
+            )
             return Response(
                 {
                     "error": "INVALID_IMAGE",
@@ -150,7 +183,12 @@ class AIRecognitionView(APIView):
             )
 
         except AIProxyError as e:
-            logger.error(f"AI Proxy error: {e}", exc_info=True)
+            view_total = time.time() - view_start_time
+            logger.error(
+                f"AI Proxy error for user {request.user.username}: {e}, "
+                f"total_view_time={view_total:.2f}s",
+                exc_info=True
+            )
             return Response(
                 {
                     "error": "AI_PROXY_ERROR",
@@ -160,7 +198,11 @@ class AIRecognitionView(APIView):
             )
 
         except ValueError as e:
-            logger.error(f"AI recognition validation error: {e}")
+            view_total = time.time() - view_start_time
+            logger.error(
+                f"AI recognition validation error for user {request.user.username}: {e}, "
+                f"total_view_time={view_total:.2f}s"
+            )
             return Response(
                 {
                     "error": "INVALID_IMAGE",
@@ -170,7 +212,12 @@ class AIRecognitionView(APIView):
             )
 
         except Exception as e:
-            logger.error(f"AI recognition unexpected error: {e}", exc_info=True)
+            view_total = time.time() - view_start_time
+            logger.error(
+                f"AI recognition unexpected error for user {request.user.username}: {e}, "
+                f"total_view_time={view_total:.2f}s",
+                exc_info=True
+            )
             return Response(
                 {
                     "error": "AI_SERVICE_ERROR",

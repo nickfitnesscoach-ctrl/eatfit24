@@ -6,6 +6,7 @@ It decodes data URL images and sends them as multipart/form-data to AI Proxy.
 """
 
 import logging
+import time
 from typing import Dict, Optional
 
 from .client import AIProxyClient
@@ -51,17 +52,21 @@ class AIProxyRecognitionService:
             AIProxyError: If AI Proxy call fails
             AIProxyValidationError: If data URL format is invalid
         """
+        service_start_time = time.time()
+
         # Merge description and comment (prioritize comment)
         final_comment = user_comment or user_description or ""
 
         try:
             # Parse data URL to bytes
             logger.debug("Parsing data URL to image bytes")
+            parse_start = time.time()
             image_bytes, content_type = parse_data_url(image_data_url)
+            parse_elapsed = time.time() - parse_start
 
             logger.info(
                 f"Parsed data URL: size={len(image_bytes)/1024:.1f}KB, "
-                f"content_type={content_type}"
+                f"content_type={content_type}, parse_time={parse_elapsed:.3f}s"
             )
 
         except ValueError as e:
@@ -72,23 +77,32 @@ class AIProxyRecognitionService:
         try:
             # Call AI Proxy with image bytes via multipart/form-data
             logger.info("Calling AI Proxy with image bytes")
+            proxy_start = time.time()
             ai_proxy_response = self.client.recognize_food(
                 image_bytes=image_bytes,
                 content_type=content_type,
                 user_comment=final_comment,
                 locale="ru",
             )
+            proxy_elapsed = time.time() - proxy_start
 
             # Adapt response to legacy format
+            adapt_start = time.time()
             result = adapt_ai_proxy_response(ai_proxy_response)
+            adapt_elapsed = time.time() - adapt_start
+
+            service_total = time.time() - service_start_time
 
             logger.info(
                 f"AI Proxy recognition successful. "
-                f"Items: {len(result.get('recognized_items', []))}"
+                f"Items: {len(result.get('recognized_items', []))}, "
+                f"proxy_time={proxy_elapsed:.2f}s, adapt_time={adapt_elapsed:.3f}s, "
+                f"total_service_time={service_total:.2f}s"
             )
 
             return result
 
         except AIProxyError as e:
-            logger.error(f"AI Proxy error: {e}")
+            service_total = time.time() - service_start_time
+            logger.error(f"AI Proxy error: {e}, total_service_time={service_total:.2f}s")
             raise

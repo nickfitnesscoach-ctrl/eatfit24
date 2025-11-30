@@ -28,6 +28,7 @@ Usage:
 """
 
 import logging
+import time
 from typing import Dict, Optional
 
 import httpx
@@ -89,8 +90,9 @@ class AIProxyClient:
         self.api_url = self.api_url.rstrip("/")
 
         # Initialize HTTP client with timeout
-        # AI Proxy uses 60s timeout for OpenRouter calls
-        self.timeout = 60.0  # 60 seconds
+        # Set to 20s to ensure response before frontend timeout (30s)
+        # This leaves 10s margin for Django processing and network delays
+        self.timeout = 20.0  # 20 seconds
         self.client = httpx.Client(timeout=self.timeout)
 
         logger.info(
@@ -165,9 +167,13 @@ class AIProxyClient:
         # Log request (log size and type, not the actual bytes)
         image_size_kb = len(image_bytes) / 1024
         logger.info(
-            f"AI Proxy request: image_size={image_size_kb:.1f}KB, "
-            f"content_type={content_type}, comment={user_comment!r}, locale={locale}"
+            f"AI Proxy request START: endpoint={endpoint}, "
+            f"image_size={image_size_kb:.1f}KB, content_type={content_type}, "
+            f"comment={user_comment!r}, locale={locale}, timeout={self.timeout}s"
         )
+
+        # Measure request time
+        start_time = time.time()
 
         try:
             # Make HTTP POST request with multipart/form-data
@@ -178,6 +184,8 @@ class AIProxyClient:
                 data=data,
             )
 
+            elapsed_time = time.time() - start_time
+
             # Handle different status codes
             if response.status_code == 200:
                 result = response.json()
@@ -186,8 +194,8 @@ class AIProxyClient:
                 total_calories = result.get("total", {}).get("kcal", 0)
 
                 logger.info(
-                    f"AI Proxy success: {items_count} items found, "
-                    f"total {total_calories} kcal"
+                    f"AI Proxy SUCCESS: {items_count} items found, "
+                    f"total {total_calories} kcal, elapsed_time={elapsed_time:.2f}s"
                 )
 
                 return result
@@ -196,7 +204,7 @@ class AIProxyClient:
                 error_detail = response.json().get("detail", "Invalid or missing API key")
                 logger.error(
                     f"AI Proxy authentication failed: {error_detail}. "
-                    f"Key prefix: {self.api_key[:8]}..."
+                    f"Key prefix: {self.api_key[:8]}..., elapsed_time={elapsed_time:.2f}s"
                 )
                 raise AIProxyAuthenticationError(
                     f"AI Proxy authentication failed: {error_detail}"
@@ -204,14 +212,20 @@ class AIProxyClient:
 
             elif response.status_code == 422:
                 error_detail = response.json().get("detail", "Validation error")
-                logger.error(f"AI Proxy validation error: {error_detail}")
+                logger.error(
+                    f"AI Proxy validation error: {error_detail}, "
+                    f"elapsed_time={elapsed_time:.2f}s"
+                )
                 raise AIProxyValidationError(
                     f"AI Proxy validation error: {error_detail}"
                 )
 
             elif response.status_code == 500:
                 error_detail = response.json().get("detail", "Internal server error")
-                logger.error(f"AI Proxy server error: {error_detail}")
+                logger.error(
+                    f"AI Proxy server error: {error_detail}, "
+                    f"elapsed_time={elapsed_time:.2f}s"
+                )
                 raise AIProxyServerError(
                     f"AI Proxy server error: {error_detail}"
                 )
@@ -219,21 +233,30 @@ class AIProxyClient:
             else:
                 # Unexpected status code
                 logger.error(
-                    f"AI Proxy unexpected status {response.status_code}: {response.text[:200]}"
+                    f"AI Proxy unexpected status {response.status_code}: {response.text[:200]}, "
+                    f"elapsed_time={elapsed_time:.2f}s"
                 )
                 raise AIProxyServerError(
                     f"AI Proxy returned unexpected status {response.status_code}"
                 )
 
         except httpx.TimeoutException as e:
-            logger.error(f"AI Proxy timeout after {self.timeout}s: {e}")
+            elapsed_time = time.time() - start_time
+            logger.error(
+                f"AI Proxy TIMEOUT after {self.timeout}s: {e}, "
+                f"elapsed_time={elapsed_time:.2f}s"
+            )
             raise AIProxyTimeoutError(
                 f"AI Proxy request timed out after {self.timeout} seconds"
             )
 
         except httpx.HTTPError as e:
+            elapsed_time = time.time() - start_time
             # Network errors, connection errors, etc.
-            logger.error(f"AI Proxy HTTP error: {type(e).__name__}: {e}")
+            logger.error(
+                f"AI Proxy HTTP error: {type(e).__name__}: {e}, "
+                f"elapsed_time={elapsed_time:.2f}s"
+            )
             raise AIProxyServerError(
                 f"AI Proxy connection error: {type(e).__name__}: {e}"
             )
