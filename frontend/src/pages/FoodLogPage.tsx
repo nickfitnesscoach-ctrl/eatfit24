@@ -169,7 +169,8 @@ const FoodLogPage: React.FC = () => {
         let totals = { calories: 0, protein: 0, fat: 0, carbohydrates: 0 };
 
         analysisResult.recognized_items.forEach((item, index) => {
-            if (selectedItems.has(index)) {
+            // Не включаем строку "Итого" в подсчёт
+            if (selectedItems.has(index) && !item.name.toLowerCase().includes('итого')) {
                 totals.calories += item.calories;
                 totals.protein += item.protein;
                 totals.fat += item.fat;
@@ -209,6 +210,8 @@ const FoodLogPage: React.FC = () => {
             // 2. Add selected Food Items
             const selectedFoodItems = analysisResult.recognized_items
                 .filter((_, index) => selectedItems.has(index))
+                // Фильтруем строку "Итого" - её не нужно сохранять
+                .filter((item) => !item.name.toLowerCase().includes('итого'))
                 .map((item): CreateFoodItemRequest => ({
                     name: item.name,
                     grams: item.grams,
