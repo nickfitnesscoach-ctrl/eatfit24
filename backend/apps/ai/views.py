@@ -2,8 +2,10 @@
 Views for AI app.
 """
 
+import base64
 import logging
 import time
+from typing import Iterable
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import status
@@ -16,7 +18,6 @@ from .serializers import (
     AIRecognitionResponseSerializer,
     RecognizedItemSerializer
 )
-from .services import AIRecognitionService
 from apps.ai_proxy.service import AIProxyRecognitionService
 from apps.ai_proxy.exceptions import AIProxyError, AIProxyValidationError, AIProxyTimeoutError
 from .throttles import AIRecognitionPerMinuteThrottle, AIRecognitionPerDayThrottle
@@ -31,7 +32,7 @@ class AIRecognitionView(APIView):
     """
     POST /api/v1/ai/recognize/ - Распознать блюда на фотографии
 
-    Принимает изображение в формате Base64 и возвращает список распознанных блюд с КБЖУ.
+    Принимает изображение (multipart/form-data или Base64) и возвращает список распознанных блюд с КБЖУ.
 
     **Лимиты:**
     - 10 запросов в минуту с одного IP
@@ -52,6 +53,24 @@ class AIRecognitionView(APIView):
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [AIRecognitionPerMinuteThrottle, AIRecognitionPerDayThrottle]
+    MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+    @staticmethod
+    def _log_request_files(files: Iterable[str]):
+        file_list = list(files)
+        if file_list:
+            logger.info(f"Incoming multipart files: {file_list}")
+        else:
+            logger.info("No multipart files received")
+
+    def _file_to_data_url(self, image_file):
+        """Convert uploaded file to data URL for existing serializer validation."""
+        if image_file.size > self.MAX_IMAGE_SIZE_BYTES:
+            raise ValueError("Image exceeds maximum allowed size of 10MB")
+
+        content_type = image_file.content_type or "application/octet-stream"
+        encoded = base64.b64encode(image_file.read()).decode("utf-8")
+        return f"data:{content_type};base64,{encoded}"
 
     @extend_schema(
         request=AIRecognitionRequestSerializer,
@@ -66,7 +85,7 @@ class AIRecognitionView(APIView):
 Отправь изображение еды в Base64 и получи список распознанных блюд с КБЖУ.
 
 **Параметры:**
-- `image` (обязательно): Изображение в формате Base64 (data:image/jpeg;base64,...)
+- `image` (обязательно): Изображение в формате multipart/form-data (ключ `image`) или Base64 (data:image/jpeg;base64,...)
 - `description` (опционально): Дополнительное описание блюд (устаревшее поле)
 - `comment` (опционально): Комментарий пользователя о блюде (новое поле, передается в AI Proxy)
 - `date` (опционально): Дата приёма пищи
@@ -80,12 +99,53 @@ class AIRecognitionView(APIView):
         view_start_time = time.time()
         logger.info(f"AI recognition request START for user {request.user.username}")
 
-        serializer = AIRecognitionRequestSerializer(data=request.data)
+        # Log multipart payload details
+        self._log_request_files(request.FILES.keys())
+        if request.FILES.get("image"):
+            image_file = request.FILES["image"]
+            logger.info(
+                "Received image file: name=%s, size=%s bytes, content_type=%s",
+                getattr(image_file, "name", "<unknown>"),
+                getattr(image_file, "size", "<unknown>"),
+                getattr(image_file, "content_type", "<unknown>"),
+            )
+
+        data = request.data.copy()
+
+        if not data.get("image"):
+            if request.FILES.get("image"):
+                try:
+                    data["image"] = self._file_to_data_url(request.FILES["image"])
+                except ValueError as exc:
+                    logger.error("Invalid image file: %s", exc)
+                    return Response(
+                        {
+                            "error": "INVALID_IMAGE",
+                            "detail": str(exc),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                logger.error("Missing image in request data and files")
+                return Response(
+                    {
+                        "error": "MISSING_IMAGE",
+                        "detail": "Изображение обязательно",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        serializer = AIRecognitionRequestSerializer(data=data)
 
         if not serializer.is_valid():
+            logger.error("AI recognition validation failed: %s", serializer.errors)
             return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "error": "INVALID_IMAGE",
+                    "detail": serializer.errors.get("image", ["Некорректные данные запроса"])[0],
+                    "fields": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         image_data_url = serializer.validated_data['image']
@@ -191,10 +251,10 @@ class AIRecognitionView(APIView):
             )
             return Response(
                 {
-                    "error": "AI_PROXY_ERROR",
+                    "error": "AI_SERVICE_ERROR",
                     "detail": "Сервис распознавания временно недоступен. Попробуйте позже"
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_502_BAD_GATEWAY
             )
 
         except ValueError as e:

@@ -9,6 +9,46 @@ import { buildTelegramHeaders, getTelegramDebugInfo } from '../lib/telegram';
 import { Profile } from '../types/profile';
 import { BillingMe, CreatePaymentRequest, CreatePaymentResponse, SubscriptionDetails, PaymentMethod, PaymentHistory, SubscriptionPlan } from '../types/billing';
 
+// ============================================================
+// AI Recognition types
+// ============================================================
+
+export interface ProxyFoodItem {
+    name: string;
+    grams: number;
+    kcal: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+}
+
+export interface ProxyResponse {
+    items: ProxyFoodItem[];
+    total: {
+        kcal: number;
+        protein: number;
+        fat: number;
+        carbs: number;
+    };
+}
+
+export interface RecognizedItem {
+    name: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number;
+}
+
+export interface AnalysisResult {
+    recognized_items: RecognizedItem[];
+    total_calories: number;
+    total_protein: number;
+    total_fat: number;
+    total_carbohydrates: number;
+}
+
 export interface TrainerPanelAuthResponse {
     ok: boolean;
     user_id: number;
@@ -978,8 +1018,67 @@ export const api = {
     // AI Recognition
     // ========================================================
 
-    async recognizeFood(imageFile: File, description?: string) {
+    async recognizeFood(imageFile: File, description?: string): Promise<AnalysisResult> {
         log(`Calling AI recognize endpoint with file: ${imageFile.name}`);
+
+        const isRecord = (value: unknown): value is Record<string, unknown> => {
+            return typeof value === 'object' && value !== null;
+        };
+
+        const asNumber = (value: unknown, field: string): number => {
+            if (typeof value !== 'number' || Number.isNaN(value)) {
+                throw new Error(`Invalid AI response: ${field} is missing or not a number`);
+            }
+            return value;
+        };
+
+        const asString = (value: unknown, field: string): string => {
+            if (typeof value !== 'string' || value.trim() === '') {
+                throw new Error(`Invalid AI response: ${field} is missing or empty`);
+            }
+            return value;
+        };
+
+        const mapProxyItem = (item: unknown, index: number): RecognizedItem => {
+            if (!isRecord(item)) {
+                throw new Error(`Invalid AI response: items[${index}] is not an object`);
+            }
+
+            return {
+                name: asString(item.name, `items[${index}].name`),
+                grams: asNumber(item.grams, `items[${index}].grams`),
+                calories: asNumber(item.kcal, `items[${index}].kcal`),
+                protein: asNumber(item.protein, `items[${index}].protein`),
+                fat: asNumber(item.fat, `items[${index}].fat`),
+                carbohydrates: asNumber(item.carbs, `items[${index}].carbs`),
+            };
+        };
+
+        const mapProxyResponse = (data: unknown): AnalysisResult => {
+            if (!isRecord(data)) {
+                throw new Error('Invalid AI response: expected an object');
+            }
+
+            if (!Array.isArray(data.items)) {
+                throw new Error('Invalid AI response: items must be an array');
+            }
+
+            const totals = data.total;
+            if (!isRecord(totals)) {
+                throw new Error('Invalid AI response: total is missing');
+            }
+
+            const mappedItems = data.items.map((item, index) => mapProxyItem(item, index));
+
+            return {
+                recognized_items: mappedItems,
+                total_calories: asNumber(totals.kcal, 'total.kcal'),
+                total_protein: asNumber(totals.protein, 'total.protein'),
+                total_fat: asNumber(totals.fat, 'total.fat'),
+                total_carbohydrates: asNumber(totals.carbs, 'total.carbs'),
+            };
+        };
+
         try {
             const formData = new FormData();
             formData.append('image', imageFile);
@@ -987,13 +1086,15 @@ export const api = {
                 formData.append('description', description);
             }
 
+            console.log('RECOGNIZE FORM DATA KEYS', Array.from(formData.keys()));
+
             // Get headers without Content-Type (browser sets it with boundary)
-            const headers = getHeaders();
-            delete (headers as any)['Content-Type'];
+            const headers = { ...(getHeaders() as Record<string, string>) };
+            delete headers['Content-Type'];
 
             const response = await fetchWithTimeout(URLS.recognize, {
                 method: 'POST',
-                headers: headers,
+                headers,
                 body: formData,
             });
 
@@ -1002,36 +1103,22 @@ export const api = {
                 log(`AI recognition error: ${errorData.error || errorData.detail || response.status}`);
 
                 const error = new Error(errorData.detail || errorData.error || `AI recognition failed (${response.status})`);
-                (error as any).error = errorData.error || 'UNKNOWN_ERROR';
-                (error as any).detail = errorData.detail || error.message;
+                (error as Error & { error?: string; detail?: string }).error = errorData.error || 'UNKNOWN_ERROR';
+                (error as Error & { error?: string; detail?: string }).detail = errorData.detail || error.message;
                 throw error;
             }
 
-            const backendResult = await response.json();
+            const backendResult: unknown = await response.json();
             console.log('RAW RECOGNIZE RESPONSE', backendResult);
             log(`RAW AI response: ${JSON.stringify(backendResult)}`);
 
-            // Map backend response to frontend structure
-            // AI Proxy returns: { items: [{name, grams, kcal, protein, fat, carbs}], total: {kcal, protein, fat, carbs} }
-            const mappedResult = {
-                recognized_items: (backendResult.items || []).map((item: any) => ({
-                    name: item.name || "Unknown",
-                    grams: item.grams || 0,
-                    calories: item.kcal || 0,
-                    protein: item.protein || 0,
-                    fat: item.fat || 0,
-                    carbohydrates: item.carbs || 0
-                })),
-                total_calories: backendResult.total?.kcal || 0,
-                total_protein: backendResult.total?.protein || 0,
-                total_fat: backendResult.total?.fat || 0,
-                total_carbohydrates: backendResult.total?.carbs || 0
-            };
+            const mappedResult = mapProxyResponse(backendResult as ProxyResponse);
 
             log(`AI recognized ${mappedResult.recognized_items.length} items`);
             console.log('MAPPED RESULT', mappedResult);
             return mappedResult;
-        } catch (error) {
+        } catch (error: unknown) {
+            console.log('RECOGNIZE ERROR', (error as any)?.message, (error as any)?.response?.status, (error as any)?.response?.data);
             console.error('AI recognition error:', error);
             throw error;
         }

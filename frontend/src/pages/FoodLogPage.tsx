@@ -1,26 +1,9 @@
 import React, { useState } from 'react';
 import { Camera, Upload, X, Check, Plus, CreditCard, AlertCircle } from 'lucide-react';
-import { api } from '../services/api';
+import { AnalysisResult, RecognizedItem, api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
-
-interface RecognizedItem {
-    name: string;
-    grams: number;
-    calories: number;
-    protein: number;
-    fat: number;
-    carbohydrates: number;
-}
-
-interface AnalysisResult {
-    recognized_items: RecognizedItem[];
-    total_calories: number;
-    total_protein: number;
-    total_fat: number;
-    total_carbohydrates: number;
-}
 
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
