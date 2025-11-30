@@ -376,11 +376,21 @@ const FoodLogPage: React.FC = () => {
                             </div>
                             <input
                                 type="file"
-                                accept="image/*,android/allowCamera"
+                                accept="image/*"
+                                capture="environment"
                                 className="hidden"
                                 onChange={handleFileSelect}
                             />
                         </label>
+
+                        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4">
+                            <p className="text-amber-900 text-sm font-semibold mb-2 text-center">
+                                📱 Если камера не открывается на Android:
+                            </p>
+                            <p className="text-amber-800 text-xs text-center">
+                                В настройках телефона найдите Telegram → Разрешения → Камера → Разрешить
+                            </p>
+                        </div>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
