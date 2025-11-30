@@ -24,40 +24,46 @@ export interface TelegramAuthData {
     initData: string;
     user: TelegramUserInfo;
 }
-
-// ============================================================
-// DEV Mode Configuration
-// ============================================================
-
-const isDevMode = import.meta.env.DEV;
-const skipTelegramAuth = import.meta.env.VITE_SKIP_TG_AUTH === 'true';
-
-const DEV_USER: TelegramUserInfo = {
-    id: 123456789,
-    first_name: 'DevUser',
-    username: 'devuser',
-    language_code: 'ru',
-};
-
-const DEV_INIT_DATA = import.meta.env.VITE_DEV_TG_INIT_DATA || 'dev_mode_init_data';
-
 // ============================================================
 // Internal State
 // ============================================================
 
 let _telegramAuthData: TelegramAuthData | null = null;
 let _initPromise: Promise<TelegramAuthData | null> | null = null;
+openLink: (url: string) => window.open(url, '_blank'),
+    showAlert: (msg: string) => alert(`[Telegram Alert] ${msg}`),
+        showConfirm: (msg: string, cb: (ok: boolean) => void) => {
+            const result = confirm(`[Telegram Confirm] ${msg}`);
+            cb?.(result);
+        },
+            platform: 'unknown',
+                colorScheme: 'light',
+                    themeParams: { },
+MainButton: {
+    text: '',
+        color: '',
+            textColor: '',
+                isVisible: false,
+                    isActive: true,
+                        show: () => console.log('[Telegram Mock] MainButton.show()'),
+                            hide: () => console.log('[Telegram Mock] MainButton.hide()'),
+                                onClick: () => { },
+                                    offClick: () => { },
+                                        setText: () => { },
+                                            enable: () => { },
+                                                disable: () => { },
+            },
+BackButton: {
+    isVisible: false,
+        show: () => console.log('[Telegram Mock] BackButton.show()'),
+            hide: () => console.log('[Telegram Mock] BackButton.hide()'),
+                onClick: () => { },
+                    offClick: () => { },
+            }
+        };
+    }
 
-// ============================================================
-// Core Functions
-// ============================================================
-
-/**
- * Получение Telegram WebApp instance
- */
-export function getTelegramWebApp(): any | null {
-    if (typeof window === 'undefined') return null;
-    return (window as any).Telegram?.WebApp || null;
+return (window as any).Telegram?.WebApp || null;
 }
 
 /**

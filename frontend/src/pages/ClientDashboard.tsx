@@ -307,7 +307,8 @@ const ClientDashboard: React.FC = () => {
                                 return (
                                     <div
                                         key={meal.id}
-                                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                                        onClick={() => navigate(`/meal/${meal.id}`)}
+                                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors active:scale-[0.98]"
                                     >
                                         <div>
                                             <p className="font-medium text-gray-900">

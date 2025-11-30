@@ -119,7 +119,37 @@ const URLS = {
     plans: `${API_BASE}/billing/plans/`,
     // AI endpoints
     recognize: `${API_BASE}/ai/recognize/`,
+    // mealAnalysis: (id: number) => `${API_BASE}/diary/meals/${id}/analysis/`, // REMOVED: Use URLS.meals + id
 };
+
+// ============================================================
+// Meal Analysis Types
+// ============================================================
+
+export interface RecognizedItemAnalysis {
+    id: number;
+    name: string;
+    amount_grams: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number; // In JSON it was "carbs" but usually we use "carbohydrates" or map it. 
+    // User JSON says "carbs". I should probably map it or use "carbs".
+    // Let's use "carbs" to match the JSON exactly if I can, or map it.
+    // The user JSON: "carbs": 48.3.
+    // My existing types use "carbohydrates".
+    // I will define it as "carbs" here to match the expected JSON, 
+    // but I might want to map it to "carbohydrates" for consistency in UI if I reuse components.
+    // Let's stick to the JSON structure for the type.
+    carbs: number;
+}
+
+export interface MealAnalysis {
+    id: number;
+    photo_url: string | null;
+    label: string;
+    recognized_items: RecognizedItemAnalysis[];
+}
 
 // ============================================================
 // Debug Logging
@@ -490,6 +520,40 @@ export const api = {
             return foodItem;
         } catch (error) {
             console.error('Error adding food item:', error);
+            throw error;
+        }
+    },
+
+    async getMealAnalysis(id: number): Promise<MealAnalysis> {
+        try {
+            // Use existing endpoint /api/v1/meals/{id}/
+            const response = await fetchWithTimeout(`${URLS.meals}${id}/`, {
+                headers: getHeaders(),
+            });
+            if (!response.ok) throw new Error('Failed to fetch meal analysis');
+
+            const data = await response.json();
+
+            // Map MealSerializer response to MealAnalysis
+            // Find the first item with a photo to use as the main photo
+            const mainPhoto = data.items?.find((item: any) => item.photo)?.photo || null;
+
+            return {
+                id: data.id,
+                photo_url: mainPhoto,
+                label: data.meal_type_display,
+                recognized_items: data.items.map((item: any) => ({
+                    id: item.id,
+                    name: item.name,
+                    amount_grams: item.grams,
+                    calories: item.calories,
+                    protein: item.protein,
+                    fat: item.fat,
+                    carbs: item.carbohydrates
+                }))
+            };
+        } catch (error) {
+            console.error('Error fetching meal analysis:', error);
             throw error;
         }
     },

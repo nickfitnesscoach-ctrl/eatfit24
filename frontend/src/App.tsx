@@ -20,6 +20,8 @@ import PaymentHistoryPage from './pages/PaymentHistoryPage';
 import SubscribersPage from './pages/SubscribersPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
+import MealDetailsPage from './pages/MealDetailsPage';
+
 function App() {
   useEffect(() => {
     // Условная инициализация Telegram WebApp (только когда работаем как Telegram Mini App)
@@ -48,6 +50,7 @@ function App() {
                 <Route path="/" element={<ClientLayout />}>
                   <Route index element={<ClientDashboard />} />
                   <Route path="log" element={<FoodLogPage />} />
+                  <Route path="meal/:id" element={<MealDetailsPage />} />
                   <Route path="subscription" element={<SubscriptionPage />} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route path="settings" element={<SettingsPage />} />

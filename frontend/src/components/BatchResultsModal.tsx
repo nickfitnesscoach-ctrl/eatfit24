@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check, AlertCircle, X, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export interface RecognizedItem {
     name: string;
@@ -29,9 +30,11 @@ interface BatchResultsModalProps {
     results: BatchResult[];
     onClose: () => void;
     onOpenDiary?: () => void;
+    mealId?: number | null;
 }
 
-export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, onClose, onOpenDiary }) => {
+export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, onClose, onOpenDiary, mealId }) => {
+    const navigate = useNavigate();
     const successCount = results.filter(r => r.status === 'success').length;
     const totalCount = results.length;
 
@@ -58,7 +61,7 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                 {/* List */}
                 <div className="overflow-y-auto p-4 space-y-4">
                     {results.map((result, index) => (
-                        <div key={index} className="flex gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div key={index} className="flex gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100 relative group">
                             {/* Thumbnail */}
                             <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gray-200 relative">
                                 <img
@@ -97,6 +100,14 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                                                 У {Math.round(result.data.total_carbohydrates)}
                                             </span>
                                         </div>
+                                        {mealId && (
+                                            <button
+                                                onClick={() => navigate(`/meal/${mealId}`)}
+                                                className="mt-2 text-sm text-blue-600 font-medium hover:underline text-left"
+                                            >
+                                                Подробнее
+                                            </button>
+                                        )}
                                     </>
                                 ) : (
                                     <>

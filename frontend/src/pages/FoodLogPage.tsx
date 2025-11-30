@@ -17,6 +17,7 @@ const FoodLogPage: React.FC = () => {
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState<BatchResult[]>([]);
     const [showBatchResults, setShowBatchResults] = useState(false);
+    const [createdMealId, setCreatedMealId] = useState<number | null>(null);
 
     // Preview state
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -91,6 +92,7 @@ const FoodLogPage: React.FC = () => {
             };
             const meal = await api.createMeal(mealData);
             console.log('[Batch] Meal created:', meal.id);
+            setCreatedMealId(meal.id);
 
             // 2. Process files sequentially
             for (let i = 0; i < files.length; i++) {
@@ -498,6 +500,7 @@ const FoodLogPage: React.FC = () => {
                             setShowBatchResults(false);
                             navigate('/');
                         }}
+                        mealId={createdMealId}
                     />
                 )}
             </div>
