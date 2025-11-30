@@ -108,7 +108,8 @@ class AIRecognitionView(APIView):
 
         # Handle multipart/form-data file upload
         # Convert uploaded file to data URL if present
-        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        # Copy non-file fields from request.data
+        data = {key: value for key, value in request.data.items() if key != 'image'}
 
         if request.FILES.get("image"):
             # Multipart file upload - convert to data URL
