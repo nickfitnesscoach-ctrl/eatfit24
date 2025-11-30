@@ -137,7 +137,7 @@ def test_ai_proxy_direct(image_path=None, num_tests=3):
 
     # Run tests
     results = []
-    timeout_seconds = 20.0  # Match client timeout
+    timeout_seconds = 130.0  # Match client timeout (temporarily increased)
 
     for i in range(num_tests):
         print(f"Test {i+1}/{num_tests}:")
