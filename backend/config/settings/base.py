@@ -193,6 +193,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Trust X-Forwarded-Host header from proxy (for correct URL generation in Docker)
+USE_X_FORWARDED_HOST = True
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

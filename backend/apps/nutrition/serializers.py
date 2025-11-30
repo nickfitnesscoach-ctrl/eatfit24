@@ -10,6 +10,10 @@ from .models import Meal, FoodItem, DailyGoal
 class FoodItemSerializer(serializers.ModelSerializer):
     """Serializer for FoodItem model."""
 
+    # Override photo field to return relative URL (not absolute)
+    # This prevents Django from returning internal Docker URLs like http://backend:8000/media/...
+    photo = serializers.SerializerMethodField()
+
     class Meta:
         model = FoodItem
         fields = [
@@ -18,6 +22,14 @@ class FoodItemSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_photo(self, obj):
+        """Return relative URL for photo (not absolute)."""
+        if obj.photo:
+            # Return only the relative path (e.g., /media/meals/photo.jpg)
+            # This works in both local and production environments
+            return obj.photo.url
+        return None
 
     def validate_grams(self, value):
         """Validate that grams is positive."""
