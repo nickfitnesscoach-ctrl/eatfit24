@@ -4,6 +4,7 @@ import { api, CreateMealRequest, CreateFoodItemRequest } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
+import { isIOS } from '../utils/platform';
 
 interface RecognizedItem {
     name: string;
@@ -38,23 +39,7 @@ const FoodLogPage: React.FC = () => {
     const [showLimitModal, setShowLimitModal] = useState(false);
     const MAX_RETRIES = 3;
 
-    // Detect Android
-    const isAndroid = () => {
-        const tg = window.Telegram?.WebApp;
-        const platformCheck = tg?.platform === 'android';
-        const userAgentCheck = /android/i.test(navigator.userAgent);
-        const result = platformCheck || userAgentCheck;
 
-        console.log('[FoodLog] Platform detection:', {
-            platform: tg?.platform,
-            userAgent: navigator.userAgent,
-            platformCheck,
-            userAgentCheck,
-            isAndroid: result
-        });
-
-        return result;
-    };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -382,27 +367,26 @@ const FoodLogPage: React.FC = () => {
                 {!selectedImage && !analysisResult ? (
                     /* Initial state - show capture options */
                     <div className="space-y-6">
-                        {isAndroid() ? (
+                        <p className="text-center text-gray-500 mb-4">
+                            Выберите способ добавления фото
+                        </p>
+
+                        <label className="block">
+                            <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
+                                <Camera size={64} className="mb-4" />
+                                <span className="text-xl font-bold mb-2">Загрузить фото</span>
+                                <span className="text-sm text-white/80">Выбрать из галереи</span>
+                            </div>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileSelect}
+                            />
+                        </label>
+
+                        {isIOS() && (
                             <>
-                                <p className="text-center text-gray-500 mb-4">
-                                    Выберите способ добавления фото
-                                </p>
-
-                                <label className="block">
-                                    <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
-                                        <Camera size={64} className="mb-4" />
-                                        <span className="text-xl font-bold mb-2">Загрузить фото</span>
-                                        <span className="text-sm text-white/80">Выбрать из галереи</span>
-                                    </div>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        capture="environment"
-                                        className="hidden"
-                                        onChange={handleFileSelect}
-                                    />
-                                </label>
-
                                 <div className="relative">
                                     <div className="absolute inset-0 flex items-center">
                                         <div className="w-full border-t border-gray-300"></div>
@@ -416,9 +400,7 @@ const FoodLogPage: React.FC = () => {
                                     onClick={() => {
                                         const tg = window.Telegram?.WebApp;
                                         if (tg) {
-                                            tg.showAlert('Отправьте боту фото еды в чате, и оно будет автоматически распознано!', () => {
-                                                tg.close();
-                                            });
+                                            tg.openTelegramLink(`https://t.me/EatFit24Bot?startattach=photo`);
                                         }
                                     }}
                                     className="w-full aspect-video bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform"
@@ -427,37 +409,6 @@ const FoodLogPage: React.FC = () => {
                                     <span className="text-xl font-bold mb-2">Отправить в чате</span>
                                     <span className="text-sm text-white/80">Сфотографировать и отправить боту</span>
                                 </button>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-center text-gray-500">
-                                    Сфотографируйте или загрузите фото еды для анализа
-                                </p>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <label className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
-                                        <Camera size={48} className="mb-3" />
-                                        <span className="font-semibold">Камера</span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            capture="environment"
-                                            className="hidden"
-                                            onChange={handleFileSelect}
-                                        />
-                                    </label>
-
-                                    <label className="aspect-square bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
-                                        <Upload size={48} className="mb-3" />
-                                        <span className="font-semibold">Галерея</span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleFileSelect}
-                                        />
-                                    </label>
-                                </div>
                             </>
                         )}
 
