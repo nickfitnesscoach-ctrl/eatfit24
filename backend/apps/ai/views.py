@@ -108,8 +108,12 @@ class AIRecognitionView(APIView):
 
         # Handle multipart/form-data file upload
         # Convert uploaded file to data URL if present
-        # Copy non-file fields from request.data
-        data = {key: value for key, value in request.data.items() if key != 'image'}
+        data = {}
+
+        # Copy text fields (avoiding file objects that can't be pickled)
+        for key, value in request.data.items():
+            if key != 'image':  # Skip image field, we'll handle it separately
+                data[key] = value
 
         if request.FILES.get("image"):
             # Multipart file upload - convert to data URL
@@ -139,6 +143,9 @@ class AIRecognitionView(APIView):
                     },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
+        elif 'image' in request.data:
+            # Base64 image already in request.data
+            data['image'] = request.data['image']
 
         serializer = AIRecognitionRequestSerializer(data=data)
 
