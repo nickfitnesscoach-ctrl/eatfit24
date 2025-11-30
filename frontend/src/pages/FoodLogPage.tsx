@@ -229,10 +229,10 @@ const FoodLogPage: React.FC = () => {
             const tg = window.Telegram?.WebApp;
             if (tg?.showAlert) {
                 tg.showAlert('Приём пищи сохранён!');
-                navigate('/client');
+                navigate('/');
             } else {
                 alert('Приём пищи сохранён!');
-                navigate('/client');
+                navigate('/');
             }
         } catch (err: any) {
             console.error('[FoodLog] Save error:', err);

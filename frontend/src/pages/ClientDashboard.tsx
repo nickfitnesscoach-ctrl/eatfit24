@@ -71,7 +71,32 @@ const ClientDashboard: React.FC = () => {
             }
 
             const mealsData = await api.getMeals(dateStr);
-            if (Array.isArray(mealsData)) {
+
+            // API возвращает объект с полями: {date, daily_goal, total_consumed, progress, meals}
+            if (mealsData && mealsData.meals && Array.isArray(mealsData.meals)) {
+                setMeals(mealsData.meals);
+
+                // Используем total_consumed из ответа API (уже подсчитано на бэкенде)
+                if (mealsData.total_consumed) {
+                    setConsumed({
+                        calories: Math.round(mealsData.total_consumed.calories || 0),
+                        protein: Math.round(mealsData.total_consumed.protein || 0),
+                        fat: Math.round(mealsData.total_consumed.fat || 0),
+                        carbohydrates: Math.round(mealsData.total_consumed.carbohydrates || 0)
+                    });
+                }
+
+                // Обновляем цели из ответа, если они там есть
+                if (mealsData.daily_goal && !goals) {
+                    setGoals({
+                        calories: mealsData.daily_goal.calories || 2000,
+                        protein: mealsData.daily_goal.protein || 150,
+                        fat: mealsData.daily_goal.fat || 70,
+                        carbohydrates: mealsData.daily_goal.carbohydrates || 250
+                    });
+                }
+            } else if (Array.isArray(mealsData)) {
+                // Fallback: если API вернул массив (старый формат)
                 setMeals(mealsData);
 
                 let totalCalories = 0;
@@ -80,7 +105,7 @@ const ClientDashboard: React.FC = () => {
                 let totalCarbs = 0;
 
                 mealsData.forEach((meal: any) => {
-                    meal.food_items?.forEach((item: any) => {
+                    meal.items?.forEach((item: any) => {
                         totalCalories += parseFloat(item.calories) || 0;
                         totalProtein += parseFloat(item.protein) || 0;
                         totalFat += parseFloat(item.fat) || 0;
@@ -253,7 +278,7 @@ const ClientDashboard: React.FC = () => {
                 </div>
 
                 <button
-                    onClick={() => navigate('/client/log')}
+                    onClick={() => navigate('/log')}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-transform"
                 >
                     <Plus size={24} />
@@ -273,8 +298,10 @@ const ClientDashboard: React.FC = () => {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {meals.map((meal) => {
-                                const mealCalories = meal.food_items?.reduce((sum: number, item: any) =>
+                            {meals.map((meal: any) => {
+                                // Бэкенд возвращает поле 'items', а не 'food_items'
+                                const items = meal.items || meal.food_items || [];
+                                const mealCalories = items.reduce((sum: number, item: any) =>
                                     sum + (parseFloat(item.calories) || 0), 0) || 0;
 
                                 return (
@@ -287,7 +314,7 @@ const ClientDashboard: React.FC = () => {
                                                 {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
                                             </p>
                                             <p className="text-sm text-gray-500">
-                                                {meal.food_items?.length || 0} блюд
+                                                {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -310,7 +337,7 @@ const ClientDashboard: React.FC = () => {
                             Установите дневные цели КБЖУ в профиле для отслеживания прогресса
                         </p>
                         <button
-                            onClick={() => navigate('/client/profile')}
+                            onClick={() => navigate('/profile')}
                             className="bg-yellow-500 text-white px-4 py-2 rounded-xl font-medium text-sm"
                         >
                             Установить цели
