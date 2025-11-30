@@ -5,6 +5,7 @@ Views for AI app.
 import base64
 import logging
 import time
+from datetime import date
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import status
@@ -202,6 +203,9 @@ class AIRecognitionView(APIView):
 
         try:
             # 1. Create Meal and save photo
+            if image_file:
+                image_file.seek(0)
+            
             meal = Meal.objects.create(
                 user=request.user,
                 meal_type=meal_type,
