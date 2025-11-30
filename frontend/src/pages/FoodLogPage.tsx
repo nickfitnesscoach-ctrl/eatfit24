@@ -58,28 +58,6 @@ const FoodLogPage: React.FC = () => {
         }
     };
 
-    const handleCameraCapture = () => {
-        // Create input for camera
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = 'environment';
-        input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64 = reader.result as string;
-                    setSelectedImage(base64);
-                    setSelectedFile(file);
-                    analyzeImage(file);
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-        input.click();
-    };
-
     const getErrorMessage = (errorCode: string, defaultMessage: string): string => {
         const messages: Record<string, string> = {
             'INVALID_IMAGE': 'Некорректное изображение. Попробуйте другое фото с едой',
@@ -391,13 +369,17 @@ const FoodLogPage: React.FC = () => {
                         </p>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={handleCameraCapture}
-                                className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
-                            >
+                            <label className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
                                 <Camera size={48} className="mb-3" />
                                 <span className="font-semibold">Камера</span>
-                            </button>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    className="hidden"
+                                    onChange={handleFileSelect}
+                                />
+                            </label>
 
                             <label className="aspect-square bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
                                 <Upload size={48} className="mb-3" />
