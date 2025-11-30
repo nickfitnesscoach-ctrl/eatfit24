@@ -5,23 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 import { isIOS } from '../utils/platform';
-
-interface RecognizedItem {
-    name: string;
-    grams: number;
-    calories: number;
-    protein: number;
-    fat: number;
-    carbohydrates: number;
-}
-
-interface AnalysisResult {
-    recognized_items: RecognizedItem[];
-    total_calories: number;
-    total_protein: number;
-    total_fat: number;
-    total_carbohydrates: number;
-}
+import { BatchResultsModal, BatchResult, AnalysisResult, RecognizedItem } from '../components/BatchResultsModal';
 
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
@@ -31,6 +15,8 @@ const FoodLogPage: React.FC = () => {
     // Batch state
     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+    const [batchResults, setBatchResults] = useState<BatchResult[]>([]);
+    const [showBatchResults, setShowBatchResults] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
@@ -75,7 +61,10 @@ const FoodLogPage: React.FC = () => {
     const processBatch = async (files: File[]) => {
         setIsBatchProcessing(true);
         setBatchProgress({ current: 0, total: files.length });
+        setBatchResults([]);
         setError(null);
+
+        const results: BatchResult[] = [];
 
         try {
             // 1. Create a meal upfront to add items to
@@ -86,8 +75,6 @@ const FoodLogPage: React.FC = () => {
             const meal = await api.createMeal(mealData);
             console.log('[Batch] Meal created:', meal.id);
 
-            let successCount = 0;
-
             // 2. Process files sequentially
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -95,7 +82,6 @@ const FoodLogPage: React.FC = () => {
 
                 try {
                     // Recognize
-                    // Explicitly cast the result to AnalysisResult to avoid implicit 'any' errors
                     const result = await api.recognizeFood(file) as AnalysisResult;
 
                     if (result.recognized_items && result.recognized_items.length > 0) {
@@ -113,34 +99,51 @@ const FoodLogPage: React.FC = () => {
                                 carbohydrates: item.carbohydrates
                             });
                         }
-                        successCount++;
+
+                        results.push({
+                            file,
+                            status: 'success',
+                            data: result
+                        });
+                    } else {
+                        results.push({
+                            file,
+                            status: 'error',
+                            error: 'Еда не найдена'
+                        });
                     }
                 } catch (err: any) {
                     console.error(`[Batch] Error processing file ${file.name}:`, err);
+
                     // Check for daily limit
                     if (err.error === 'DAILY_LIMIT_REACHED' || err.code === 'DAILY_LIMIT_REACHED') {
                         setShowLimitModal(true);
-                        break; // Stop processing if limit reached
+                        // Add remaining files as errors or just stop?
+                        // Requirement: "If one photo fails... do not break the batch". 
+                        // But limit reached is a hard stop.
+                        results.push({
+                            file,
+                            status: 'error',
+                            error: 'Лимит исчерпан'
+                        });
+                        break;
                     }
+
+                    results.push({
+                        file,
+                        status: 'error',
+                        error: 'Ошибка распознавания'
+                    });
                 }
             }
 
-            // 3. Finalize
-            if (successCount > 0) {
-                await billing.refresh();
+            setBatchResults(results);
 
-                const tg = window.Telegram?.WebApp;
-                const message = `${successCount} фото распознаны и добавлены в дневник`;
+            // Refresh billing info
+            await billing.refresh();
 
-                if (tg?.showAlert) {
-                    tg.showAlert(message);
-                } else {
-                    alert(message);
-                }
-                navigate('/');
-            } else if (!showLimitModal) {
-                setError('Не удалось распознать еду на загруженных фото.');
-            }
+            // Show results modal
+            setShowBatchResults(true);
 
         } catch (err: any) {
             console.error('[Batch] Global error:', err);
@@ -148,6 +151,11 @@ const FoodLogPage: React.FC = () => {
         } finally {
             setIsBatchProcessing(false);
         }
+    };
+
+    const handleCloseResults = () => {
+        setShowBatchResults(false);
+        navigate('/');
     };
 
     // While WebApp is initializing
@@ -375,6 +383,18 @@ const FoodLogPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                )}
+
+                {/* Batch Results Modal */}
+                {showBatchResults && (
+                    <BatchResultsModal
+                        results={batchResults}
+                        onClose={handleCloseResults}
+                        onOpenDiary={() => {
+                            setShowBatchResults(false);
+                            navigate('/');
+                        }}
+                    />
                 )}
             </div>
         </div>
