@@ -365,33 +365,22 @@ const FoodLogPage: React.FC = () => {
                     /* Initial state - show capture options */
                     <div className="space-y-6">
                         <p className="text-center text-gray-500">
-                            Сфотографируйте или загрузите фото еды для анализа
+                            Загрузите фото еды для анализа
                         </p>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <label className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
-                                <Camera size={48} className="mb-3" />
-                                <span className="font-semibold">Камера</span>
-                                <input
-                                    type="file"
-                                    accept="image/*,android/force-camera-workaround"
-                                    capture
-                                    className="hidden"
-                                    onChange={handleFileSelect}
-                                />
-                            </label>
-
-                            <label className="aspect-square bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg active:scale-95 transition-transform cursor-pointer">
-                                <Upload size={48} className="mb-3" />
-                                <span className="font-semibold">Галерея</span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleFileSelect}
-                                />
-                            </label>
-                        </div>
+                        <label className="block">
+                            <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
+                                <Camera size={64} className="mb-4" />
+                                <span className="text-xl font-bold mb-2">Выбрать фото</span>
+                                <span className="text-sm text-white/80">Камера или галерея</span>
+                            </div>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileSelect}
+                            />
+                        </label>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
