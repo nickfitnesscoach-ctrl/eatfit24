@@ -364,15 +364,15 @@ const FoodLogPage: React.FC = () => {
                 {!selectedImage && !analysisResult ? (
                     /* Initial state - show capture options */
                     <div className="space-y-6">
-                        <p className="text-center text-gray-500">
-                            Загрузите фото еды для анализа
+                        <p className="text-center text-gray-500 mb-4">
+                            Выберите способ добавления фото
                         </p>
 
                         <label className="block">
                             <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
                                 <Camera size={64} className="mb-4" />
-                                <span className="text-xl font-bold mb-2">Выбрать фото</span>
-                                <span className="text-sm text-white/80">Камера или галерея</span>
+                                <span className="text-xl font-bold mb-2">Загрузить фото</span>
+                                <span className="text-sm text-white/80">Выбрать из галереи</span>
                             </div>
                             <input
                                 type="file"
@@ -383,14 +383,30 @@ const FoodLogPage: React.FC = () => {
                             />
                         </label>
 
-                        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4">
-                            <p className="text-amber-900 text-sm font-semibold mb-2 text-center">
-                                📱 Если камера не открывается на Android:
-                            </p>
-                            <p className="text-amber-800 text-xs text-center">
-                                В настройках телефона найдите Telegram → Разрешения → Камера → Разрешить
-                            </p>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-gray-300"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-2 bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-500">или</span>
+                            </div>
                         </div>
+
+                        <button
+                            onClick={() => {
+                                const tg = window.Telegram?.WebApp;
+                                if (tg) {
+                                    tg.showAlert('Отправьте боту фото еды в чате, и оно будет автоматически распознано!', () => {
+                                        tg.close();
+                                    });
+                                }
+                            }}
+                            className="w-full aspect-video bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform"
+                        >
+                            <Upload size={64} className="mb-4" />
+                            <span className="text-xl font-bold mb-2">Отправить в чате</span>
+                            <span className="text-sm text-white/80">Сфотографировать и отправить боту</span>
+                        </button>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
