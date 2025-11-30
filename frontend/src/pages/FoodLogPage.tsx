@@ -374,7 +374,8 @@ const FoodLogPage: React.FC = () => {
                                 <span className="font-semibold">Камера</span>
                                 <input
                                     type="file"
-                                    accept="image/*;capture=camera"
+                                    accept="image/*"
+                                    capture="environment"
                                     className="hidden"
                                     onChange={handleFileSelect}
                                 />
