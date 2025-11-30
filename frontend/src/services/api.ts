@@ -1008,24 +1008,28 @@ export const api = {
             }
 
             const backendResult = await response.json();
+            console.log('RAW RECOGNIZE RESPONSE', backendResult);
+            log(`RAW AI response: ${JSON.stringify(backendResult)}`);
 
             // Map backend response to frontend structure
+            // AI Proxy returns: { items: [{name, grams, kcal, protein, fat, carbs}], total: {kcal, protein, fat, carbs} }
             const mappedResult = {
                 recognized_items: (backendResult.items || []).map((item: any) => ({
                     name: item.name || "Unknown",
-                    grams: item.weight_grams || 0,
-                    calories: item.nutrition?.calories || 0,
-                    protein: item.nutrition?.proteins || 0,
-                    fat: item.nutrition?.fats || 0,
-                    carbohydrates: item.nutrition?.carbs || 0
+                    grams: item.grams || 0,
+                    calories: item.kcal || 0,
+                    protein: item.protein || 0,
+                    fat: item.fat || 0,
+                    carbohydrates: item.carbs || 0
                 })),
-                total_calories: backendResult.total?.calories || 0,
-                total_protein: backendResult.total?.proteins || 0,
-                total_fat: backendResult.total?.fats || 0,
+                total_calories: backendResult.total?.kcal || 0,
+                total_protein: backendResult.total?.protein || 0,
+                total_fat: backendResult.total?.fat || 0,
                 total_carbohydrates: backendResult.total?.carbs || 0
             };
 
             log(`AI recognized ${mappedResult.recognized_items.length} items`);
+            console.log('MAPPED RESULT', mappedResult);
             return mappedResult;
         } catch (error) {
             console.error('AI recognition error:', error);

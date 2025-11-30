@@ -100,9 +100,11 @@ const FoodLogPage: React.FC = () => {
 
         try {
             const result = await api.recognizeFood(imageFile);
+            console.log('analysisResult received from API:', result);
 
             if (result.recognized_items && result.recognized_items.length > 0) {
                 setAnalysisResult(result);
+                console.log('analysisResult SET IN STATE:', result);
                 setRetryCount(0); // Reset retry count on success
                 // Select all items by default
                 setSelectedItems(new Set(result.recognized_items.map((_: any, i: number) => i)));
@@ -111,6 +113,7 @@ const FoodLogPage: React.FC = () => {
                 await billing.refresh();
             } else {
                 // Empty result - no food detected
+                console.log('NO FOOD DETECTED - empty items array');
                 setErrorCode('NO_FOOD_DETECTED');
                 setError('Мы не нашли на фото еду. Попробуйте сделать кадр ближе или при лучшем освещении');
             }
