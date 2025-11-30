@@ -376,7 +376,7 @@ const FoodLogPage: React.FC = () => {
                             </div>
                             <input
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,android/allowCamera"
                                 className="hidden"
                                 onChange={handleFileSelect}
                             />
