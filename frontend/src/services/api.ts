@@ -978,32 +978,55 @@ export const api = {
     // AI Recognition
     // ========================================================
 
-    async recognizeFood(imageBase64: string, description?: string) {
-        log('Calling AI recognize endpoint');
+    async recognizeFood(imageFile: File, description?: string) {
+        log(`Calling AI recognize endpoint with file: ${imageFile.name}`);
         try {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            if (description) {
+                formData.append('description', description);
+            }
+
+            // Get headers without Content-Type (browser sets it with boundary)
+            const headers = getHeaders();
+            delete (headers as any)['Content-Type'];
+
             const response = await fetchWithTimeout(URLS.recognize, {
                 method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({
-                    image: imageBase64,
-                    description: description || '',
-                }),
+                headers: headers,
+                body: formData,
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 log(`AI recognition error: ${errorData.error || errorData.detail || response.status}`);
 
-                // Preserve error structure for proper handling in FoodLogPage
                 const error = new Error(errorData.detail || errorData.error || `AI recognition failed (${response.status})`);
                 (error as any).error = errorData.error || 'UNKNOWN_ERROR';
                 (error as any).detail = errorData.detail || error.message;
                 throw error;
             }
 
-            const result = await response.json();
-            log(`AI recognized ${result.recognized_items?.length || 0} items`);
-            return result;
+            const backendResult = await response.json();
+
+            // Map backend response to frontend structure
+            const mappedResult = {
+                recognized_items: (backendResult.items || []).map((item: any) => ({
+                    name: item.name || "Unknown",
+                    grams: item.weight_grams || 0,
+                    calories: item.nutrition?.calories || 0,
+                    protein: item.nutrition?.proteins || 0,
+                    fat: item.nutrition?.fats || 0,
+                    carbohydrates: item.nutrition?.carbs || 0
+                })),
+                total_calories: backendResult.total?.calories || 0,
+                total_protein: backendResult.total?.proteins || 0,
+                total_fat: backendResult.total?.fats || 0,
+                total_carbohydrates: backendResult.total?.carbs || 0
+            };
+
+            log(`AI recognized ${mappedResult.recognized_items.length} items`);
+            return mappedResult;
         } catch (error) {
             console.error('AI recognition error:', error);
             throw error;

@@ -27,6 +27,7 @@ const FoodLogPage: React.FC = () => {
     const billing = useBilling();
     const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
@@ -50,7 +51,8 @@ const FoodLogPage: React.FC = () => {
             reader.onloadend = () => {
                 const base64 = reader.result as string;
                 setSelectedImage(base64);
-                analyzeImage(base64);
+                setSelectedFile(file);
+                analyzeImage(file);
             };
             reader.readAsDataURL(file);
         }
@@ -69,7 +71,8 @@ const FoodLogPage: React.FC = () => {
                 reader.onloadend = () => {
                     const base64 = reader.result as string;
                     setSelectedImage(base64);
-                    analyzeImage(base64);
+                    setSelectedFile(file);
+                    analyzeImage(file);
                 };
                 reader.readAsDataURL(file);
             }
@@ -89,14 +92,14 @@ const FoodLogPage: React.FC = () => {
         return messages[errorCode] || defaultMessage;
     };
 
-    const analyzeImage = async (imageBase64: string) => {
+    const analyzeImage = async (imageFile: File) => {
         setAnalyzing(true);
         setError(null);
         setErrorCode(null);
         setAnalysisResult(null);
 
         try {
-            const result = await api.recognizeFood(imageBase64);
+            const result = await api.recognizeFood(imageFile);
 
             if (result.recognized_items && result.recognized_items.length > 0) {
                 setAnalysisResult(result);
@@ -226,6 +229,7 @@ const FoodLogPage: React.FC = () => {
 
     const resetState = () => {
         setSelectedImage(null);
+        setSelectedFile(null);
         setAnalysisResult(null);
         setSelectedItems(new Set());
         setError(null);
@@ -235,7 +239,7 @@ const FoodLogPage: React.FC = () => {
     };
 
     const retryAnalysis = () => {
-        if (!selectedImage) return;
+        if (!selectedFile) return;
 
         if (retryCount >= MAX_RETRIES) {
             setError('Превышено количество попыток. Попробуйте загрузить другое фото');
@@ -244,7 +248,7 @@ const FoodLogPage: React.FC = () => {
         }
 
         setRetryCount(prev => prev + 1);
-        analyzeImage(selectedImage);
+        analyzeImage(selectedFile);
     };
 
     // Determine if retry button should be shown
@@ -288,10 +292,10 @@ const FoodLogPage: React.FC = () => {
                 {/* Billing Info Banner */}
                 {billing.data && !billing.loading && (
                     <div className={`mb-6 rounded-2xl p-4 ${billing.isPro
-                            ? 'bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-200'
-                            : billing.isLimitReached
-                                ? 'bg-red-50 border-2 border-red-200'
-                                : 'bg-blue-50 border-2 border-blue-200'
+                        ? 'bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-200'
+                        : billing.isLimitReached
+                            ? 'bg-red-50 border-2 border-red-200'
+                            : 'bg-blue-50 border-2 border-blue-200'
                         }`}>
                         {billing.isPro ? (
                             <>
