@@ -627,7 +627,12 @@ class UploadAvatarView(APIView):
 
         # Get user profile
         user = request.user
-        profile = user.profile
+        # Defensive: Create profile if missing (should be created by signal, but just in case)
+        try:
+            profile = user.profile
+        except Profile.DoesNotExist:
+            logger.warning(f"[AvatarUploadView] Profile missing for user {user.id}, creating now")
+            profile = Profile.objects.create(user=user)
 
         try:
             # Use the safe set_avatar method which:
