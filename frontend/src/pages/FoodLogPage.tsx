@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
-import { isIOS } from '../utils/platform';
+import { isAndroid } from '../utils/platform';
 import { BatchResultsModal, BatchResult, AnalysisResult } from '../components/BatchResultsModal';
 
 const FoodLogPage: React.FC = () => {
@@ -17,6 +17,7 @@ const FoodLogPage: React.FC = () => {
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState<BatchResult[]>([]);
     const [showBatchResults, setShowBatchResults] = useState(false);
+    const [cancelRequested, setCancelRequested] = useState(false);
 
     // Preview state
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -74,12 +75,19 @@ const FoodLogPage: React.FC = () => {
         setBatchProgress({ current: 0, total: files.length });
         setBatchResults([]);
         setError(null);
+        setCancelRequested(false);
 
         const results: BatchResult[] = [];
 
         try {
             // Process files sequentially
             for (let i = 0; i < files.length; i++) {
+                // Check if user requested cancellation
+                if (cancelRequested) {
+                    console.log('[Batch] User cancelled processing');
+                    break;
+                }
+
                 const file = files[i];
                 setBatchProgress({ current: i + 1, total: files.length });
 
@@ -283,6 +291,18 @@ const FoodLogPage: React.FC = () => {
                             <p className="text-gray-400 text-sm mt-4">
                                 Пожалуйста, не закрывайте приложение
                             </p>
+
+                            {/* Cancel Button */}
+                            <button
+                                onClick={() => {
+                                    setCancelRequested(true);
+                                    setIsBatchProcessing(false);
+                                    setSelectedFiles([]);
+                                }}
+                                className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl font-medium transition-colors"
+                            >
+                                Прекратить анализ
+                            </button>
                         </div>
                     </div>
                 ) : selectedFiles.length > 0 ? (
@@ -393,7 +413,7 @@ const FoodLogPage: React.FC = () => {
                             />
                         </label>
 
-                        {isIOS() && (
+                        {isAndroid() && (
                             <>
                                 <div className="relative">
                                     <div className="absolute inset-0 flex items-center">

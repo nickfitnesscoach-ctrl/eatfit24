@@ -95,14 +95,11 @@ class MealListCreateView(generics.ListCreateAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Get active daily goal
+            # Get active daily goal (optional)
             try:
                 daily_goal = DailyGoal.objects.get(user=request.user, is_active=True)
             except DailyGoal.DoesNotExist:
-                return Response(
-                    {"error": "Установите дневную цель КБЖУ"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                daily_goal = None
 
             # Get all meals for the date
             meals = Meal.objects.filter(user=request.user, date=target_date).prefetch_related('items')
@@ -113,17 +110,26 @@ class MealListCreateView(generics.ListCreateAPIView):
             total_fat = sum(meal.total_fat for meal in meals)
             total_carbs = sum(meal.total_carbohydrates for meal in meals)
 
-            # Calculate progress percentage
-            progress = {
-                'calories': round((total_calories / daily_goal.calories * 100), 1) if daily_goal.calories else 0,
-                'protein': round((float(total_protein) / float(daily_goal.protein) * 100), 1) if daily_goal.protein else 0,
-                'fat': round((float(total_fat) / float(daily_goal.fat) * 100), 1) if daily_goal.fat else 0,
-                'carbohydrates': round((float(total_carbs) / float(daily_goal.carbohydrates) * 100), 1) if daily_goal.carbohydrates else 0,
-            }
+            # Calculate progress percentage (only if daily goal exists)
+            if daily_goal:
+                progress = {
+                    'calories': round((total_calories / daily_goal.calories * 100), 1) if daily_goal.calories else 0,
+                    'protein': round((float(total_protein) / float(daily_goal.protein) * 100), 1) if daily_goal.protein else 0,
+                    'fat': round((float(total_fat) / float(daily_goal.fat) * 100), 1) if daily_goal.fat else 0,
+                    'carbohydrates': round((float(total_carbs) / float(daily_goal.carbohydrates) * 100), 1) if daily_goal.carbohydrates else 0,
+                }
+            else:
+                # No goal set - progress is null
+                progress = {
+                    'calories': 0,
+                    'protein': 0,
+                    'fat': 0,
+                    'carbohydrates': 0,
+                }
 
             data = {
                 'date': target_date,
-                'daily_goal': DailyGoalSerializer(daily_goal).data,
+                'daily_goal': DailyGoalSerializer(daily_goal).data if daily_goal else None,
                 'total_consumed': {
                     'calories': float(total_calories),
                     'protein': float(total_protein),

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, MealAnalysis } from '../services/api';
 import PageHeader from '../components/PageHeader';
-import { Flame, Drumstick, Droplets, Wheat } from 'lucide-react';
+import { Flame, Drumstick, Droplets, Wheat, Trash2 } from 'lucide-react';
 
 const MealDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -10,6 +10,8 @@ const MealDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<MealAnalysis | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -28,6 +30,22 @@ const MealDetailsPage: React.FC = () => {
 
         loadData();
     }, [id]);
+
+    const handleDelete = async () => {
+        if (!id) return;
+
+        try {
+            setDeleting(true);
+            await api.deleteMeal(parseInt(id));
+            // Success - navigate back to home
+            navigate('/', { replace: true });
+        } catch (err) {
+            console.error('Failed to delete meal:', err);
+            setError('Не удалось удалить приём пищи');
+            setShowDeleteConfirm(false);
+            setDeleting(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -135,7 +153,54 @@ const MealDetailsPage: React.FC = () => {
                         ))}
                     </div>
                 </div>
+
+                {/* Delete Button */}
+                <div className="px-4 pb-8">
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-4 rounded-2xl transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Trash2 size={20} />
+                        Удалить приём пищи
+                    </button>
+                </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+                        <div className="text-center mb-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Trash2 className="text-red-600" size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                Удалить приём пищи?
+                            </h3>
+                            <p className="text-gray-600">
+                                Это действие нельзя будет отменить. Все блюда в этом приёме пищи будут удалены.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {deleting ? 'Удаление...' : 'Да, удалить'}
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={deleting}
+                                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
