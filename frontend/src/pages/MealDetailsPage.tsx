@@ -41,7 +41,8 @@ const MealDetailsPage: React.FC = () => {
             navigate('/', { replace: true });
         } catch (err) {
             console.error('Failed to delete meal:', err);
-            setError('Не удалось удалить приём пищи');
+            const errorMessage = err instanceof Error ? err.message : 'Не удалось удалить приём пищи';
+            setError(errorMessage);
             setShowDeleteConfirm(false);
             setDeleting(false);
         }

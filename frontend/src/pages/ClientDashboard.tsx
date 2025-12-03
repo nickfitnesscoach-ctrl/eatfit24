@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Flame, Drumstick, Droplets, Wheat, Plus, ChevronRight } from 'lucide-react';
+import { Flame, Drumstick, Droplets, Wheat, Plus, ChevronRight, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,6 +46,9 @@ const ClientDashboard: React.FC = () => {
     const [meals, setMeals] = useState<Meal[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [mealToDelete, setMealToDelete] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         if (isReady && webAppDetected) {
@@ -125,6 +128,33 @@ const ClientDashboard: React.FC = () => {
             setError('Не удалось загрузить данные');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteMealClick = (e: React.MouseEvent, mealId: number) => {
+        e.stopPropagation(); // Предотвратить переход к деталям
+        setMealToDelete(mealId);
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!mealToDelete) return;
+
+        try {
+            setDeleting(true);
+            await api.deleteMeal(mealToDelete);
+            // Обновить данные после удаления
+            await loadDashboardData(selectedDate);
+            setShowDeleteConfirm(false);
+            setMealToDelete(null);
+        } catch (err) {
+            console.error('Delete meal error:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Не удалось удалить приём пищи';
+            setError(errorMessage);
+            setShowDeleteConfirm(false);
+            setMealToDelete(null);
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -307,22 +337,33 @@ const ClientDashboard: React.FC = () => {
                                 return (
                                     <div
                                         key={meal.id}
-                                        onClick={() => navigate(`/meal/${meal.id}`)}
-                                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors active:scale-[0.98]"
+                                        className="relative group"
                                     >
-                                        <div>
-                                            <p className="font-medium text-gray-900">
-                                                {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-orange-600">
-                                                {Math.round(mealCalories)} ккал
-                                            </span>
-                                            <ChevronRight size={18} className="text-gray-400" />
+                                        <div
+                                            onClick={() => navigate(`/meal/${meal.id}`)}
+                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors active:scale-[0.98]"
+                                        >
+                                            <div>
+                                                <p className="font-medium text-gray-900">
+                                                    {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
+                                                </p>
+                                                <p className="text-sm text-gray-500">
+                                                    {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-bold text-orange-600">
+                                                    {Math.round(mealCalories)} ккал
+                                                </span>
+                                                <button
+                                                    onClick={(e) => handleDeleteMealClick(e, meal.id)}
+                                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                    aria-label="Удалить приём пищи"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                                <ChevronRight size={18} className="text-gray-400" />
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -346,6 +387,45 @@ const ClientDashboard: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+                        <div className="text-center mb-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Trash2 className="text-red-600" size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                Удалить приём пищи?
+                            </h3>
+                            <p className="text-gray-600">
+                                Это действие нельзя будет отменить. Все блюда в этом приёме пищи будут удалены.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={deleting}
+                                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {deleting ? 'Удаление...' : 'Да, удалить'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    setMealToDelete(null);
+                                }}
+                                disabled={deleting}
+                                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

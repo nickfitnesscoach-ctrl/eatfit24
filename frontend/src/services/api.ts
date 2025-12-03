@@ -635,6 +635,24 @@ export const api = {
         }
     },
 
+    async deleteMeal(id: number): Promise<void> {
+        try {
+            const response = await fetchWithTimeout(`${URLS.meals}${id}/`, {
+                method: 'DELETE',
+                headers: getHeaders(),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}`;
+                throw new Error(`Failed to delete meal: ${errorMessage}`);
+            }
+        } catch (error) {
+            console.error('Error deleting meal:', error);
+            throw error;
+        }
+    },
+
     // ========================================================
     // Nutrition - Goals
     // ========================================================

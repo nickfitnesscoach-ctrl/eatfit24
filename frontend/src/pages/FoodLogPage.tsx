@@ -19,9 +19,12 @@ const FoodLogPage: React.FC = () => {
     const [showBatchResults, setShowBatchResults] = useState(false);
     const [cancelRequested, setCancelRequested] = useState(false);
 
-    // Preview state
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-    const [description, setDescription] = useState('');
+    // Preview state - now with individual comments per file
+    interface FileWithComment {
+        file: File;
+        comment: string;
+    }
+    const [selectedFiles, setSelectedFiles] = useState<FileWithComment[]>([]);
 
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
@@ -51,8 +54,12 @@ const FoodLogPage: React.FC = () => {
                 return;
             }
 
-            // Instead of processing immediately, set selected files for preview
-            setSelectedFiles(validFiles);
+            // Convert to FileWithComment objects with empty comments
+            const filesWithComments: FileWithComment[] = validFiles.map(file => ({
+                file,
+                comment: ''
+            }));
+            setSelectedFiles(filesWithComments);
             setError(null);
         }
     };
@@ -63,16 +70,22 @@ const FoodLogPage: React.FC = () => {
         setSelectedFiles(newFiles);
     };
 
+    const handleCommentChange = (index: number, comment: string) => {
+        const newFiles = [...selectedFiles];
+        newFiles[index] = { ...newFiles[index], comment };
+        setSelectedFiles(newFiles);
+    };
+
     const handleAnalyze = () => {
         if (selectedFiles.length === 0) return;
-        processBatch(selectedFiles, description);
+        processBatch(selectedFiles);
     };
 
 
 
-    const processBatch = async (files: File[], desc: string) => {
+    const processBatch = async (filesWithComments: FileWithComment[]) => {
         setIsBatchProcessing(true);
-        setBatchProgress({ current: 0, total: files.length });
+        setBatchProgress({ current: 0, total: filesWithComments.length });
         setBatchResults([]);
         setError(null);
         setCancelRequested(false);
@@ -81,19 +94,19 @@ const FoodLogPage: React.FC = () => {
 
         try {
             // Process files sequentially
-            for (let i = 0; i < files.length; i++) {
+            for (let i = 0; i < filesWithComments.length; i++) {
                 // Check if user requested cancellation
                 if (cancelRequested) {
                     console.log('[Batch] User cancelled processing');
                     break;
                 }
 
-                const file = files[i];
-                setBatchProgress({ current: i + 1, total: files.length });
+                const { file, comment } = filesWithComments[i];
+                setBatchProgress({ current: i + 1, total: filesWithComments.length });
 
                 try {
-                    // Recognize with description (Backend now creates the meal)
-                    const result = await api.recognizeFood(file, desc) as AnalysisResult;
+                    // Recognize with INDIVIDUAL comment per photo
+                    const result = await api.recognizeFood(file, comment) as AnalysisResult;
 
                     if (result.recognized_items && result.recognized_items.length > 0) {
                         results.push({
@@ -152,7 +165,6 @@ const FoodLogPage: React.FC = () => {
 
             // Clear selection
             setSelectedFiles([]);
-            setDescription('');
 
         } catch (err: any) {
             console.error('[Batch] Global error:', err);
@@ -306,11 +318,11 @@ const FoodLogPage: React.FC = () => {
                         </div>
                     </div>
                 ) : selectedFiles.length > 0 ? (
-                    /* Preview State */
+                    /* Preview State with Individual Comments */
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="bg-white rounded-3xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-gray-900">Выбранные фото</h2>
+                                <h2 className="text-lg font-bold text-gray-900">Выбранные фото ({selectedFiles.length})</h2>
                                 <button
                                     onClick={() => setSelectedFiles([])}
                                     className="text-gray-400 hover:text-gray-600"
@@ -319,27 +331,53 @@ const FoodLogPage: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Horizontal scroll for photos */}
-                            <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-                                {selectedFiles.map((file, index) => (
-                                    <div key={index} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden group">
-                                        <img
-                                            src={URL.createObjectURL(file)}
-                                            alt={`Preview ${index}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                        <button
-                                            onClick={() => handleRemoveFile(index)}
-                                            className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            <X size={12} />
-                                        </button>
+                            {/* Vertical list of photos with individual comment fields */}
+                            <div className="space-y-4">
+                                {selectedFiles.map(({ file, comment }, index) => (
+                                    <div key={index} className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                                        <div className="flex gap-4">
+                                            {/* Photo Preview */}
+                                            <div className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden group">
+                                                <img
+                                                    src={URL.createObjectURL(file)}
+                                                    alt={`Preview ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    onClick={() => handleRemoveFile(index)}
+                                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                                <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded">
+                                                    #{index + 1}
+                                                </div>
+                                            </div>
+
+                                            {/* Comment Input */}
+                                            <div className="flex-1 min-w-0">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Комментарий для фото #{index + 1}
+                                                </label>
+                                                <textarea
+                                                    value={comment}
+                                                    onChange={(e) => handleCommentChange(index, e.target.value)}
+                                                    placeholder={`Например: бургер 300 гр, картофель фри...`}
+                                                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                                                    rows={3}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
+
+                                {/* Add More Button */}
                                 {selectedFiles.length < 5 && (
-                                    <label className="shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors cursor-pointer">
-                                        <Camera size={24} />
-                                        <span className="text-xs mt-1">Добавить</span>
+                                    <label className="block">
+                                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-4 flex items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
+                                            <Camera size={20} />
+                                            <span className="font-medium">Добавить ещё фото</span>
+                                        </div>
                                         <input
                                             type="file"
                                             accept="image/*"
@@ -352,7 +390,8 @@ const FoodLogPage: React.FC = () => {
                                                         alert('Максимум 5 фото');
                                                         return;
                                                     }
-                                                    setSelectedFiles([...selectedFiles, ...newFiles]);
+                                                    const newFilesWithComments = newFiles.map(f => ({ file: f, comment: '' }));
+                                                    setSelectedFiles([...selectedFiles, ...newFilesWithComments]);
                                                 }
                                             }}
                                         />
@@ -360,17 +399,11 @@ const FoodLogPage: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Comment Input */}
-                            <div className="mt-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Комментарий к еде (опционально)
-                                </label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    placeholder="С комментарием анализ будет точнее. Пример: кура 150 гр, рис 200 гр..."
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none h-32"
-                                />
+                            {/* Hint */}
+                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                                <p className="text-blue-800 text-sm">
+                                    💡 <strong>Совет:</strong> Укажите комментарий для каждого фото отдельно — так ИИ точнее распознает блюда и калории
+                                </p>
                             </div>
 
                             {/* Actions */}
