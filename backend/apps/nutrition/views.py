@@ -506,3 +506,134 @@ class SetAutoGoalView(views.APIView):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+@extend_schema(tags=['Nutrition - Statistics'])
+class WeeklyStatsView(views.APIView):
+    """
+    GET /api/v1/stats/weekly/?start_date=YYYY-MM-DD
+
+    Returns weekly nutrition statistics with daily averages.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Получить недельную статистику",
+        description="Возвращает статистику по КБЖУ за неделю с ежедневными данными и средними значениями.",
+        parameters=[
+            OpenApiParameter(
+                name='start_date',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Дата начала недели (понедельник) в формате YYYY-MM-DD',
+                required=True
+            )
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Недельная статистика",
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'start_date': {'type': 'string'},
+                        'end_date': {'type': 'string'},
+                        'daily_data': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'properties': {
+                                    'date': {'type': 'string'},
+                                    'calories': {'type': 'number'},
+                                    'protein': {'type': 'number'},
+                                    'fat': {'type': 'number'},
+                                    'carbs': {'type': 'number'},
+                                }
+                            }
+                        },
+                        'averages': {
+                            'type': 'object',
+                            'properties': {
+                                'calories': {'type': 'number'},
+                                'protein': {'type': 'number'},
+                                'fat': {'type': 'number'},
+                                'carbs': {'type': 'number'},
+                            }
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(description="Невалидные параметры"),
+        }
+    )
+    def get(self, request):
+        from datetime import datetime, timedelta
+
+        start_date_str = request.query_params.get('start_date')
+        if not start_date_str:
+            return Response(
+                {"error": "start_date parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Calculate end date (start + 6 days = 7 days total)
+        end_date = start_date + timedelta(days=6)
+
+        # Get all meals for the week
+        meals = Meal.objects.filter(
+            user=request.user,
+            date__gte=start_date,
+            date__lte=end_date
+        ).prefetch_related('items')
+
+        # Collect daily data
+        daily_data = {}
+        for i in range(7):
+            current_date = start_date + timedelta(days=i)
+            daily_data[current_date.isoformat()] = {
+                'date': current_date.isoformat(),
+                'calories': 0,
+                'protein': 0,
+                'fat': 0,
+                'carbs': 0,
+            }
+
+        # Sum up nutrition for each day
+        for meal in meals:
+            date_key = meal.date.isoformat()
+            if date_key in daily_data:
+                for item in meal.items.all():
+                    daily_data[date_key]['calories'] += item.calories
+                    daily_data[date_key]['protein'] += item.protein
+                    daily_data[date_key]['fat'] += item.fat
+                    daily_data[date_key]['carbs'] += item.carbohydrates
+
+        # Calculate averages
+        total_calories = sum(day['calories'] for day in daily_data.values())
+        total_protein = sum(day['protein'] for day in daily_data.values())
+        total_fat = sum(day['fat'] for day in daily_data.values())
+        total_carbs = sum(day['carbs'] for day in daily_data.values())
+
+        days_count = 7
+
+        result = {
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'daily_data': list(daily_data.values()),
+            'averages': {
+                'calories': round(total_calories / days_count, 1),
+                'protein': round(total_protein / days_count, 1),
+                'fat': round(total_fat / days_count, 1),
+                'carbs': round(total_carbs / days_count, 1),
+            }
+        }
+
+        return Response(result)

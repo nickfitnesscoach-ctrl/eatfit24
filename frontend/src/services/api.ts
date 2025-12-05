@@ -100,6 +100,7 @@ const URLS = {
     goals: `${API_BASE}/goals/`,
     calculateGoals: `${API_BASE}/goals/calculate/`,
     setAutoGoals: `${API_BASE}/goals/set-auto/`,
+    weeklyStats: `${API_BASE}/stats/weekly/`,
     // User endpoints
     profile: `${API_BASE}/users/profile/`,
     uploadAvatar: `${API_BASE}/users/profile/avatar/`,
@@ -808,6 +809,21 @@ export const api = {
             return await response.json();
         } catch (error) {
             console.error('Error setting auto goals:', error);
+            throw error;
+        }
+    },
+
+    async getWeeklyStats(startDate: string) {
+        try {
+            const response = await fetchWithTimeout(`${URLS.weeklyStats}?start_date=${startDate}`, {
+                headers: getHeaders(),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch weekly stats');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching weekly stats:', error);
             throw error;
         }
     },

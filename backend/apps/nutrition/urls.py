@@ -33,4 +33,7 @@ urlpatterns = [
     path('goals/', views.DailyGoalView.as_view(), name='daily-goal'),
     path('goals/calculate/', views.CalculateGoalsView.as_view(), name='calculate-goals'),
     path('goals/set-auto/', views.SetAutoGoalView.as_view(), name='set-auto-goal'),
+
+    # Statistics
+    path('stats/weekly/', views.WeeklyStatsView.as_view(), name='weekly-stats'),
 ]
