@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Camera, Upload, CreditCard, AlertCircle, Check, X, Send } from 'lucide-react';
+import { Camera, CreditCard, AlertCircle, Check, X, Send } from 'lucide-react';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
-import { isAndroid } from '../utils/platform';
 import { BatchResultsModal, BatchResult, AnalysisResult } from '../components/BatchResultsModal';
 
 const FoodLogPage: React.FC = () => {
@@ -473,33 +472,6 @@ const FoodLogPage: React.FC = () => {
                                 onChange={handleFileSelect}
                             />
                         </label>
-
-                        {isAndroid() && (
-                            <>
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-gray-300"></div>
-                                    </div>
-                                    <div className="relative flex justify-center text-sm">
-                                        <span className="px-2 bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-500">или</span>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={() => {
-                                        const tg = window.Telegram?.WebApp;
-                                        if (tg) {
-                                            tg.openTelegramLink(`https://t.me/EatFit24Bot?startattach=photo`);
-                                        }
-                                    }}
-                                    className="w-full aspect-video bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform"
-                                >
-                                    <Upload size={64} className="mb-4" />
-                                    <span className="text-xl font-bold mb-2">Отправить в чате</span>
-                                    <span className="text-sm text-white/80">Сфотографировать и отправить боту</span>
-                                </button>
-                            </>
-                        )}
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
