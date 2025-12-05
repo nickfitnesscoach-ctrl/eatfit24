@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api, MealAnalysis } from '../services/api';
 import PageHeader from '../components/PageHeader';
 import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2 } from 'lucide-react';
 const MealDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<MealAnalysis | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -50,8 +51,13 @@ const MealDetailsPage: React.FC = () => {
         try {
             setDeleting(true);
             await api.deleteMeal(parseInt(id));
-            // Success - navigate back (preserves the date in ClientDashboard)
-            navigate(-1);
+            // Success - navigate back with date from location state
+            const returnDate = (location.state as any)?.returnDate;
+            if (returnDate) {
+                navigate(`/?date=${returnDate}`, { replace: true });
+            } else {
+                navigate('/', { replace: true });
+            }
         } catch (err) {
             console.error('Failed to delete meal:', err);
             const errorMessage = err instanceof Error ? err.message : 'Не удалось удалить приём пищи';
@@ -72,9 +78,14 @@ const MealDetailsPage: React.FC = () => {
             const result = await api.getMealAnalysis(parseInt(id));
             setData(result);
 
-            // If no items left, navigate back (preserves the date in ClientDashboard)
+            // If no items left, navigate back with date from location state
             if (result.recognized_items.length === 0) {
-                navigate(-1);
+                const returnDate = (location.state as any)?.returnDate;
+                if (returnDate) {
+                    navigate(`/?date=${returnDate}`, { replace: true });
+                } else {
+                    navigate('/', { replace: true });
+                }
                 return;
             }
 

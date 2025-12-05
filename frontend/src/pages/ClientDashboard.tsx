@@ -357,7 +357,7 @@ const ClientDashboard: React.FC = () => {
                                         className="relative group"
                                     >
                                         <div
-                                            onClick={() => navigate(`/meal/${meal.id}`)}
+                                            onClick={() => navigate(`/meal/${meal.id}`, { state: { returnDate: selectedDate.toISOString().split('T')[0] } })}
                                             className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors active:scale-[0.98]"
                                         >
                                             <div>
