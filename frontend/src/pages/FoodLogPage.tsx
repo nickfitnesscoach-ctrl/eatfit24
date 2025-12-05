@@ -415,9 +415,7 @@ const FoodLogPage: React.FC = () => {
                 ) : (
                     /* Initial Upload State */
                     <div className="space-y-6">
-                        <p className="text-center text-gray-500 mb-4">
-                            Выберите способ добавления фото
-                        </p>
+
 
                         <label className="block">
                             <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
