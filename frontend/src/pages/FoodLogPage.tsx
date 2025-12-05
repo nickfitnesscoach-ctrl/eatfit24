@@ -231,100 +231,39 @@ const FoodLogPage: React.FC = () => {
             <div className="max-w-lg mx-auto">
                 <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center">Дневник питания</h1>
 
-                {/* Billing Info Banner */}
-                {billing.data && !billing.loading && (
-                    <div className={`mb-6 rounded-2xl p-4 ${billing.isPro
-                        ? 'bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-200'
-                        : billing.isLimitReached
-                            ? 'bg-red-50 border-2 border-red-200'
-                            : 'bg-blue-50 border-2 border-blue-200'
-                        }`}>
-                        {billing.isPro ? (
-                            <>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Check className="text-purple-600" size={18} />
-                                    <span className="font-semibold text-purple-900">
-                                        Ваш тариф: {billing.data.plan_name}
-                                    </span>
-                                </div>
-                                <p className="text-purple-700 text-sm">
-                                    Анализ фото — без ограничений ∞
-                                </p>
-                                {billing.data.expires_at && (
-                                    <p className="text-purple-700 text-sm mt-1 font-medium">
-                                        Подписка активна до {new Date(billing.data.expires_at).toLocaleDateString('ru-RU', {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric'
-                                        })}
-                                    </p>
-                                )}
-                            </>
-                        ) : billing.isLimitReached ? (
-                            <>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <AlertCircle className="text-red-600" size={18} />
-                                    <span className="font-semibold text-red-900">
-                                        Лимит на сегодня исчерпан
-                                    </span>
-                                </div>
-                                <p className="text-red-700 text-sm mb-3">
-                                    Использовано: {billing.data.used_today} из {billing.data.daily_photo_limit} фото
-                                </p>
-                                <button
-                                    onClick={() => navigate('/subscription')}
-                                    className="w-full bg-red-600 text-white py-2 rounded-xl font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <CreditCard size={18} />
-                                    Оформить PRO
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold text-blue-900">
-                                        {billing.data.plan_name}
-                                    </span>
-                                    <button
-                                        onClick={() => navigate('/subscription')}
-                                        className="text-blue-600 text-sm font-medium hover:underline"
-                                    >
-                                        Обновить
-                                    </button>
-                                </div>
-                                <p className="text-blue-700 text-sm">
-                                    Сегодня: {billing.data.used_today} из {billing.data.daily_photo_limit} фото проанализировано
-                                </p>
-                            </>
-                        )}
-                    </div>
-                )}
-
                 {/* Date and Meal Type Selector */}
                 <div className="bg-white rounded-3xl shadow-sm p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Дата приёма пищи</h3>
-                    <input
-                        type="date"
-                        value={selectedDate.toISOString().split('T')[0]}
-                        onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                        className="w-full p-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all mb-4"
-                    />
-
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Тип приёма пищи</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                        {mealTypeOptions.map((option) => (
-                            <button
-                                key={option.value}
-                                onClick={() => setMealType(option.value)}
-                                className={`py-3 px-4 rounded-xl font-bold transition-all ${
-                                    mealType === option.value
-                                        ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg scale-105'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Дата</h3>
+                            <input
+                                type="date"
+                                value={selectedDate.toISOString().split('T')[0]}
+                                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                                className="w-full p-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white"
+                            />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Приём пищи</h3>
+                            <div className="relative">
+                                <select
+                                    value={mealType}
+                                    onChange={(e) => setMealType(e.target.value)}
+                                    className="w-full p-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white appearance-none"
+                                >
+                                    {mealTypeOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -557,6 +496,59 @@ const FoodLogPage: React.FC = () => {
                             navigate('/');
                         }}
                     />
+                )}
+
+                {/* Compact Billing Info Footer */}
+                {billing.data && !billing.loading && (
+                    <div className={`mt-8 rounded-xl p-3 text-sm ${billing.isPro
+                        ? 'bg-purple-50 border border-purple-100'
+                        : billing.isLimitReached
+                            ? 'bg-red-50 border border-red-100'
+                            : 'bg-blue-50 border border-blue-100'
+                        }`}>
+                        {billing.isPro ? (
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Check className="text-purple-600" size={16} />
+                                    <span className="font-medium text-purple-900">
+                                        PRO активен
+                                    </span>
+                                </div>
+                                {billing.data.expires_at && (
+                                    <span className="text-purple-600 text-xs">
+                                        до {new Date(billing.data.expires_at).toLocaleDateString('ru-RU')}
+                                    </span>
+                                )}
+                            </div>
+                        ) : billing.isLimitReached ? (
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle className="text-red-600" size={16} />
+                                    <span className="font-medium text-red-900">
+                                        Лимит исчерпан
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => navigate('/subscription')}
+                                    className="text-red-600 font-medium text-xs hover:underline whitespace-nowrap"
+                                >
+                                    Купить PRO
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <span className="text-blue-900">
+                                    {billing.data.used_today} / {billing.data.daily_photo_limit} фото
+                                </span>
+                                <button
+                                    onClick={() => navigate('/subscription')}
+                                    className="text-blue-600 font-medium text-xs hover:underline"
+                                >
+                                    Увеличить лимит
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>
