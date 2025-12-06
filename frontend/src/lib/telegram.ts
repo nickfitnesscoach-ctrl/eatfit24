@@ -24,15 +24,50 @@ export interface TelegramAuthData {
     initData: string;
     user: TelegramUserInfo;
 }
+
 // ============================================================
-// Internal State
+// Browser Debug Mode
 // ============================================================
+
+/**
+ * Debug user для Browser Debug Mode
+ */
+const DEBUG_TELEGRAM_USER: TelegramUserInfo = {
+    id: 999999999,
+    first_name: 'Debug',
+    last_name: 'User',
+    username: 'eatfit24_debug',
+    language_code: 'ru',
+    is_premium: false,
+};
+
+/**
+ * Проверка, включён ли Browser Debug Mode
+ */
+export function isBrowserDebugMode(): boolean {
+    if (typeof window === 'undefined') return false;
+
+    // Проверяем env переменную
+    const isWebDebugEnabled = import.meta.env.VITE_WEB_DEBUG_ENABLED === 'true';
+    if (!isWebDebugEnabled) return false;
+
+    // Проверяем URL параметры
+    const params = new URLSearchParams(window.location.search);
+    const hasDebugFlag = params.has('web_debug') || params.has('debug');
+
+    // Проверяем, что не запущено в Telegram
+    const isTelegramEnv = Boolean(window.Telegram?.WebApp?.initData);
+
+    return !isTelegramEnv && hasDebugFlag;
+}
+
 // ============================================================
 // Internal State
 // ============================================================
 
 let _telegramAuthData: TelegramAuthData | null = null;
 let _initPromise: Promise<TelegramAuthData | null> | null = null;
+let _isBrowserDebug = false;
 
 export function getTelegramWebApp(): any | null {
     if (typeof window === 'undefined') return null;
@@ -69,6 +104,18 @@ export async function initTelegramWebApp(): Promise<TelegramAuthData | null> {
 }
 
 async function _doInitTelegramWebApp(): Promise<TelegramAuthData | null> {
+    // Проверяем Browser Debug Mode
+    if (isBrowserDebugMode()) {
+        console.log('[Telegram] Browser Debug Mode enabled');
+        _isBrowserDebug = true;
+        _telegramAuthData = {
+            initData: 'debug_mode_init_data',
+            user: DEBUG_TELEGRAM_USER,
+        };
+        console.log('[Telegram] Debug user initialized:', DEBUG_TELEGRAM_USER.username);
+        return _telegramAuthData;
+    }
+
     const tg = getTelegramWebApp();
 
     // Telegram WebApp доступен
@@ -139,6 +186,19 @@ export function buildTelegramHeaders(): HeadersInit {
 
     console.log('[Telegram] Building headers with user ID:', user.id);
 
+    // Browser Debug Mode - специальные заголовки
+    if (_isBrowserDebug) {
+        return {
+            'Content-Type': 'application/json',
+            'X-Debug-Mode': 'true',
+            'X-Debug-User-Id': String(user.id),
+            'X-Telegram-ID': String(user.id),
+            'X-Telegram-First-Name': encodeURIComponent(user.first_name || ''),
+            'X-Telegram-Username': encodeURIComponent(user.username || ''),
+        };
+    }
+
+    // Обычный Telegram режим
     return {
         'Content-Type': 'application/json',
         'X-Telegram-ID': String(user.id),
@@ -274,5 +334,6 @@ export function getTelegramDebugInfo() {
         version: tg?.version || null,
         colorScheme: tg?.colorScheme || null,
         devMode: false,
+        browserDebugMode: _isBrowserDebug,
     };
 }

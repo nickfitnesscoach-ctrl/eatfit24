@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getTelegramWebApp, type TelegramUserInfo } from '../lib/telegram';
+import { getTelegramWebApp, isBrowserDebugMode, type TelegramUserInfo } from '../lib/telegram';
 
 export type TelegramPlatform = 'ios' | 'android' | 'tdesktop' | 'macos' | 'web' | 'unknown';
 
@@ -17,6 +17,9 @@ export interface UseTelegramWebAppResult {
     /** Application is running inside Telegram WebApp */
     isTelegramWebApp: boolean;
 
+    /** Browser Debug Mode is active (testing in regular browser) */
+    isBrowserDebug: boolean;
+
     /** Telegram user ID (if available) */
     telegramUserId: number | null;
 
@@ -25,13 +28,13 @@ export interface UseTelegramWebAppResult {
 
     /** Telegram WebApp instance (for direct access) */
     webApp: any | null;
-    
+
     /** Платформа: ios, android, tdesktop, macos, web */
     platform: TelegramPlatform;
-    
+
     /** Запущено на мобильном устройстве (iOS или Android) */
     isMobile: boolean;
-    
+
     /** Запущено на десктопе (tdesktop, macos, web) */
     isDesktop: boolean;
 }
@@ -57,6 +60,7 @@ export interface UseTelegramWebAppResult {
 export function useTelegramWebApp(): UseTelegramWebAppResult {
     const [isReady, setIsReady] = useState(false);
     const [isTelegramWebApp, setIsTelegramWebApp] = useState(false);
+    const [isBrowserDebug, setIsBrowserDebug] = useState(false);
     const [telegramUserId, setTelegramUserId] = useState<number | null>(null);
     const [telegramUser, setTelegramUser] = useState<TelegramUserInfo | null>(null);
     const [webApp, setWebApp] = useState<any | null>(null);
@@ -65,6 +69,17 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
     useEffect(() => {
         // Give time for window.Telegram to load (CDN script)
         const checkWebApp = () => {
+            // Check Browser Debug Mode first
+            const debugMode = isBrowserDebugMode();
+            if (debugMode) {
+                console.log('[useTelegramWebApp] Browser Debug Mode detected');
+                setIsBrowserDebug(true);
+                setIsTelegramWebApp(false);
+                setPlatform('web');
+                setIsReady(true);
+                return;
+            }
+
             const tg = getTelegramWebApp();
 
             if (!tg) {
@@ -75,7 +90,7 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
             }
 
             setWebApp(tg);
-            
+
             // Определяем платформу
             const tgPlatform = (tg.platform || 'unknown').toLowerCase() as TelegramPlatform;
             setPlatform(tgPlatform);
@@ -122,6 +137,7 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
     return {
         isReady,
         isTelegramWebApp,
+        isBrowserDebug,
         telegramUserId,
         telegramUser,
         webApp,

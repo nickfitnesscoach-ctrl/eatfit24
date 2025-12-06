@@ -20,9 +20,9 @@ interface UserGoals {
 }
 
 const ProfilePage: React.FC = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, isBrowserDebug } = useAuth();
     const navigate = useNavigate();
-    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
+    const { isReady, isTelegramWebApp: webAppDetected, isBrowserDebug: webAppBrowserDebug } = useTelegramWebApp();
     const [isEditing, setIsEditing] = useState(false);
     const [isEditingGoals, setIsEditingGoals] = useState(false);
     const [isWeeklyStatsOpen, setIsWeeklyStatsOpen] = useState(false);
@@ -318,7 +318,8 @@ const ProfilePage: React.FC = () => {
     }
 
     // WebApp is ready but we're not in Telegram
-    if (!webAppDetected) {
+    // Allow Browser Debug Mode to continue
+    if (!webAppDetected && !isBrowserDebug && !webAppBrowserDebug) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">

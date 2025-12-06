@@ -1,10 +1,14 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { Home, Camera, CreditCard, User } from 'lucide-react';
+import BrowserDebugBanner from './BrowserDebugBanner';
 
 const ClientLayout: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
+            {/* Browser Debug Mode Banner */}
+            <BrowserDebugBanner />
+
             {/* DEBUG: Version marker */}
             <div className="bg-red-500 text-white text-center py-1 text-xs font-bold">
                 DEBUG_VERSION_42

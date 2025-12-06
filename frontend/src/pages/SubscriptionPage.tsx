@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PlanCard, { Plan, PlanId } from '../components/PlanCard';
 import { api } from '../services/api';
 import { useBilling } from '../contexts/BillingContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 
@@ -11,7 +12,8 @@ import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 const SubscriptionPage: React.FC = () => {
     const billing = useBilling();
     const navigate = useNavigate();
-    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
+    const { isBrowserDebug } = useAuth();
+    const { isReady, isTelegramWebApp: webAppDetected, isBrowserDebug: webAppBrowserDebug } = useTelegramWebApp();
     const [loadingPlanId, setLoadingPlanId] = useState<PlanId | null>(null);
     const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
     const [plans, setPlans] = useState<Plan[]>([]);
@@ -81,6 +83,12 @@ const SubscriptionPage: React.FC = () => {
 
     const handleSelectPlan = async (planId: PlanId) => {
         if (loadingPlanId) return;
+
+        // Block payments in Browser Debug Mode
+        if (isBrowserDebug || webAppBrowserDebug) {
+            showToast('Платежи недоступны в режиме отладки браузера');
+            return;
+        }
 
         const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
 
@@ -183,7 +191,8 @@ const SubscriptionPage: React.FC = () => {
     }
 
     // WebApp is ready but we're not in Telegram
-    if (!webAppDetected) {
+    // Allow Browser Debug Mode to continue (but payments will be disabled)
+    if (!webAppDetected && !isBrowserDebug && !webAppBrowserDebug) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">

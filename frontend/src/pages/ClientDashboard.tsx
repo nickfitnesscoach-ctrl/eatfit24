@@ -38,8 +38,8 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 const ClientDashboard: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth();
-    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
+    const { user, isBrowserDebug } = useAuth();
+    const { isReady, isTelegramWebApp: webAppDetected, isBrowserDebug: webAppBrowserDebug } = useTelegramWebApp();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [loading, setLoading] = useState(true);
@@ -204,7 +204,8 @@ const ClientDashboard: React.FC = () => {
     }
 
     // WebApp is ready but we're not in Telegram
-    if (!webAppDetected) {
+    // Allow Browser Debug Mode to continue
+    if (!webAppDetected && !isBrowserDebug && !webAppBrowserDebug) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">

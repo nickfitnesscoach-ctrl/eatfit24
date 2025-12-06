@@ -9,6 +9,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 import {
     initTelegramWebApp,
+    isBrowserDebugMode,
     type TelegramUserInfo,
 } from '../lib/telegram';
 
@@ -35,6 +36,7 @@ interface AuthContextType {
     error: string | null;
     isInitialized: boolean;
     isAdmin: boolean;
+    isBrowserDebug: boolean;
     authenticate: () => Promise<void>;
     logout: () => void;
 }
@@ -51,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [isBrowserDebug, setIsBrowserDebug] = useState(false);
 
     /**
      * Инициализация и аутентификация
@@ -60,13 +63,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(true);
             setError(null);
 
-            // Шаг 1: Инициализация Telegram WebApp
+            // Проверяем Browser Debug Mode
+            const debugMode = isBrowserDebugMode();
+            if (debugMode) {
+                console.log('[Auth] Browser Debug Mode enabled');
+                setIsBrowserDebug(true);
+            }
+
+            // Шаг 1: Инициализация Telegram WebApp (или Debug Mode)
             console.log('[Auth] Initializing Telegram WebApp...');
             const authData = await initTelegramWebApp();
 
             if (!authData) {
                 console.warn('[Auth] Telegram WebApp not available');
-                setError('Telegram WebApp не инициализирован. Откройте приложение через Telegram.');
+                if (!debugMode) {
+                    setError('Telegram WebApp не инициализирован. Откройте приложение через Telegram.');
+                }
                 setLoading(false);
                 return;
             }
@@ -77,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Шаг 2: Аутентификация на backend (для получения user info)
             // NOTE: JWT токены из response игнорируются, используем Header auth
+            // В Browser Debug Mode backend должен распознать X-Debug-Mode заголовок
             try {
                 const response = await api.authenticate(authData.initData);
                 console.log('[Auth] Backend auth response:', response);
@@ -93,8 +106,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             } catch (authError) {
                 // Backend auth failed, но Telegram init успешен
-                // Можно продолжить работу с ограниченной функциональностью
+                // В Browser Debug Mode это нормально - можем работать без backend
                 console.error('[Auth] Backend auth failed:', authError);
+                if (debugMode) {
+                    console.log('[Auth] Browser Debug Mode: continuing without backend auth');
+                }
                 // Не устанавливаем error - пользователь может работать
             }
         } catch (err) {
@@ -124,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 error,
                 isInitialized,
                 isAdmin: user?.is_admin || false,
+                isBrowserDebug,
                 authenticate,
                 logout,
             }}
