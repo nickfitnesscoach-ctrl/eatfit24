@@ -298,37 +298,52 @@ const FoodLogPage: React.FC = () => {
                     }
 
                     // UNIVERSAL FALLBACK: If items empty but meal_id exists
-                    // This handles BOTH Sync mode empty results AND Async results where pollTaskStatus fallback might have failed or not run
-                    // We try one more time with a robust check here in `processBatch` loop
+                    // This handles BOTH Sync mode empty results AND Async results where pollTaskStatus fallback might have failed
+                    // We try multiple times with increasing delays to handle DB propagation
                     if ((!result.recognized_items || result.recognized_items.length === 0) && result.meal_id) {
-                        console.log(`[Batch] Empty items but meal_id=${result.meal_id}, trying universal fallback...`);
+                        console.log(`[Batch] Empty items but meal_id=${result.meal_id}, trying universal fallback with retries...`);
 
-                        // Add 1s delay for consistency
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // Try up to 3 times with increasing delays (1s, 2s, 3s)
+                        for (let fallbackAttempt = 1; fallbackAttempt <= 3; fallbackAttempt++) {
+                            const delayMs = fallbackAttempt * 1000;
+                            console.log(`[Batch] Fallback attempt ${fallbackAttempt}/3, waiting ${delayMs}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                        try {
-                            const mealData = await api.getMealAnalysis(result.meal_id);
-                            if (mealData.recognized_items && mealData.recognized_items.length > 0) {
-                                // Map from MealAnalysis format to AnalysisResult format
-                                // Backend returns: id, name, grams, calories, protein, fat, carbohydrates
-                                result.recognized_items = mealData.recognized_items.map(item => ({
-                                    id: String(item.id),
-                                    name: item.name,
-                                    grams: item.grams,
-                                    calories: item.calories,
-                                    protein: item.protein,
-                                    fat: item.fat,
-                                    carbohydrates: item.carbohydrates
-                                }));
+                            try {
+                                const mealData = await api.getMealAnalysis(result.meal_id);
+                                if (mealData.recognized_items && mealData.recognized_items.length > 0) {
+                                    console.log(`[Batch] Fallback attempt ${fallbackAttempt} SUCCESS: found ${mealData.recognized_items.length} items`);
+                                    // Map from MealAnalysis format to AnalysisResult format
+                                    // Backend returns: id, name, grams, calories, protein, fat, carbohydrates
+                                    result.recognized_items = mealData.recognized_items.map(item => ({
+                                        id: String(item.id),
+                                        name: item.name,
+                                        grams: item.grams,
+                                        calories: item.calories,
+                                        protein: item.protein,
+                                        fat: item.fat,
+                                        carbohydrates: item.carbohydrates
+                                    }));
 
-                                // Recalculate totals
-                                result.total_calories = result.recognized_items.reduce((sum: number, i) => sum + (i.calories || 0), 0);
-                                result.total_protein = result.recognized_items.reduce((sum: number, i) => sum + (i.protein || 0), 0);
-                                result.total_fat = result.recognized_items.reduce((sum: number, i) => sum + (i.fat || 0), 0);
-                                result.total_carbohydrates = result.recognized_items.reduce((sum: number, i) => sum + (i.carbohydrates || 0), 0);
+                                    // Recalculate totals
+                                    result.total_calories = result.recognized_items.reduce((sum: number, i) => sum + (i.calories || 0), 0);
+                                    result.total_protein = result.recognized_items.reduce((sum: number, i) => sum + (i.protein || 0), 0);
+                                    result.total_fat = result.recognized_items.reduce((sum: number, i) => sum + (i.fat || 0), 0);
+                                    result.total_carbohydrates = result.recognized_items.reduce((sum: number, i) => sum + (i.carbohydrates || 0), 0);
+                                    
+                                    // Success - break out of retry loop
+                                    break;
+                                } else {
+                                    console.log(`[Batch] Fallback attempt ${fallbackAttempt}: meal exists but 0 items yet`);
+                                }
+                            } catch (fallbackErr) {
+                                console.warn(`[Batch] Fallback attempt ${fallbackAttempt} failed:`, fallbackErr);
+                                // If meal not found (404), stop retrying - it was deleted
+                                if ((fallbackErr as any)?.message?.includes('404')) {
+                                    console.warn(`[Batch] Meal ${result.meal_id} not found (deleted by backend), stopping retries`);
+                                    break;
+                                }
                             }
-                        } catch (fallbackErr) {
-                            console.warn(`[Batch] Universal fallback failed:`, fallbackErr);
                         }
                     }
 
@@ -339,8 +354,8 @@ const FoodLogPage: React.FC = () => {
                             data: result
                         });
                     } else {
-                        // AI returned success but no items - AND fallback failed
-                        // This implies the model really didn't find anything OR fallback fetch failed
+                        // AI returned success but no items - AND all fallback attempts failed
+                        // This means either: 1) backend deleted the meal (nothing recognized), or 2) genuine failure
                         console.warn(`[Batch] Final result empty for meal_id=${result.meal_id}. Status: ERROR`);
                         results.push({
                             file,
