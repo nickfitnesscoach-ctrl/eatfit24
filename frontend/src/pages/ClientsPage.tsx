@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, UserPlus, Eye, MessageCircle, ArrowLeft, User, CheckCircle2, AlertCircle, ImageIcon, Trash2 } from 'lucide-react';
 import { useClients } from '../contexts/ClientsContext';
-import { Application } from '../services/mockData';
+import { Application } from '../types/application';
 import { useNavigate } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 

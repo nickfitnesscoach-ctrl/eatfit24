@@ -9,8 +9,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 import {
     initTelegramWebApp,
-    getTelegramAuthData,
-    isTelegramInitialized,
     type TelegramUserInfo,
 } from '../lib/telegram';
 

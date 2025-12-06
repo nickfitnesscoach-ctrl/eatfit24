@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Application } from '../services/mockData';
+import { Application } from '../types/application';
 import { api } from '../services/api';
 
 interface ClientsContextType {

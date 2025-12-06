@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Copy, Eye, MessageCircle, UserPlus, ArrowLeft, User, CheckCircle2, AlertCircle, ImageIcon } from 'lucide-react';
-import { Application } from '../services/mockData';
+import { Search, Copy, Eye, MessageCircle, UserPlus, ArrowLeft, CheckCircle2, AlertCircle, ImageIcon } from 'lucide-react';
+import { Application } from '../types/application';
 import { useClients } from '../contexts/ClientsContext';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';

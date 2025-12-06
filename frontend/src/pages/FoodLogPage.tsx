@@ -5,18 +5,19 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 import { BatchResultsModal, BatchResult, AnalysisResult } from '../components/BatchResultsModal';
+import { POLLING, getErrorMessage, API_ERROR_CODES } from '../constants';
 
-// Polling constants
-const POLLING_MAX_DURATION = 60000; // 60 seconds
-const POLLING_INITIAL_DELAY = 2000; // 2 seconds
-const POLLING_MAX_DELAY = 5000; // 5 seconds
-const POLLING_BACKOFF_MULTIPLIER = 1.5;
+// Polling constants (from centralized config)
+const POLLING_MAX_DURATION = POLLING.MAX_DURATION_MS;
+const POLLING_INITIAL_DELAY = POLLING.INITIAL_DELAY_MS;
+const POLLING_MAX_DELAY = POLLING.MAX_DELAY_MS;
+const POLLING_BACKOFF_MULTIPLIER = POLLING.BACKOFF_MULTIPLIER;
 
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const billing = useBilling();
-    const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
+    const { isReady, isTelegramWebApp: webAppDetected, isDesktop } = useTelegramWebApp();
 
     // Batch state
     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -157,15 +158,15 @@ const FoodLogPage: React.FC = () => {
                     }
                     
                     // Extract totals - backend uses "totals" object, not individual fields
-                    const totals = result?.totals || {};
+                    const totals = result?.totals;
                     
                     return {
                         recognized_items: result?.recognized_items || [],
-                        total_calories: totals.calories || 0,
-                        total_protein: totals.protein || 0,
-                        total_fat: totals.fat || 0,
-                        total_carbohydrates: totals.carbohydrates || 0,
-                        meal_id: result?.meal_id,
+                        total_calories: totals?.calories || 0,
+                        total_protein: totals?.protein || 0,
+                        total_fat: totals?.fat || 0,
+                        total_carbohydrates: totals?.carbohydrates || 0,
+                        meal_id: result?.meal_id ? Number(result.meal_id) : undefined,
                         photo_url: result?.photo_url
                     };
                 }
@@ -273,44 +274,36 @@ const FoodLogPage: React.FC = () => {
                     console.log(`[Batch] Error details: errorType=${err.errorType}, error=${err.error}, code=${err.code}`);
 
                     // Check for daily limit
-                    if (err.error === 'DAILY_LIMIT_REACHED' || err.code === 'DAILY_LIMIT_REACHED') {
+                    if (err.error === API_ERROR_CODES.DAILY_LIMIT_REACHED || err.code === API_ERROR_CODES.DAILY_LIMIT_REACHED) {
                         setShowLimitModal(true);
                         results.push({
                             file,
                             status: 'error',
-                            error: 'Лимит исчерпан'
+                            error: getErrorMessage(API_ERROR_CODES.DAILY_LIMIT_REACHED)
                         });
                         break;
                     }
 
-                    // Determine error message based on error type
+                    // Determine error message using centralized localization
                     let errorMessage: string;
                     
                     // Custom error types from pollTaskStatus
                     if (err.errorType === 'AI_EMPTY_RESULT') {
-                        // AI processed but found no food - user should try different photo
-                        errorMessage = 'Еда не распознана. Попробуйте другой ракурс.';
+                        errorMessage = getErrorMessage('No food items recognized');
                     } else if (err.errorType === 'TIMEOUT') {
-                        errorMessage = 'Превышено время ожидания';
+                        errorMessage = getErrorMessage(API_ERROR_CODES.TIMEOUT);
                     } else if (err.errorType === 'NETWORK_ERROR') {
-                        errorMessage = 'Ошибка сети. Проверьте интернет.';
+                        errorMessage = getErrorMessage(API_ERROR_CODES.NETWORK_ERROR);
                     } else if (err.errorType === 'CELERY_FAILURE') {
-                        errorMessage = 'Ошибка обработки. Попробуйте ещё раз.';
+                        errorMessage = getErrorMessage(API_ERROR_CODES.SERVER_ERROR);
+                    } else if (err.error) {
+                        // Use error code from backend
+                        errorMessage = getErrorMessage(err.error, err.message);
                     } else if (err.message) {
-                        // Legacy error handling
-                        if (err.message.includes('Failed to add food item')) {
-                            errorMessage = 'Ошибка сохранения';
-                        } else if (err.message.includes('timeout') || err.message.includes('Превышено время')) {
-                            errorMessage = 'Превышено время ожидания';
-                        } else if (err.message.includes('Network') || err.message.includes('fetch') || err.message.includes('сети')) {
-                            errorMessage = 'Ошибка сети';
-                        } else if (err.status >= 500) {
-                            errorMessage = 'Ошибка сервера. Попробуйте позже.';
-                        } else {
-                            errorMessage = 'Ошибка распознавания';
-                        }
+                        // Try to localize error message
+                        errorMessage = getErrorMessage(err.message);
                     } else {
-                        errorMessage = 'Неизвестная ошибка';
+                        errorMessage = getErrorMessage('default');
                     }
 
                     results.push({
@@ -568,11 +561,30 @@ const FoodLogPage: React.FC = () => {
                     /* Initial Upload State */
                     <div className="space-y-6">
 
+                        {/* Desktop Warning */}
+                        {isDesktop && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="text-yellow-600 shrink-0 mt-0.5" size={20} />
+                                    <div>
+                                        <p className="text-yellow-800 font-medium text-sm">
+                                            Вы используете десктоп-версию
+                                        </p>
+                                        <p className="text-yellow-700 text-sm mt-1">
+                                            Для съёмки еды рекомендуем открыть приложение на телефоне. 
+                                            На десктопе можно загрузить готовые фото.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <label className="block">
                             <div className="aspect-video bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-3xl flex flex-col items-center justify-center text-white shadow-xl active:scale-95 transition-transform cursor-pointer">
                                 <Camera size={64} className="mb-4" />
-                                <span className="text-xl font-bold mb-2">Загрузить фото</span>
+                                <span className="text-xl font-bold mb-2">
+                                    {isDesktop ? 'Загрузить фото' : 'Сфотографировать'}
+                                </span>
                                 <span className="text-sm text-white/80">Можно выбрать до 5 фото</span>
                             </div>
                             <input
@@ -586,7 +598,10 @@ const FoodLogPage: React.FC = () => {
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
-                                💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении
+                                {isDesktop 
+                                    ? '💡 Загрузите фото еды с хорошим освещением для точного распознавания'
+                                    : '💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении'
+                                }
                             </p>
                         </div>
 

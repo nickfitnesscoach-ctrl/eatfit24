@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Check, AlertCircle, X, ChevronRight, ChevronLeft, Flame, Drumstick, Droplets, Wheat } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 export interface RecognizedItem {
     name: string;
@@ -36,7 +35,6 @@ interface BatchResultsModalProps {
 }
 
 export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, onClose, onOpenDiary }) => {
-    const navigate = useNavigate();
     const successCount = results.filter(r => r.status === 'success').length;
     const totalCount = results.length;
 

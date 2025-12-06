@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Copy, Check, ArrowLeft, Send, UserPlus, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

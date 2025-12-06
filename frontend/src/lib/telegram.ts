@@ -162,7 +162,8 @@ export function getTelegramUser(): TelegramUserInfo | null {
 /**
  * @deprecated Используйте getTelegramAuthData().initData
  */
-export function getTelegramInitData(devMode = false): string | null {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getTelegramInitData(_devMode = false): string | null {
     if (_telegramAuthData) {
         return _telegramAuthData.initData;
     }

@@ -35,11 +35,13 @@ const GOAL_ADJUSTMENTS: Record<string, number> = {
 /**
  * Caloric values per gram of macronutrients
  */
-const CALORIES_PER_GRAM = {
+const _CALORIES_PER_GRAM = {
     protein: 4,
     fat: 9,
     carbs: 4,
 };
+// Export for potential future use
+export { _CALORIES_PER_GRAM as CALORIES_PER_GRAM };
 
 /**
  * Minimum daily caloric intake by gender (calorie floor)
@@ -95,7 +97,7 @@ function calculateBMR(
 /**
  * Round calories to nearest 5
  */
-function roundToNearest5(value: number): number {
+export function roundToNearest5(value: number): number {
     return Math.round(value / 5) * 5;
 }
 

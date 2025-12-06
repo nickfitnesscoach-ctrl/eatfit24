@@ -19,6 +19,7 @@ import SubscriptionDetailsPage from './pages/SubscriptionDetailsPage';
 import PaymentHistoryPage from './pages/PaymentHistoryPage';
 import SubscribersPage from './pages/SubscribersPage';
 import ErrorBoundary from './components/ErrorBoundary';
+import AuthErrorModal from './components/AuthErrorModal';
 
 import MealDetailsPage from './pages/MealDetailsPage';
 
@@ -44,6 +45,8 @@ function App() {
       <AuthProvider>
         <BillingProvider>
           <ClientsProvider>
+            {/* Глобальный обработчик ошибок авторизации (401/403) */}
+            <AuthErrorModal />
             <Router basename="/app">
               <Routes>
                 {/* Client Routes - КБЖУ трекер на главной (для всех) */}

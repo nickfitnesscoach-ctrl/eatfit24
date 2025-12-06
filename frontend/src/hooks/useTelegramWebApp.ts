@@ -8,6 +8,8 @@
 import { useState, useEffect } from 'react';
 import { getTelegramWebApp, type TelegramUserInfo } from '../lib/telegram';
 
+export type TelegramPlatform = 'ios' | 'android' | 'tdesktop' | 'macos' | 'web' | 'unknown';
+
 export interface UseTelegramWebAppResult {
     /** WebApp is ready to use */
     isReady: boolean;
@@ -23,6 +25,15 @@ export interface UseTelegramWebAppResult {
 
     /** Telegram WebApp instance (for direct access) */
     webApp: any | null;
+    
+    /** Платформа: ios, android, tdesktop, macos, web */
+    platform: TelegramPlatform;
+    
+    /** Запущено на мобильном устройстве (iOS или Android) */
+    isMobile: boolean;
+    
+    /** Запущено на десктопе (tdesktop, macos, web) */
+    isDesktop: boolean;
 }
 
 /**
@@ -49,6 +60,7 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
     const [telegramUserId, setTelegramUserId] = useState<number | null>(null);
     const [telegramUser, setTelegramUser] = useState<TelegramUserInfo | null>(null);
     const [webApp, setWebApp] = useState<any | null>(null);
+    const [platform, setPlatform] = useState<TelegramPlatform>('unknown');
 
     useEffect(() => {
         // Give time for window.Telegram to load (CDN script)
@@ -63,6 +75,10 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
             }
 
             setWebApp(tg);
+            
+            // Определяем платформу
+            const tgPlatform = (tg.platform || 'unknown').toLowerCase() as TelegramPlatform;
+            setPlatform(tgPlatform);
 
             // Check for initData (main indicator)
             if (!tg.initData) {
@@ -99,11 +115,18 @@ export function useTelegramWebApp(): UseTelegramWebAppResult {
         return () => clearTimeout(timeoutId);
     }, []);
 
+    // Вычисляем isMobile/isDesktop на основе платформы
+    const isMobile = platform === 'ios' || platform === 'android';
+    const isDesktop = platform === 'tdesktop' || platform === 'macos' || platform === 'web';
+
     return {
         isReady,
         isTelegramWebApp,
         telegramUserId,
         telegramUser,
         webApp,
+        platform,
+        isMobile,
+        isDesktop,
     };
 }
