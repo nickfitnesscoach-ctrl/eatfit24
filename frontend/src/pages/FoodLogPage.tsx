@@ -164,7 +164,7 @@ const FoodLogPage: React.FC = () => {
                     // But if we have a meal_id, we should still try to see if anything was saved
                     if (result && resultSuccess === false && !mealId) {
                         console.log(`[Polling] Backend returned success=false with no meal_id, throwing error`);
-                        const emptyError = new Error(result.error || 'AI не смог распознать еду на фото');
+                        const emptyError = new Error(result.error || 'Ошибка обработки фото');
                         (emptyError as any).errorType = 'AI_EMPTY_RESULT';
                         throw emptyError;
                     }
@@ -209,9 +209,11 @@ const FoodLogPage: React.FC = () => {
                     }
 
                     // Check again after fallback
+                    // UI HOTFIX: Не выбрасываем ошибку если есть mealId - бэкенд создал приём пищи
+                    // Пустые items при наличии mealId - это нормально, пользователь увидит meal в дневнике
                     if (recognizedItems.length === 0 && !mealId) {
                         // Still empty and no meal_id -> genuine failure
-                        const emptyError = new Error('Еда не распознана');
+                        const emptyError = new Error('Ошибка обработки');
                         (emptyError as any).errorType = 'AI_EMPTY_RESULT';
                         throw emptyError;
                     }

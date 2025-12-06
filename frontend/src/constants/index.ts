@@ -78,7 +78,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     [API_ERROR_CODES.AI_SERVICE_ERROR]: 'Сервис распознавания временно недоступен',
     [API_ERROR_CODES.AI_SERVICE_TIMEOUT]: 'Распознавание заняло слишком много времени',
     [API_ERROR_CODES.AI_PROXY_ERROR]: 'Ошибка сервиса распознавания',
-    [API_ERROR_CODES.AI_EMPTY_RESULT]: 'Не удалось распознать еду на фото. Попробуйте другое фото.',
+    [API_ERROR_CODES.AI_EMPTY_RESULT]: 'Ошибка обработки. Попробуйте ещё раз.',
     [API_ERROR_CODES.INVALID_IMAGE]: 'Некорректный формат изображения',
     [API_ERROR_CODES.TASK_ERROR]: 'Ошибка обработки задачи',
     
@@ -100,7 +100,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     [API_ERROR_CODES.TIMEOUT]: 'Превышено время ожидания',
     
     // Common English errors from backend (for partial matching)
-    'No food items recognized': 'Не удалось распознать продукты на фото',
+    'No food items recognized': 'Ошибка обработки. Попробуйте ещё раз.',
     'Meal not found': 'Приём пищи не найден',
     'AI service timeout': 'Сервис распознавания не отвечает',
     'Network error': 'Ошибка сети',
