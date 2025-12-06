@@ -137,14 +137,24 @@ export function useTaskPolling(
                         return;
                     }
                     
-                    // Extract totals - backend uses "totals" object
+                    // Extract data from task result
+                    let recognizedItems = result?.recognized_items || [];
                     const totals = result?.totals || {};
+                    const mealId = result?.meal_id;
+                    
+                    // FALLBACK: If recognized_items is empty but meal_id exists,
+                    // the items may have been saved but not returned in task result
+                    if (recognizedItems.length === 0 && mealId) {
+                        console.log(`[TaskPolling] Empty recognized_items but meal_id=${mealId} exists`);
+                        // Note: In hook we don't have access to api.getMealAnalysis
+                        // The caller should handle this case by fetching meal directly
+                    }
                     
                     setStatus('success');
                     setResult({
                         success: true,
-                        meal_id: result?.meal_id,
-                        recognized_items: result?.recognized_items || [],
+                        meal_id: mealId,
+                        recognized_items: recognizedItems,
                         total_calories: totals.calories || 0,
                         total_protein: totals.protein || 0,
                         total_fat: totals.fat || 0,

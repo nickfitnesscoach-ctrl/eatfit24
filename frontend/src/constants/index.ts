@@ -44,12 +44,19 @@ export const API_ERROR_CODES = {
     AI_SERVICE_ERROR: 'AI_SERVICE_ERROR',
     AI_SERVICE_TIMEOUT: 'AI_SERVICE_TIMEOUT',
     AI_PROXY_ERROR: 'AI_PROXY_ERROR',
+    AI_EMPTY_RESULT: 'AI_EMPTY_RESULT',
     INVALID_IMAGE: 'INVALID_IMAGE',
+    TASK_ERROR: 'TASK_ERROR',
     
     // Auth
     UNAUTHORIZED: 'UNAUTHORIZED',
     FORBIDDEN: 'FORBIDDEN',
     TELEGRAM_INVALID: 'TELEGRAM_INVALID',
+    
+    // Billing
+    NO_SUBSCRIPTION: 'NO_SUBSCRIPTION',
+    INVALID_PLAN: 'INVALID_PLAN',
+    PAYMENT_ERROR: 'PAYMENT_ERROR',
     
     // General
     NOT_FOUND: 'NOT_FOUND',
@@ -66,23 +73,35 @@ export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES];
 // ============================================================
 
 export const ERROR_MESSAGES: Record<string, string> = {
-    // API error codes
+    // AI Recognition errors
     [API_ERROR_CODES.DAILY_LIMIT_REACHED]: 'Лимит распознавания исчерпан на сегодня',
     [API_ERROR_CODES.AI_SERVICE_ERROR]: 'Сервис распознавания временно недоступен',
     [API_ERROR_CODES.AI_SERVICE_TIMEOUT]: 'Распознавание заняло слишком много времени',
     [API_ERROR_CODES.AI_PROXY_ERROR]: 'Ошибка сервиса распознавания',
+    [API_ERROR_CODES.AI_EMPTY_RESULT]: 'Не удалось распознать еду на фото. Попробуйте другое фото.',
     [API_ERROR_CODES.INVALID_IMAGE]: 'Некорректный формат изображения',
+    [API_ERROR_CODES.TASK_ERROR]: 'Ошибка обработки задачи',
+    
+    // Auth errors
     [API_ERROR_CODES.UNAUTHORIZED]: 'Сессия истекла. Откройте приложение заново.',
     [API_ERROR_CODES.FORBIDDEN]: 'Доступ запрещён',
     [API_ERROR_CODES.TELEGRAM_INVALID]: 'Ошибка авторизации Telegram',
+    
+    // Billing errors
+    [API_ERROR_CODES.NO_SUBSCRIPTION]: 'Подписка не найдена',
+    [API_ERROR_CODES.INVALID_PLAN]: 'Недоступный тарифный план',
+    [API_ERROR_CODES.PAYMENT_ERROR]: 'Ошибка при создании платежа',
+    
+    // General errors
     [API_ERROR_CODES.NOT_FOUND]: 'Данные не найдены',
     [API_ERROR_CODES.VALIDATION_ERROR]: 'Некорректные данные',
     [API_ERROR_CODES.SERVER_ERROR]: 'Ошибка сервера. Попробуйте позже.',
     [API_ERROR_CODES.NETWORK_ERROR]: 'Проблема с интернетом. Проверьте подключение.',
     [API_ERROR_CODES.TIMEOUT]: 'Превышено время ожидания',
     
-    // Common English errors from backend
+    // Common English errors from backend (for partial matching)
     'No food items recognized': 'Не удалось распознать продукты на фото',
+    'Meal not found': 'Приём пищи не найден',
     'AI service timeout': 'Сервис распознавания не отвечает',
     'Network error': 'Ошибка сети',
     'Request timeout': 'Превышено время ожидания',

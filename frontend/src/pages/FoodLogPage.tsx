@@ -157,16 +157,51 @@ const FoodLogPage: React.FC = () => {
                         throw emptyError;
                     }
                     
-                    // Extract totals - backend uses "totals" object, not individual fields
+                    // Extract data from task result
+                    let recognizedItems = result?.recognized_items || [];
                     const totals = result?.totals;
+                    const mealId = result?.meal_id ? Number(result.meal_id) : undefined;
+                    
+                    // FALLBACK: If recognized_items is empty but meal_id exists,
+                    // fetch meal directly from API (items may have been saved but not returned)
+                    if (recognizedItems.length === 0 && mealId) {
+                        console.log(`[Polling] Empty recognized_items but meal_id=${mealId} exists, fetching meal...`);
+                        try {
+                            const mealData = await api.getMealAnalysis(mealId);
+                            if (mealData.recognized_items && mealData.recognized_items.length > 0) {
+                                console.log(`[Polling] Fallback successful: found ${mealData.recognized_items.length} items in meal`);
+                                // Map from MealAnalysis format to AnalysisResult format
+                                recognizedItems = mealData.recognized_items.map(item => ({
+                                    id: String(item.id),
+                                    name: item.name,
+                                    grams: item.amount_grams,
+                                    calories: item.calories,
+                                    protein: item.protein,
+                                    fat: item.fat,
+                                    carbohydrates: item.carbs
+                                }));
+                            }
+                        } catch (fallbackErr) {
+                            console.warn(`[Polling] Fallback fetch failed:`, fallbackErr);
+                            // Continue with empty items - will show error below
+                        }
+                    }
+                    
+                    // Calculate totals from items if not provided
+                    const finalTotals = totals || {
+                        calories: recognizedItems.reduce((sum, i) => sum + (i.calories || 0), 0),
+                        protein: recognizedItems.reduce((sum, i) => sum + (i.protein || 0), 0),
+                        fat: recognizedItems.reduce((sum, i) => sum + (i.fat || 0), 0),
+                        carbohydrates: recognizedItems.reduce((sum, i) => sum + (i.carbohydrates || 0), 0)
+                    };
                     
                     return {
-                        recognized_items: result?.recognized_items || [],
-                        total_calories: totals?.calories || 0,
-                        total_protein: totals?.protein || 0,
-                        total_fat: totals?.fat || 0,
-                        total_carbohydrates: totals?.carbohydrates || 0,
-                        meal_id: result?.meal_id ? Number(result.meal_id) : undefined,
+                        recognized_items: recognizedItems,
+                        total_calories: finalTotals.calories || 0,
+                        total_protein: finalTotals.protein || 0,
+                        total_fat: finalTotals.fat || 0,
+                        total_carbohydrates: finalTotals.carbohydrates || 0,
+                        meal_id: mealId,
                         photo_url: result?.photo_url
                     };
                 }
