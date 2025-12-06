@@ -149,48 +149,68 @@ const FoodLogPage: React.FC = () => {
 
                 if (taskStatus.state === 'SUCCESS') {
                     const result = taskStatus.result;
+                    
+                    console.log(`[Polling] SUCCESS result:`, {
+                        success: result?.success,
+                        meal_id: result?.meal_id,
+                        recognized_items_count: result?.recognized_items?.length || 0,
+                        has_totals: !!result?.totals
+                    });
 
-                    // Backend may return success: false with error message
-                    if (result && result.success === false) {
+                    // Extract data from task result FIRST
+                    let recognizedItems = result?.recognized_items || [];
+                    const totals = result?.totals;
+                    const mealId = result?.meal_id;
+                    
+                    // If backend explicitly says success: false AND no meal_id, it's a real failure
+                    // But if there's a meal_id, we should try fallback first
+                    if (result && result.success === false && !mealId) {
+                        console.log(`[Polling] Backend returned success=false with no meal_id, throwing error`);
                         const emptyError = new Error(result.error || 'AI не смог распознать еду на фото');
                         (emptyError as any).errorType = 'AI_EMPTY_RESULT';
                         throw emptyError;
                     }
 
-                    // Extract data from task result
-                    let recognizedItems = result?.recognized_items || [];
-                    const totals = result?.totals;
-                    const mealId = result?.meal_id;
-
                     // FALLBACK: If recognized_items is empty but meal_id exists,
                     // fetch meal directly from API (items may have been saved but not returned)
+                    // This also handles success: false with meal_id - try to recover
+                    // Key insight: even if backend says success:false, if meal_id exists,
+                    // the meal might have been created with items before the error
                     if (recognizedItems.length === 0 && mealId) {
-                        console.log(`[Polling] Empty recognized_items but meal_id=${mealId} exists. Waiting 1s before fallback fetch...`);
+                        console.log(`[Polling] Empty items but meal_id=${mealId} exists, trying fallback (success=${result?.success})...`);
 
-                        // Add 1s delay to allow DB commit/propagation
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // Try up to 3 times with increasing delays
+                        for (let attempt = 1; attempt <= 3; attempt++) {
+                            const delayMs = attempt * 1000;
+                            console.log(`[Polling] Fallback attempt ${attempt}/3, waiting ${delayMs}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                        try {
-                            const mealData = await api.getMealAnalysis(mealId);
-                            if (mealData.recognized_items && mealData.recognized_items.length > 0) {
-                                console.log(`[Polling] Fallback successful: found ${mealData.recognized_items.length} items in meal`);
-                                // Map from MealAnalysis format to AnalysisResult format
-                                // Backend returns: id, name, grams, calories, protein, fat, carbohydrates
-                                recognizedItems = mealData.recognized_items.map(item => ({
-                                    id: String(item.id),
-                                    name: item.name,
-                                    grams: item.grams,
-                                    calories: item.calories,
-                                    protein: item.protein,
-                                    fat: item.fat,
-                                    carbohydrates: item.carbohydrates
-                                }));
-                            } else {
-                                console.warn('[Polling] Fallback fetch returned 0 items');
+                            try {
+                                const mealData = await api.getMealAnalysis(mealId);
+                                if (mealData.recognized_items && mealData.recognized_items.length > 0) {
+                                    console.log(`[Polling] Fallback SUCCESS on attempt ${attempt}: found ${mealData.recognized_items.length} items`);
+                                    // Map from MealAnalysis format to AnalysisResult format
+                                    recognizedItems = mealData.recognized_items.map(item => ({
+                                        id: String(item.id),
+                                        name: item.name,
+                                        grams: item.grams,
+                                        calories: item.calories,
+                                        protein: item.protein,
+                                        fat: item.fat,
+                                        carbohydrates: item.carbohydrates
+                                    }));
+                                    break; // Success - exit retry loop
+                                } else {
+                                    console.log(`[Polling] Fallback attempt ${attempt}: meal exists but 0 items`);
+                                }
+                            } catch (fallbackErr) {
+                                // If 404, meal was deleted - stop retrying
+                                if ((fallbackErr as Error)?.message?.includes('404')) {
+                                    console.warn(`[Polling] Meal ${mealId} not found (404), stopping fallback`);
+                                    break;
+                                }
+                                console.warn(`[Polling] Fallback attempt ${attempt} failed:`, fallbackErr);
                             }
-                        } catch (fallbackErr) {
-                            console.warn(`[Polling] Fallback fetch failed:`, fallbackErr);
-                            // Continue with empty items - will show error below
                         }
                     }
 
