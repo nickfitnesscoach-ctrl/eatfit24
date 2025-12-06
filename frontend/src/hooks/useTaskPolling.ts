@@ -127,17 +127,36 @@ export function useTaskPolling(
                 const data = await response.json();
                 console.log(`[TaskPolling] Task ${taskId} state: ${data.state}`, data);
 
-                if (data.state === 'SUCCESS' && data.result) {
-                    // Task completed successfully
+                if (data.state === 'SUCCESS') {
+                    const result = data.result;
+                    
+                    // Backend may return success: false with error message
+                    if (result && result.success === false) {
+                        setStatus('failed');
+                        setError(result.error || 'AI не смог распознать еду на фото');
+                        return;
+                    }
+                    
+                    // Extract totals - backend uses "totals" object
+                    const totals = result?.totals || {};
+                    
                     setStatus('success');
-                    setResult(data.result);
+                    setResult({
+                        success: true,
+                        meal_id: result?.meal_id,
+                        recognized_items: result?.recognized_items || [],
+                        total_calories: totals.calories || 0,
+                        total_protein: totals.protein || 0,
+                        total_fat: totals.fat || 0,
+                        total_carbohydrates: totals.carbohydrates || 0,
+                        photo_url: result?.photo_url
+                    });
                     return;
                 }
 
                 if (data.state === 'FAILURE') {
-                    // Task failed
                     setStatus('failed');
-                    setError(data.error || 'Ошибка распознавания');
+                    setError(data.error || 'Ошибка обработки фото');
                     return;
                 }
 

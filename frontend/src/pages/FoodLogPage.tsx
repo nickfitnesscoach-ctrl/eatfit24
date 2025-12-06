@@ -112,6 +112,18 @@ const FoodLogPage: React.FC = () => {
 
     /**
      * Poll task status until completion or timeout
+     * 
+     * Backend returns on SUCCESS:
+     * {
+     *   state: "SUCCESS",
+     *   result: {
+     *     success: true/false,
+     *     meal_id: "...",
+     *     recognized_items: [...],
+     *     totals: { calories, protein, fat, carbohydrates },
+     *     error?: "..." (when success: false)
+     *   }
+     * }
      */
     const pollTaskStatus = async (taskId: string, abortController: AbortController): Promise<AnalysisResult | null> => {
         const startTime = Date.now();
@@ -120,7 +132,9 @@ const FoodLogPage: React.FC = () => {
         while (!abortController.signal.aborted) {
             const elapsed = Date.now() - startTime;
             if (elapsed >= POLLING_MAX_DURATION) {
-                throw new Error('Превышено время ожидания распознавания');
+                const timeoutError = new Error('Превышено время ожидания распознавания');
+                (timeoutError as any).errorType = 'TIMEOUT';
+                throw timeoutError;
             }
 
             const delay = Math.min(
@@ -132,24 +146,37 @@ const FoodLogPage: React.FC = () => {
                 const taskStatus = await api.getTaskStatus(taskId);
                 console.log(`[Polling] Task ${taskId} state: ${taskStatus.state}`, taskStatus);
 
-                if (taskStatus.state === 'SUCCESS' && taskStatus.result) {
-                    // Task completed - return result
+                if (taskStatus.state === 'SUCCESS') {
+                    const result = taskStatus.result;
+                    
+                    // Backend may return success: false with error message
+                    if (result && result.success === false) {
+                        const emptyError = new Error(result.error || 'AI не смог распознать еду на фото');
+                        (emptyError as any).errorType = 'AI_EMPTY_RESULT';
+                        throw emptyError;
+                    }
+                    
+                    // Extract totals - backend uses "totals" object, not individual fields
+                    const totals = result?.totals || {};
+                    
                     return {
-                        recognized_items: taskStatus.result.recognized_items || [],
-                        total_calories: taskStatus.result.total_calories || 0,
-                        total_protein: taskStatus.result.total_protein || 0,
-                        total_fat: taskStatus.result.total_fat || 0,
-                        total_carbohydrates: taskStatus.result.total_carbohydrates || 0,
-                        meal_id: taskStatus.result.meal_id,
-                        photo_url: taskStatus.result.photo_url
+                        recognized_items: result?.recognized_items || [],
+                        total_calories: totals.calories || 0,
+                        total_protein: totals.protein || 0,
+                        total_fat: totals.fat || 0,
+                        total_carbohydrates: totals.carbohydrates || 0,
+                        meal_id: result?.meal_id,
+                        photo_url: result?.photo_url
                     };
                 }
 
                 if (taskStatus.state === 'FAILURE') {
-                    throw new Error(taskStatus.error || 'Ошибка распознавания');
+                    const failError = new Error(taskStatus.error || 'Ошибка обработки фото');
+                    (failError as any).errorType = 'CELERY_FAILURE';
+                    throw failError;
                 }
 
-                // Task still processing - wait and retry
+                // Task still processing (PENDING, STARTED, RETRY) - wait and retry
                 await new Promise(resolve => setTimeout(resolve, delay));
                 attempt++;
 
@@ -157,13 +184,23 @@ const FoodLogPage: React.FC = () => {
                 if (abortController.signal.aborted) {
                     return null;
                 }
+                
+                // If it's our custom error, re-throw it
+                if (err.errorType) {
+                    throw err;
+                }
+                
                 // Network error - retry a few times
                 if (attempt < 3) {
+                    console.warn(`[Polling] Network error, retry ${attempt + 1}/3:`, err.message);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     attempt++;
                     continue;
                 }
-                throw err;
+                
+                const networkError = new Error('Ошибка сети при получении результата');
+                (networkError as any).errorType = 'NETWORK_ERROR';
+                throw networkError;
             }
         }
 
@@ -224,14 +261,16 @@ const FoodLogPage: React.FC = () => {
                             data: result
                         });
                     } else {
+                        // AI returned success but no items - rare case, treat as empty result
                         results.push({
                             file,
                             status: 'error',
-                            error: 'Еда не найдена'
+                            error: 'Еда не распознана. Попробуйте другое фото.'
                         });
                     }
                 } catch (err: any) {
                     console.error(`[Batch] Error processing file ${file.name}:`, err);
+                    console.log(`[Batch] Error details: errorType=${err.errorType}, error=${err.error}, code=${err.code}`);
 
                     // Check for daily limit
                     if (err.error === 'DAILY_LIMIT_REACHED' || err.code === 'DAILY_LIMIT_REACHED') {
@@ -244,16 +283,34 @@ const FoodLogPage: React.FC = () => {
                         break;
                     }
 
-                    // Show specific error message
-                    let errorMessage = 'Ошибка распознавания';
-                    if (err.message) {
+                    // Determine error message based on error type
+                    let errorMessage: string;
+                    
+                    // Custom error types from pollTaskStatus
+                    if (err.errorType === 'AI_EMPTY_RESULT') {
+                        // AI processed but found no food - user should try different photo
+                        errorMessage = 'Еда не распознана. Попробуйте другой ракурс.';
+                    } else if (err.errorType === 'TIMEOUT') {
+                        errorMessage = 'Превышено время ожидания';
+                    } else if (err.errorType === 'NETWORK_ERROR') {
+                        errorMessage = 'Ошибка сети. Проверьте интернет.';
+                    } else if (err.errorType === 'CELERY_FAILURE') {
+                        errorMessage = 'Ошибка обработки. Попробуйте ещё раз.';
+                    } else if (err.message) {
+                        // Legacy error handling
                         if (err.message.includes('Failed to add food item')) {
                             errorMessage = 'Ошибка сохранения';
                         } else if (err.message.includes('timeout') || err.message.includes('Превышено время')) {
                             errorMessage = 'Превышено время ожидания';
-                        } else if (err.message.includes('Network') || err.message.includes('fetch')) {
+                        } else if (err.message.includes('Network') || err.message.includes('fetch') || err.message.includes('сети')) {
                             errorMessage = 'Ошибка сети';
+                        } else if (err.status >= 500) {
+                            errorMessage = 'Ошибка сервера. Попробуйте позже.';
+                        } else {
+                            errorMessage = 'Ошибка распознавания';
                         }
+                    } else {
+                        errorMessage = 'Неизвестная ошибка';
                     }
 
                     results.push({
