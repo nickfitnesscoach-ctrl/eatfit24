@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Flame, Drumstick, Droplets, Wheat, Plus, ChevronRight, Trash2 } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
@@ -37,6 +37,7 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 
 const ClientDashboard: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const { isReady, isTelegramWebApp: webAppDetected } = useTelegramWebApp();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -67,11 +68,12 @@ const ClientDashboard: React.FC = () => {
         setSearchParams({ date: dateStr }, { replace: true });
     }, [selectedDate]);
 
+    // Reload data when navigating back to dashboard (location.key changes on each navigation)
     useEffect(() => {
         if (isReady && webAppDetected) {
             loadDashboardData(selectedDate);
         }
-    }, [isReady, webAppDetected, selectedDate]);
+    }, [isReady, webAppDetected, selectedDate, location.key]);
 
     const loadDashboardData = async (date: Date) => {
         setLoading(true);
