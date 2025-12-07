@@ -54,9 +54,50 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
     if (selectedResultIndex !== null) {
         const result = results[selectedResultIndex];
 
+        // DEV MODE: Mock successful data for testing UI
+        const isDev = import.meta.env.DEV;
+        const mockResult: BatchResult | null = isDev && result.status === 'error' ? {
+            ...result,
+            status: 'success',
+            data: {
+                recognized_items: [
+                    {
+                        name: 'Куриная грудка',
+                        grams: 150,
+                        calories: 248,
+                        protein: 47,
+                        fat: 5,
+                        carbohydrates: 0
+                    },
+                    {
+                        name: 'Рис отварной',
+                        grams: 200,
+                        calories: 260,
+                        protein: 5,
+                        fat: 1,
+                        carbohydrates: 58
+                    },
+                    {
+                        name: 'Овощной салат',
+                        grams: 100,
+                        calories: 45,
+                        protein: 2,
+                        fat: 1,
+                        carbohydrates: 8
+                    }
+                ],
+                total_calories: 553,
+                total_protein: 54,
+                total_fat: 7,
+                total_carbohydrates: 66
+            }
+        } : null;
+
+        const displayResult = mockResult || result;
+
         return (
             <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
+                <div className="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl h-[98vh] sm:h-auto sm:max-h-[95vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
 
                     {/* Detail View Header */}
                     <div className="p-6 border-b border-gray-100 flex items-center gap-3 shrink-0">
@@ -77,8 +118,8 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                     {/* Detail View Content */}
                     <div className="overflow-y-auto flex-1">
                         {/* Large Photo */}
-                        {/* Large Photo - F-009: 1:1 Aspect Ratio Fix */}
-                        <div className="w-full aspect-square bg-gray-200 relative">
+                        {/* Large Photo - Reduced height for better content visibility */}
+                        <div className="w-full h-64 bg-gray-200 relative">
                             <img
                                 src={URL.createObjectURL(result.file)}
                                 alt="Detail"
@@ -86,15 +127,15 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                             />
                         </div>
 
-                        {result.status === 'success' && result.data ? (
-                            <div className="p-6 space-y-4">
+                        {displayResult.status === 'success' && displayResult.data ? (
+                            <div className="p-6 pb-24 space-y-4">
                                 {/* Neutral message for empty items but successful processing */}
-                                {result.data._neutralMessage ? (
+                                {displayResult.data._neutralMessage ? (
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
                                         <Check className="text-blue-500 mx-auto mb-3" size={48} />
                                         <h3 className="text-xl font-bold text-blue-600 mb-2">Анализ завершён</h3>
                                         <p className="text-blue-500">
-                                            {result.data._neutralMessage}
+                                            {displayResult.data._neutralMessage}
                                         </p>
                                     </div>
                                 ) : (
@@ -104,29 +145,29 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                                         <div className="grid grid-cols-4 gap-2 mb-4 p-3 bg-gray-50 rounded-2xl">
                                             <div className="text-center border-r border-gray-200 last:border-0">
                                                 <div className="text-xs text-gray-500 font-medium">Ккал</div>
-                                                <div className="text-sm font-bold text-gray-900">{Math.round(result.data.total_calories)}</div>
+                                                <div className="text-sm font-bold text-gray-900">{Math.round(displayResult.data.total_calories)}</div>
                                             </div>
                                             <div className="text-center border-r border-gray-200 last:border-0">
                                                 <div className="text-xs text-gray-500 font-medium">Белки</div>
-                                                <div className="text-sm font-bold text-gray-900">{Math.round(result.data.total_protein)}</div>
+                                                <div className="text-sm font-bold text-gray-900">{Math.round(displayResult.data.total_protein)}</div>
                                             </div>
                                             <div className="text-center border-r border-gray-200 last:border-0">
                                                 <div className="text-xs text-gray-500 font-medium">Жиры</div>
-                                                <div className="text-sm font-bold text-gray-900">{Math.round(result.data.total_fat)}</div>
+                                                <div className="text-sm font-bold text-gray-900">{Math.round(displayResult.data.total_fat)}</div>
                                             </div>
                                             <div className="text-center">
                                                 <div className="text-xs text-gray-500 font-medium">Угл.</div>
-                                                <div className="text-sm font-bold text-gray-900">{Math.round(result.data.total_carbohydrates)}</div>
+                                                <div className="text-sm font-bold text-gray-900">{Math.round(displayResult.data.total_carbohydrates)}</div>
                                             </div>
                                         </div>
 
                                         {/* Recognized Items */}
                                         <div>
                                             <h3 className="text-lg font-bold text-gray-900 mb-3">
-                                                Распознанные блюда ({result.data.recognized_items.length})
+                                                Распознанные блюда ({displayResult.data.recognized_items.length})
                                             </h3>
                                             <div className="space-y-3">
-                                                {result.data.recognized_items.map((item, idx) => (
+                                                {displayResult.data.recognized_items.map((item, idx) => (
                                                     <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                                                         <div className="flex justify-between items-start mb-3">
                                                             <div>
@@ -177,26 +218,16 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                                 )}
                             </div>
                         ) : (
-                            <div className="p-6">
+                            <div className="p-6 pb-24">
                                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
                                     <AlertCircle className="text-gray-500 mx-auto mb-3" size={48} />
                                     <h3 className="text-xl font-bold text-gray-600 mb-2">Ошибка загрузки</h3>
                                     <p className="text-gray-500">
-                                        {result.error || 'Попробуйте ещё раз'}
+                                        {displayResult.error || 'Попробуйте ещё раз'}
                                     </p>
                                 </div>
                             </div>
                         )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="p-4 border-t border-gray-100 shrink-0 bg-white sm:rounded-b-3xl pb-8 sm:pb-4">
-                        <button
-                            onClick={handleBackToList}
-                            className="w-full bg-black text-white py-3.5 rounded-xl font-bold hover:bg-gray-800 transition-colors"
-                        >
-                            Назад к списку
-                        </button>
                     </div>
                 </div>
             </div>
@@ -206,7 +237,7 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
     // Default: List View
     return (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60] animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="bg-white w-full max-w-lg sm:rounded-3xl rounded-t-3xl h-[98vh] sm:h-auto sm:max-h-[95vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
 
                 {/* Header */}
                 <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
@@ -298,8 +329,14 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
                                     <>
                                         <h3 className="font-bold text-gray-600">Ошибка загрузки</h3>
                                         <p className="text-sm text-gray-500 mt-1">
-                                            {result.error || 'Попробуйте ещё раз'}
+                                            {result.error || 'Ошибка распознавания'}
                                         </p>
+                                        <button
+                                            onClick={() => handleViewDetails(index)}
+                                            className="mt-2 text-sm text-blue-600 font-medium hover:underline text-left"
+                                        >
+                                            Подробнее
+                                        </button>
                                     </>
                                 )}
                             </div>
