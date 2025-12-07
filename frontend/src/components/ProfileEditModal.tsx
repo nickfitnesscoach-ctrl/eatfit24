@@ -136,7 +136,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onClose, pr
 
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white w-full sm:w-[480px] h-[90vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300">
+            <div className="bg-white w-full sm:w-[480px] h-[98vh] sm:h-auto sm:max-h-[95vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300">
                 {/* Header - Fixed */}
                 <div className="flex-none px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-3xl">
                     <h2 className="text-xl font-bold text-gray-900">Редактировать профиль</h2>
