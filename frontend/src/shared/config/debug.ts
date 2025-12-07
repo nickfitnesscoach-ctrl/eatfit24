@@ -18,18 +18,44 @@
 const searchParams = new URLSearchParams(window.location.search);
 
 /**
+ * Initialize debug mode with sessionStorage persistence
+ * This allows debug mode to survive URL redirects/changes
+ */
+function initDebugMode(): boolean {
+  // Always enable in DEV
+  if (import.meta.env.DEV) {
+    sessionStorage.setItem('eatfit24_debug', 'true');
+    return true;
+  }
+
+  // Check URL parameter first (explicit debug activation)
+  if (searchParams.has("debug")) {
+    sessionStorage.setItem('eatfit24_debug', 'true');
+    return true;
+  }
+
+  // Check if debug was enabled in this session (survives redirects)
+  const sessionDebug = sessionStorage.getItem('eatfit24_debug');
+  if (sessionDebug === 'true') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Main debug flag - determines if debug mode is active
  *
  * TRUE when:
  * - Running in DEV environment (import.meta.env.DEV)
  * - OR URL contains ?debug=1 parameter (production debug access)
+ * - OR debug was activated in this browser session (survives redirects)
  *
  * FALSE when:
  * - Production build without ?debug=1 parameter
+ * - AND no active debug session
  */
-export const IS_DEBUG =
-  import.meta.env.DEV ||
-  searchParams.has("debug");
+export const IS_DEBUG = initDebugMode();
 
 /**
  * Debug user configuration for mock Telegram API
