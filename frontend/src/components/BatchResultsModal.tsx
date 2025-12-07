@@ -309,23 +309,13 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({ results, o
 
                 {/* Footer */}
                 {/* Footer - F-003, F-010: Min height & Safe Area */}
-                <div className="p-4 border-t border-gray-100 shrink-0 space-y-3 bg-white sm:rounded-b-3xl pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-4">
+                <div className="p-4 border-t border-gray-100 shrink-0 bg-white sm:rounded-b-3xl pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-4">
                     <button
                         onClick={onClose}
-                        className="w-full bg-black text-white py-3.5 rounded-xl font-bold hover:bg-gray-800 transition-colors min-h-[48px] flex items-center justify-center"
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center"
                     >
-                        Готово
+                        Сохранить прием пищи
                     </button>
-
-                    {onOpenDiary && (
-                        <button
-                            onClick={onOpenDiary}
-                            className="w-full bg-gray-100 text-gray-900 py-3.5 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 min-h-[48px]"
-                        >
-                            Открыть дневник
-                            <ChevronRight size={18} />
-                        </button>
-                    )}
                 </div>
             </div>
         </div>
