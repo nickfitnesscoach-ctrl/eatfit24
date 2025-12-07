@@ -18,5 +18,20 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  // 4.4: Bundle optimization - code splitting for better caching
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks - separate large dependencies for better caching
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['chart.js', 'react-chartjs-2'],
+          'vendor-icons': ['lucide-react'],
+        }
+      }
+    },
+    // Increase chunk size warning limit (default 500KB)
+    chunkSizeWarningLimit: 600,
   }
 })

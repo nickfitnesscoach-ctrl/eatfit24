@@ -26,6 +26,8 @@ from .throttles import AIRecognitionPerMinuteThrottle, AIRecognitionPerDayThrott
 from apps.billing.services import get_effective_plan_for_user
 from apps.billing.usage import DailyUsage
 from apps.nutrition.models import Meal
+# B-013: Image compression
+from apps.common.image_utils import compress_image
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +127,20 @@ class AIRecognitionView(APIView):
         if request.FILES.get("image"):
             # Multipart file upload
             image_file = request.FILES["image"]
+            original_size = image_file.size
             logger.info(
                 f"Received multipart image: name={image_file.name}, "
                 f"size={image_file.size} bytes, "
                 f"content_type={image_file.content_type}"
             )
             try:
+                # B-013: Compress image before processing
+                image_file = compress_image(image_file)
+                compressed_size = image_file.size if hasattr(image_file, 'size') else len(image_file.read())
+                if hasattr(image_file, 'seek'):
+                    image_file.seek(0)
+                logger.info(f"Image compression: {original_size} -> {compressed_size} bytes")
+                
                 image_data_url = self._file_to_data_url(image_file)
                 data["image"] = image_data_url
                 logger.info("Successfully converted multipart file to data URL")
