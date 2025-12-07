@@ -47,6 +47,7 @@ const ClientDashboard: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [loading, setLoading] = useState(true);
+    const [initialLoading, setInitialLoading] = useState(true); // Track first load vs subsequent reloads
     const [goals, setGoals] = useState<DailyGoal | null>(null);
     const [consumed, setConsumed] = useState<TotalConsumed>({ calories: 0, protein: 0, fat: 0, carbohydrates: 0 });
     const [meals, setMeals] = useState<Meal[]>([]);
@@ -154,6 +155,7 @@ const ClientDashboard: React.FC = () => {
             setError('Не удалось загрузить данные');
         } finally {
             setLoading(false);
+            setInitialLoading(false); // Mark that initial load is complete
         }
     };
 
@@ -233,8 +235,8 @@ const ClientDashboard: React.FC = () => {
         );
     }
 
-    // F-019: Show skeleton loader while loading dashboard data
-    if (loading) {
+    // F-019: Show skeleton loader only during initial load (not on subsequent refreshes)
+    if (initialLoading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
                 <SkeletonDashboard />
