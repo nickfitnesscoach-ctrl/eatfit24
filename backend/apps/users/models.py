@@ -1,15 +1,14 @@
 """
 Models for users app.
-"""
 
-import secrets
-from datetime import timedelta
+NOTE: Email verification has been removed.
+EatFit24 uses Telegram WebApp authentication only.
+"""
 
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
 
 from .validators import validate_avatar_file_extension, validate_avatar_file_size
 
@@ -17,7 +16,7 @@ from .validators import validate_avatar_file_extension, validate_avatar_file_siz
 class Profile(models.Model):
     """
     User profile model extending Django's built-in User model.
-    Contains additional user information for FoodMind AI.
+    Contains additional user information for EatFit24.
     """
 
     GENDER_CHOICES = [
@@ -46,11 +45,7 @@ class Profile(models.Model):
         verbose_name='Пользователь'
     )
 
-    email_verified = models.BooleanField(
-        default=False,
-        verbose_name='Email подтвержден',
-        help_text='Был ли email адрес подтвержден пользователем'
-    )
+    # NOTE: email_verified field removed - Telegram auth only
 
     full_name = models.CharField(
         max_length=255,
@@ -315,83 +310,12 @@ class Profile(models.Model):
         self.save(update_fields=['avatar', 'avatar_version'])
 
 
-class EmailVerificationToken(models.Model):
-    """
-    Token for email verification.
-    Tokens expire after 24 hours.
-    """
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='email_verification_tokens',
-        verbose_name='Пользователь'
-    )
-    token = models.CharField(
-        max_length=64,
-        unique=True,
-        verbose_name='Токен',
-        help_text='Уникальный токен для верификации email'
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Дата создания'
-    )
-    expires_at = models.DateTimeField(
-        verbose_name='Срок действия',
-        help_text='Токен действителен в течение 24 часов'
-    )
-    is_used = models.BooleanField(
-        default=False,
-        verbose_name='Использован',
-        help_text='Был ли токен использован для верификации'
-    )
-    used_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name='Дата использования'
-    )
-
-    class Meta:
-        verbose_name = 'Токен верификации email'
-        verbose_name_plural = 'Токены верификации email'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['token']),
-            models.Index(fields=['user', 'is_used']),
-            models.Index(fields=['expires_at']),
-        ]
-
-    def __str__(self):
-        return f"EmailVerificationToken for {self.user.email}"
-
-    def save(self, *args, **kwargs):
-        """Generate token and expiration date on creation."""
-        if not self.token:
-            self.token = self.generate_token()
-        if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(hours=24)
-        super().save(*args, **kwargs)
-
-    @staticmethod
-    def generate_token():
-        """Generate a secure random token."""
-        return secrets.token_urlsafe(32)
-
-    @property
-    def is_expired(self):
-        """Check if token has expired."""
-        return timezone.now() > self.expires_at
-
-    @property
-    def is_valid(self):
-        """Check if token is valid (not used and not expired)."""
-        return not self.is_used and not self.is_expired
-
-    def mark_as_used(self):
-        """Mark token as used."""
-        self.is_used = True
-        self.used_at = timezone.now()
-        self.save(update_fields=['is_used', 'used_at'])
+# =============================================================================
+# REMOVED: EmailVerificationToken model
+# =============================================================================
+# Email verification has been removed - EatFit24 uses Telegram auth only.
+# The EmailVerificationToken table will be dropped via migration.
+# =============================================================================
 
 
 @receiver(post_save, sender=User)

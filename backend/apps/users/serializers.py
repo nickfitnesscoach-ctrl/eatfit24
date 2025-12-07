@@ -1,16 +1,14 @@
 """
 Serializers for users app.
+
+NOTE: Email/password authentication serializers have been removed.
+EatFit24 uses Telegram WebApp authentication only.
 """
 
-from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Profile
-from .validators import validate_email_domain, validate_email_not_exists
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -20,7 +18,6 @@ class ProfileSerializer(serializers.ModelSerializer):
     """
     age = serializers.ReadOnlyField()
     bmi = serializers.ReadOnlyField()
-    email_verified = serializers.ReadOnlyField()
     is_complete = serializers.ReadOnlyField()
     avatar_url = serializers.SerializerMethodField()
 
@@ -39,12 +36,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             'avatar_url',
             'age',
             'bmi',
-            'email_verified',
             'is_complete',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['created_at', 'updated_at', 'email_verified', 'age', 'bmi', 'is_complete', 'avatar_url']
+        read_only_fields = ['created_at', 'updated_at', 'age', 'bmi', 'is_complete', 'avatar_url']
 
     def get_avatar_url(self, obj):
         """
@@ -92,158 +88,14 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'email']
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for user registration with email verification.
-    """
-    email = serializers.EmailField(
-        required=True,
-        validators=[
-            UniqueValidator(queryset=User.objects.all())
-        ]
-    )
-    password = serializers.CharField(
-        write_only=True,
-        required=True,
-        validators=[validate_password]
-    )
-    password_confirm = serializers.CharField(
-        write_only=True,
-        required=True
-    )
-
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password', 'password_confirm']
-
-    def validate_email(self, value):
-        """
-        Validate email domain and check for disposable emails.
-        """
-        validated_email = validate_email_domain(value)
-        return validated_email
-
-    def validate(self, attrs):
-        """
-        Validate that passwords match.
-        """
-        if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError({
-                "password": "Пароли не совпадают."
-            })
-        return attrs
-
-    def create(self, validated_data):
-        """
-        Create new user with hashed password.
-        """
-        validated_data.pop('password_confirm')
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            password=validated_data['password']
-        )
-        return user
-
-
-class UserLoginSerializer(serializers.Serializer):
-    """
-    Serializer for user login with progressive rate limiting.
-    """
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={'input_type': 'password'}
-    )
-
-    def validate(self, attrs):
-        """
-        Validate credentials and authenticate user.
-        """
-        email = attrs.get('email')
-        password = attrs.get('password')
-
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({
-                "detail": "Неверный email или пароль."
-            })
-
-        authenticated_user = authenticate(username=user.username, password=password)
-
-        if authenticated_user is None:
-            raise serializers.ValidationError({
-                "detail": "Неверный email или пароль."
-            })
-
-        if not authenticated_user.is_active:
-            raise serializers.ValidationError({
-                "detail": "Учетная запись отключена. Обратитесь в поддержку."
-            })
-
-        attrs['user'] = authenticated_user
-        return attrs
-
-
-class TokenSerializer(serializers.Serializer):
-    """
-    Serializer for JWT tokens response.
-    """
-    refresh = serializers.CharField()
-    access = serializers.CharField()
-    user = UserSerializer()
-
-    @staticmethod
-    def get_tokens_for_user(user):
-        """
-        Generate JWT tokens for user.
-        """
-        refresh = RefreshToken.for_user(user)
-        return {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserSerializer(user).data
-        }
-
-
-class ChangePasswordSerializer(serializers.Serializer):
-    """
-    Serializer for changing password.
-    """
-    old_password = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={'input_type': 'password'}
-    )
-    new_password = serializers.CharField(
-        write_only=True,
-        required=True,
-        validators=[validate_password],
-        style={'input_type': 'password'}
-    )
-    new_password_confirm = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={'input_type': 'password'}
-    )
-
-    def validate(self, attrs):
-        """
-        Validate that new passwords match.
-        """
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({
-                "new_password": "Новые пароли не совпадают."
-            })
-        return attrs
-
-    def validate_old_password(self, value):
-        """
-        Validate that old password is correct.
-        """
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Старый пароль неверен.")
-        return value
+# =============================================================================
+# REMOVED: Email/Password Authentication Serializers
+# =============================================================================
+# The following serializers have been removed as EatFit24 uses Telegram auth:
+# - UserRegistrationSerializer (email/password registration)
+# - UserLoginSerializer (email/password login)
+# - TokenSerializer (JWT tokens for email auth)
+# - ChangePasswordSerializer (password change - no passwords with Telegram)
+#
+# Telegram authentication serializers are in apps/telegram/serializers.py
+# =============================================================================

@@ -1,12 +1,15 @@
 """
 Admin configuration for users app.
+
+NOTE: EmailVerificationToken admin has been removed.
+EatFit24 uses Telegram WebApp authentication only.
 """
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import Profile, EmailVerificationToken
+from .models import Profile
 
 
 class ProfileInline(admin.StackedInline):
@@ -68,36 +71,8 @@ class ProfileAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(EmailVerificationToken)
-class EmailVerificationTokenAdmin(admin.ModelAdmin):
-    """
-    Admin interface for EmailVerificationToken model.
-    """
-    list_display = [
-        'user',
-        'token_short',
-        'created_at',
-        'expires_at',
-        'is_used',
-        'used_at',
-        'is_valid_status',
-    ]
-    list_filter = ['is_used', 'created_at', 'expires_at']
-    search_fields = ['user__username', 'user__email', 'token']
-    readonly_fields = ['token', 'created_at', 'expires_at', 'used_at']
-    ordering = ['-created_at']
-
-    def token_short(self, obj):
-        """Display shortened token."""
-        return f"{obj.token[:8]}...{obj.token[-8:]}"
-    token_short.short_description = 'Токен'
-
-    def is_valid_status(self, obj):
-        """Display if token is valid."""
-        return obj.is_valid
-    is_valid_status.short_description = 'Валидный'
-    is_valid_status.boolean = True
-
-    def has_add_permission(self, request):
-        """Disable manual token creation in admin."""
-        return False
+# =============================================================================
+# REMOVED: EmailVerificationTokenAdmin
+# =============================================================================
+# Email verification has been removed - EatFit24 uses Telegram auth only.
+# =============================================================================

@@ -61,6 +61,8 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    # NOTE: rest_framework_simplejwt kept for RefreshToken in Telegram auth views
+    # (used to generate tokens in webapp_auth response)
     "rest_framework_simplejwt",
     "drf_spectacular",
     "django_filters",
@@ -238,11 +240,11 @@ CACHES = {
 
 REST_FRAMEWORK = {
     # Authentication
-    # Order matters: DebugMode checked first, then Telegram, then JWT
+    # Order matters: DebugMode checked first, then Telegram
+    # NOTE: JWTAuthentication removed - EatFit24 uses Telegram WebApp auth only
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "apps.telegram.authentication.DebugModeAuthentication",  # Browser Debug Mode
-        "apps.telegram.authentication.TelegramHeaderAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.telegram.authentication.DebugModeAuthentication",  # Browser Debug Mode (dev only)
+        "apps.telegram.authentication.TelegramHeaderAuthentication",  # Production: Telegram WebApp
     ],
 
     # Permissions
@@ -531,30 +533,31 @@ AI_PROXY_SECRET = os.environ.get("AI_PROXY_SECRET", "")
 
 
 # ============================================================
-# Email Configuration
+# Email Configuration (DISABLED - Telegram auth only)
 # ============================================================
+# NOTE: Email authentication has been removed from EatFit24.
+# All authentication is handled via Telegram WebApp.
+# These settings are kept commented for potential future billing/notification use.
 
-EMAIL_BACKEND = os.environ.get(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend"  # Console backend for development
-)
+# EMAIL_BACKEND = os.environ.get(
+#     "EMAIL_BACKEND",
+#     "django.core.mail.backends.console.EmailBackend"
+# )
+#
+# EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+# EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+# EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+# EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") == "True"
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+#
+# DEFAULT_FROM_EMAIL = os.environ.get(
+#     "DEFAULT_FROM_EMAIL",
+#     "FoodMind AI <noreply@foodmind.ai>"
+# )
+# SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
-# SMTP Settings (for production)
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
-EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") == "True"
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-
-# Default sender email
-DEFAULT_FROM_EMAIL = os.environ.get(
-    "DEFAULT_FROM_EMAIL",
-    "FoodMind AI <noreply@foodmind.ai>"
-)
-SERVER_EMAIL = DEFAULT_FROM_EMAIL
-
-# Email verification settings
+# Frontend/API URLs (still used for redirects and links)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 
