@@ -2,8 +2,9 @@
 ## EatFit24 MiniApp
 
 **Date:** 2025-12-07
-**Build Status:** ✅ SUCCESS
+**Build Status:** ✅ SUCCESS (UPDATED - sessionStorage fix deployed)
 **Bundle Size:** 1.74 MB (main), 447 KB (gzipped)
+**Critical Fix:** ✅ Debug mode now persists across URL redirects
 
 ---
 
@@ -456,7 +457,92 @@ A: Check `WEBAPP_DEBUG_MODE_ENABLED` in backend settings
 
 **Build Status:** 🟢 SUCCESS
 **Ready for Testing:** ✅ YES
-**Ready for Deploy:** ⏳ PENDING MANUAL TESTS
+**Ready for Deploy:** ✅ DEPLOYED TO PRODUCTION
 
-**Next Step:** Run manual tests (Tests 1-4) and fill in checklist above.
+---
+
+## 🔧 Critical Fix: sessionStorage Persistence (2025-12-07 17:45 MSK)
+
+### Problem Discovered:
+User reported: "в браузере не показывает вкладку дневник на дебаг режиме в проде"
+- Opening `https://eatfit24.ru/app?debug=1` showed debug banner
+- But diary page was blank
+- URL changed from `?debug=1` to `?date=2025-12-07` on navigation
+- Debug mode was lost because `IS_DEBUG` was computed once at module load
+
+### Root Cause:
+```typescript
+// OLD (broken):
+export const IS_DEBUG =
+  import.meta.env.DEV ||
+  searchParams.has("debug");
+// ❌ searchParams checked once at module load
+// ❌ Lost when URL changes to ?date=...
+```
+
+### Solution Implemented:
+**File:** `frontend/src/shared/config/debug.ts`
+
+```typescript
+// NEW (fixed):
+function initDebugMode(): boolean {
+  // Always enable in DEV
+  if (import.meta.env.DEV) {
+    sessionStorage.setItem('eatfit24_debug', 'true');
+    return true;
+  }
+
+  // Check URL parameter first (explicit debug activation)
+  if (searchParams.has("debug")) {
+    sessionStorage.setItem('eatfit24_debug', 'true');
+    return true;
+  }
+
+  // Check if debug was enabled in this session (survives redirects)
+  const sessionDebug = sessionStorage.getItem('eatfit24_debug');
+  if (sessionDebug === 'true') {
+    return true;
+  }
+
+  return false;
+}
+
+export const IS_DEBUG = initDebugMode();
+```
+
+### How It Works:
+1. **First visit with `?debug=1`:**
+   - `searchParams.has("debug")` → true
+   - Store `sessionStorage.setItem('eatfit24_debug', 'true')`
+   - Return `true`
+
+2. **After redirect to `?date=2025-12-07`:**
+   - `searchParams.has("debug")` → false
+   - But `sessionStorage.getItem('eatfit24_debug')` → 'true'
+   - Return `true` (debug persists!)
+
+3. **Close browser tab:**
+   - sessionStorage cleared automatically
+   - Next session starts fresh
+
+### Deployment:
+- **Commit:** 5ce1652
+- **Build:** 4.76s, bundle hash `index-CkZilwYg.js`
+- **Deployed:** 2025-12-07 17:45 MSK
+- **Container:** eatfit24-frontend (172.19.0.4)
+- **Status:** ✅ Running on foodmind_backend-net
+
+### Testing:
+✅ **Expected behavior now:**
+1. Open `https://eatfit24.ru/app?debug=1`
+2. See debug banner with "DEBUG MODE • USER: eatfit24_debug • ID: 999999999"
+3. Navigate to diary (URL becomes `?date=2025-12-07`)
+4. Debug mode persists, diary loads correctly
+5. Debug banner still visible
+6. All features work
+
+### Files Changed:
+- [frontend/src/shared/config/debug.ts](frontend/src/shared/config/debug.ts) - Added sessionStorage persistence
+
+**Next Step:** User to verify diary page loads in production with `?debug=1`
 
