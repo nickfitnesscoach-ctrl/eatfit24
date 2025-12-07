@@ -84,7 +84,15 @@ jobs:
           script: |
             cd /opt/foodmind
             git pull origin main
-            docker compose up -d --build frontend
+            # Останавливаем и удаляем старый контейнер
+            docker compose down frontend
+            # Удаляем старый образ фронтенда для гарантии пересборки
+            docker rmi foodmind-frontend || true
+            # Пересобираем без кеша и запускаем
+            docker compose build --no-cache frontend
+            docker compose up -d frontend
+            # Удаляем неиспользуемые образы
+            docker image prune -f
             echo "✅ Frontend deployment completed successfully"
 
       - name: Verify deployment
