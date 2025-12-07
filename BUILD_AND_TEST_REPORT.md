@@ -546,3 +546,82 @@ export const IS_DEBUG = initDebugMode();
 
 **Next Step:** User to verify diary page loads in production with `?debug=1`
 
+---
+
+## 🔧 Critical Fix #2: Data Loading in Debug Mode (2025-12-07 18:00 MSK)
+
+### Problem Discovered:
+After sessionStorage fix, diary page still showed infinite skeletons.
+- Debug banner worked ✅
+- SessionStorage persisted ✅
+- API returned data (3 meals) ✅
+- BUT skeletons never disappeared ❌
+
+### Investigation:
+1. Checked backend - user 999999999 has data:
+   ```
+   User: id=68, username=tg_999999999
+   Meals count: 3
+   - 2025-12-07: butter (50g)
+   - 2025-12-07: butter (50g)
+   - 2025-12-07: orange (100g)
+   ```
+
+2. Tested API endpoint directly:
+   ```bash
+   curl 'https://eatfit24.ru/api/v1/meals/?date=2025-12-07' \
+     -H 'X-Telegram-ID: 999999999'
+   # ✅ Returns full JSON with meals
+   ```
+
+3. Found the bug in ClientDashboard.tsx:
+   ```typescript
+   // Line 80 - BEFORE (broken):
+   if (isReady && webAppDetected) {  // ❌ BUG!
+       loadDashboardData(selectedDate);
+   }
+   // webAppDetected = false in browser debug mode!
+   ```
+
+### Root Cause:
+ClientDashboard only loaded data when `webAppDetected === true`, which is FALSE in browser debug mode (even with mock Telegram).
+
+The component never called `loadDashboardData()`, so:
+- No API requests made
+- `loading` state stuck at `true`
+- Skeletons displayed forever
+
+### Solution Implemented:
+**File:** `frontend/src/pages/ClientDashboard.tsx`
+
+```typescript
+// Line 80 - AFTER (fixed):
+if (isReady && (webAppDetected || isBrowserDebug || webAppBrowserDebug)) {
+    loadDashboardData(selectedDate);
+}
+```
+
+Now checks for ANY debug mode in addition to real Telegram WebApp.
+
+### Deployment:
+- **Commit:** eea87fd
+- **Build:** 4.17s, bundle hash `index-BTW58Ssj.js`
+- **Deployed:** 2025-12-07 18:00 MSK
+- **Container:** eatfit24-frontend (172.19.0.4)
+- **Status:** ✅ Running
+
+### Expected Result:
+1. Open `https://eatfit24.ru/app?debug=1`
+2. Navigate to diary (Дневник tab)
+3. **Data loads** - shows 3 meals
+4. **Skeletons disappear** - replaced with real data
+5. See: butter (50g, 359 cal), orange (100g)
+6. Total consumed displayed
+7. Progress bars show actual values
+
+### Files Changed:
+- [frontend/src/shared/config/debug.ts](frontend/src/shared/config/debug.ts:24-58) - sessionStorage persistence (Fix #1)
+- [frontend/src/pages/ClientDashboard.tsx](frontend/src/pages/ClientDashboard.tsx:80) - debug mode data loading (Fix #2)
+
+**Status:** ✅ DEPLOYED - Ready for final testing
+
