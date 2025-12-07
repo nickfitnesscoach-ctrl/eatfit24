@@ -26,19 +26,21 @@ export const URLS = {
     profile: `${API_BASE}/users/profile/`,
     uploadAvatar: `${API_BASE}/users/profile/avatar/`,
     
-    // Billing endpoints
-    plan: `${API_BASE}/billing/plan`,
+    // Billing endpoints (current - use these)
     billingMe: `${API_BASE}/billing/me/`,
-    createPayment: `${API_BASE}/billing/create-payment/`,
-    cancelSubscription: `${API_BASE}/billing/cancel/`,
-    resumeSubscription: `${API_BASE}/billing/resume/`,
-    paymentMethods: `${API_BASE}/billing/payment-methods/`,
     subscriptionDetails: `${API_BASE}/billing/subscription/`,
     subscriptionAutoRenew: `${API_BASE}/billing/subscription/autorenew/`,
+    createPayment: `${API_BASE}/billing/create-payment/`,
     paymentMethodDetails: `${API_BASE}/billing/payment-method/`,
     paymentsHistory: `${API_BASE}/billing/payments/`,
     bindCardStart: `${API_BASE}/billing/bind-card/start/`,
     plans: `${API_BASE}/billing/plans/`,
+    
+    // Legacy billing endpoints (deprecated - will be removed in v2.0)
+    plan: `${API_BASE}/billing/plan`,  // Use billingMe instead
+    cancelSubscription: `${API_BASE}/billing/cancel/`,  // Not used
+    resumeSubscription: `${API_BASE}/billing/resume/`,  // Not used
+    paymentMethods: `${API_BASE}/billing/payment-methods/`,  // Use paymentMethodDetails
     
     // AI endpoints
     recognize: `${API_BASE}/ai/recognize/`,

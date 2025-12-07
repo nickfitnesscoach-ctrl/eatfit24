@@ -37,16 +37,127 @@ export class ForbiddenError extends Error {
     }
 }
 
+/**
+ * Unified API error format
+ */
+export interface ParsedApiError {
+    code: string;
+    message: string;
+    details: Record<string, unknown>;
+    status: number;
+}
+
+/**
+ * Парсит ответ API в унифицированный формат ошибки.
+ * Толерантен к разным форматам от backend:
+ * - Новый: { error: { code, message, details } }
+ * - Legacy 1: { error: "string" }
+ * - Legacy 2: { detail: "string" }
+ * - Legacy 3: { error: { code, message } } без details
+ */
+export function parseApiError(
+    responseData: unknown,
+    status: number,
+    fallbackMessage = 'Произошла ошибка'
+): ParsedApiError {
+    // Новый формат: { error: { code, message, details } }
+    if (
+        typeof responseData === 'object' &&
+        responseData !== null &&
+        'error' in responseData
+    ) {
+        const errorField = (responseData as Record<string, unknown>).error;
+
+        // Вложенный объект { code, message, details }
+        if (typeof errorField === 'object' && errorField !== null) {
+            const errObj = errorField as Record<string, unknown>;
+            return {
+                code: String(errObj.code || 'UNKNOWN_ERROR'),
+                message: String(errObj.message || fallbackMessage),
+                details: (errObj.details as Record<string, unknown>) || {},
+                status,
+            };
+        }
+
+        // Legacy: { error: "string" }
+        if (typeof errorField === 'string') {
+            return {
+                code: errorField,
+                message: errorField,
+                details: {},
+                status,
+            };
+        }
+    }
+
+    // Legacy DRF: { detail: "string" }
+    if (
+        typeof responseData === 'object' &&
+        responseData !== null &&
+        'detail' in responseData
+    ) {
+        const detail = (responseData as Record<string, unknown>).detail;
+        return {
+            code: 'API_ERROR',
+            message: String(detail),
+            details: {},
+            status,
+        };
+    }
+
+    // Fallback
+    return {
+        code: 'UNKNOWN_ERROR',
+        message: fallbackMessage,
+        details: {},
+        status,
+    };
+}
+
 export class ApiError extends Error {
     status: number;
-    code?: string;
-    
-    constructor(message: string, status: number, code?: string) {
-        super(message);
+    code: string;
+    details: Record<string, unknown>;
+
+    constructor(parsed: ParsedApiError);
+    constructor(message: string, status: number, code?: string);
+    constructor(
+        messageOrParsed: string | ParsedApiError,
+        status?: number,
+        code?: string
+    ) {
+        if (typeof messageOrParsed === 'object') {
+            super(messageOrParsed.message);
+            this.status = messageOrParsed.status;
+            this.code = messageOrParsed.code;
+            this.details = messageOrParsed.details;
+        } else {
+            super(messageOrParsed);
+            this.status = status || 0;
+            this.code = code || 'UNKNOWN_ERROR';
+            this.details = {};
+        }
         this.name = 'ApiError';
-        this.status = status;
-        this.code = code;
     }
+
+    /**
+     * Проверяет, является ли ошибка определённым кодом
+     */
+    is(code: string): boolean {
+        return this.code === code;
+    }
+}
+
+/**
+ * Обрабатывает не-OK ответ и выбрасывает ApiError
+ */
+export async function throwApiError(
+    response: Response,
+    fallbackMessage?: string
+): Promise<never> {
+    const data = await response.json().catch(() => ({}));
+    const parsed = parseApiError(data, response.status, fallbackMessage);
+    throw new ApiError(parsed);
 }
 
 // ============================================================
@@ -163,7 +274,12 @@ export const fetchWithTimeout = async (
     } catch (error) {
         clearTimeout(timeoutId);
         if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error(`Request timeout after ${timeout}ms`);
+            throw new ApiError({
+                code: 'TIMEOUT',
+                message: `Превышено время ожидания (${Math.round(timeout / 1000)}с)`,
+                details: { timeout },
+                status: 0,
+            });
         }
         throw error;
     }

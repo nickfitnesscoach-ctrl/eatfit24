@@ -42,14 +42,37 @@ const DEBUG_TELEGRAM_USER: TelegramUserInfo = {
 };
 
 /**
- * Проверка, включён ли Browser Debug Mode
+ * Проверяет, включён ли Debug Mode через env переменную
+ * SECURITY: Must be explicitly set to 'true' in .env
+ */
+export function isDebugModeEnabled(): boolean {
+    // Only enabled if explicitly set in env
+    return import.meta.env.VITE_DEBUG_MODE === 'true' || 
+           import.meta.env.VITE_WEB_DEBUG_ENABLED === 'true';
+}
+
+/**
+ * Проверяет, нужно ли использовать Debug Mode
+ * (включён в env И нет реального Telegram WebApp)
+ */
+export function shouldUseDebugMode(): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    const debugEnabled = isDebugModeEnabled();
+    const hasTelegram = Boolean(window.Telegram?.WebApp?.initData);
+    
+    return debugEnabled && !hasTelegram;
+}
+
+/**
+ * Проверка, включён ли Browser Debug Mode (legacy compatibility)
+ * @deprecated Use shouldUseDebugMode() instead
  */
 export function isBrowserDebugMode(): boolean {
     if (typeof window === 'undefined') return false;
 
     // Проверяем env переменную
-    const isWebDebugEnabled = import.meta.env.VITE_WEB_DEBUG_ENABLED === 'true';
-    if (!isWebDebugEnabled) return false;
+    if (!isDebugModeEnabled()) return false;
 
     // Проверяем URL параметры
     const params = new URLSearchParams(window.location.search);
@@ -170,12 +193,13 @@ export function isTelegramInitialized(): boolean {
  * Формирование заголовков для API запросов
  * Единая функция для всех запросов к backend
  *
- * @throws Error если Telegram не инициализирован
+ * SECURITY: Debug Mode headers are only sent when:
+ * 1. VITE_DEBUG_MODE=true in .env
+ * 2. No real Telegram WebApp is available
  */
 export function buildTelegramHeaders(): HeadersInit {
     if (!_telegramAuthData) {
         console.error('[Telegram] Headers requested but not initialized!');
-        console.error('[Telegram] Stack trace:', new Error().stack);
         // Возвращаем пустые headers вместо throw - для graceful degradation
         return {
             'Content-Type': 'application/json',
@@ -184,10 +208,10 @@ export function buildTelegramHeaders(): HeadersInit {
 
     const { initData, user } = _telegramAuthData;
 
-    console.log('[Telegram] Building headers with user ID:', user.id);
-
     // Browser Debug Mode - специальные заголовки
+    // SECURITY: Only when explicitly enabled and no Telegram available
     if (_isBrowserDebug) {
+        console.warn('[Auth] Using Debug Mode - payments disabled');
         return {
             'Content-Type': 'application/json',
             'X-Debug-Mode': 'true',
@@ -335,5 +359,7 @@ export function getTelegramDebugInfo() {
         colorScheme: tg?.colorScheme || null,
         devMode: false,
         browserDebugMode: _isBrowserDebug,
+        debugModeEnabled: isDebugModeEnabled(),
+        shouldUseDebug: shouldUseDebugMode(),
     };
 }

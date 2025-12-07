@@ -172,9 +172,12 @@ const FoodLogPage: React.FC = () => {
 
                     console.log(`[Polling] SUCCESS result FULL:`, JSON.stringify(result, null, 2));
 
-                    // Extract data from task result
-                    let recognizedItems = result?.recognized_items || [];
-                    const totals = result?.totals;
+                    // Type guard: check if result is a success result
+                    const isSuccessResult = result && 'recognized_items' in result;
+                    
+                    // Extract data from task result (with type narrowing)
+                    let recognizedItems = isSuccessResult ? (result.recognized_items || []) : [];
+                    const totals = isSuccessResult ? result.totals : undefined;
                     const mealId = result?.meal_id;
                     const resultSuccess = result?.success;
 
@@ -237,11 +240,12 @@ const FoodLogPage: React.FC = () => {
                     }
 
                     // Calculate totals from items if not provided
+                    type ItemType = typeof recognizedItems[number];
                     const finalTotals = totals || {
-                        calories: recognizedItems.reduce((sum, i) => sum + (i.calories || 0), 0),
-                        protein: recognizedItems.reduce((sum, i) => sum + (i.protein || 0), 0),
-                        fat: recognizedItems.reduce((sum, i) => sum + (i.fat || 0), 0),
-                        carbohydrates: recognizedItems.reduce((sum, i) => sum + (i.carbohydrates || 0), 0)
+                        calories: recognizedItems.reduce((sum: number, i: ItemType) => sum + (i.calories || 0), 0),
+                        protein: recognizedItems.reduce((sum: number, i: ItemType) => sum + (i.protein || 0), 0),
+                        fat: recognizedItems.reduce((sum: number, i: ItemType) => sum + (i.fat || 0), 0),
+                        carbohydrates: recognizedItems.reduce((sum: number, i: ItemType) => sum + (i.carbohydrates || 0), 0)
                     };
 
                     return {
@@ -251,7 +255,7 @@ const FoodLogPage: React.FC = () => {
                         total_fat: finalTotals.fat || 0,
                         total_carbohydrates: finalTotals.carbohydrates || 0,
                         meal_id: mealId,
-                        photo_url: result?.photo_url
+                        photo_url: isSuccessResult ? result.photo_url : undefined
                     };
                 }
 
