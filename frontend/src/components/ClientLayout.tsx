@@ -28,7 +28,7 @@ const ClientLayout: React.FC = () => {
                     }
                 >
                     <Home size={24} />
-                    <span className="text-xs font-medium">Главная</span>
+                    <span className="text-xs font-medium">Дневник</span>
                 </NavLink>
 
                 <NavLink
@@ -38,7 +38,7 @@ const ClientLayout: React.FC = () => {
                     }
                 >
                     <Camera size={24} />
-                    <span className="text-xs font-medium">Дневник</span>
+                    <span className="text-xs font-medium">Камера</span>
                 </NavLink>
 
                 <NavLink

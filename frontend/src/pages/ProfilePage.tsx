@@ -336,7 +336,7 @@ const ProfilePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-24">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-1">
             <div className="max-w-2xl mx-auto">
 
 
@@ -550,46 +550,46 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* Statistics - Average Weekly KBJU */}
-                <div className="bg-white rounded-3xl shadow-lg overflow-hidden mb-6 transition-all duration-300">
+                <div className="bg-white rounded-3xl shadow-lg overflow-hidden mb-4 transition-all duration-300">
                     <div
-                        className="p-6 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
+                        className="py-0.5 px-4 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
                         onClick={() => setIsWeeklyStatsOpen(!isWeeklyStatsOpen)}
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center shrink-0 mt-1">
                                 <TrendingUp size={24} className="text-white" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900">Среднее КБЖУ за неделю</h2>
-                                <p className="text-sm text-gray-500">Ваш прогресс</p>
+                            <div className="min-w-0 flex flex-col justify-center">
+                                <h2 className="text-lg font-bold text-gray-900 truncate leading-tight">Среднее КБЖУ за неделю</h2>
+                                <p className="text-xs text-gray-500 leading-tight">Ваш прогресс</p>
                             </div>
                         </div>
                         <ChevronRight
                             size={24}
-                            className={`text-gray-400 transition-transform duration-300 ${isWeeklyStatsOpen ? 'rotate-90' : ''}`}
+                            className={`text-gray-400 transition-transform duration-300 shrink-0 ${isWeeklyStatsOpen ? 'rotate-90' : ''}`}
                         />
                     </div>
 
-                    <div className={`grid grid-cols-2 gap-3 px-6 pb-6 transition-all duration-300 origin-top ${isWeeklyStatsOpen ? 'opacity-100 max-h-[500px] mt-0' : 'opacity-0 max-h-0 overflow-hidden mt-0 pb-0'
+                    <div className={`grid grid-cols-2 gap-2 px-4 pb-4 transition-all duration-300 origin-top ${isWeeklyStatsOpen ? 'opacity-100 max-h-[500px] mt-0' : 'opacity-0 max-h-0 overflow-hidden mt-0 pb-0'
                         }`}>
-                        <div className="flex flex-col p-4 bg-orange-50 rounded-xl">
-                            <span className="text-gray-600 text-sm mb-1">Калории</span>
-                            <span className="text-2xl font-bold text-orange-600">{goals?.avgCalories || 0}</span>
+                        <div className="flex flex-col p-3 bg-orange-50 rounded-xl">
+                            <span className="text-gray-600 text-xs mb-0.5">Калории</span>
+                            <span className="text-xl font-bold text-orange-600">{goals?.avgCalories || 0}</span>
                             <span className="text-xs text-gray-500">ккал/день</span>
                         </div>
-                        <div className="flex flex-col p-4 bg-blue-50 rounded-xl">
-                            <span className="text-gray-600 text-sm mb-1">Белки</span>
-                            <span className="text-2xl font-bold text-blue-600">{goals?.avgProtein || 0}г</span>
+                        <div className="flex flex-col p-3 bg-blue-50 rounded-xl">
+                            <span className="text-gray-600 text-xs mb-0.5">Белки</span>
+                            <span className="text-xl font-bold text-blue-600">{goals?.avgProtein || 0}г</span>
                             <span className="text-xs text-gray-500">в среднем</span>
                         </div>
-                        <div className="flex flex-col p-4 bg-yellow-50 rounded-xl">
-                            <span className="text-gray-600 text-sm mb-1">Жиры</span>
-                            <span className="text-2xl font-bold text-yellow-600">{goals?.avgFat || 0}г</span>
+                        <div className="flex flex-col p-3 bg-yellow-50 rounded-xl">
+                            <span className="text-gray-600 text-xs mb-0.5">Жиры</span>
+                            <span className="text-xl font-bold text-yellow-600">{goals?.avgFat || 0}г</span>
                             <span className="text-xs text-gray-500">в среднем</span>
                         </div>
-                        <div className="flex flex-col p-4 bg-green-50 rounded-xl">
-                            <span className="text-gray-600 text-sm mb-1">Углеводы</span>
-                            <span className="text-2xl font-bold text-green-600">{goals?.avgCarbs || 0}г</span>
+                        <div className="flex flex-col p-3 bg-green-50 rounded-xl">
+                            <span className="text-gray-600 text-xs mb-0.5">Углеводы</span>
+                            <span className="text-xl font-bold text-green-600">{goals?.avgCarbs || 0}г</span>
                             <span className="text-xs text-gray-500">в среднем</span>
                         </div>
                     </div>
@@ -597,31 +597,22 @@ const ProfilePage: React.FC = () => {
 
                 {/* Settings */}
                 <div
-                    className="bg-white rounded-3xl shadow-lg p-6 mb-6 cursor-pointer active:scale-[0.98] transition-all"
+                    className="bg-white rounded-3xl shadow-lg py-3 px-4 cursor-pointer active:scale-[0.98] transition-all"
                     onClick={() => navigate('/settings')}
                 >
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-600 rounded-xl flex items-center justify-center">
+                            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-600 rounded-xl flex items-center justify-center mt-1">
                                 <Settings size={24} className="text-white" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900">Настройки</h2>
-                                <p className="text-sm text-gray-500">Управление аккаунтом</p>
+                            <div className="flex flex-col justify-center">
+                                <h2 className="text-lg font-bold text-gray-900 leading-tight">Настройки</h2>
+                                <p className="text-xs text-gray-500 leading-tight">Управление аккаунтом</p>
                             </div>
                         </div>
                         <ChevronRight size={24} className="text-gray-400" />
                     </div>
                 </div>
-
-                {/* Logout Button */}
-                <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors font-medium shadow-sm"
-                >
-                    <LogOut size={20} />
-                    <span>Выйти из аккаунта</span>
-                </button>
             </div>
 
             <ProfileEditModal

@@ -15,7 +15,13 @@
       "Bash(if [ -f ~/.ssh/config ])",
       "Bash(then cat ~/.ssh/config)",
       "Bash(else echo \"SSH config not found\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(ssh -i ~/.ssh/id_ed25519 root@eatfit24.ru -p 22:*)",
+      "Bash(ssh:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []
