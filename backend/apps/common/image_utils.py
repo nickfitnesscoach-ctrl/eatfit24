@@ -88,8 +88,11 @@ def compress_image(image_file, max_dimension=MAX_DIMENSION, quality=JPEG_QUALITY
             # Generate filename with .jpg extension
             original_name = getattr(image_file, 'name', 'image.jpg')
             new_name = original_name.rsplit('.', 1)[0] + '.jpg'
-            
-            return ContentFile(buffer.read(), name=new_name)
+
+            # Create ContentFile with explicit content_type for JPEG
+            compressed_file = ContentFile(buffer.read(), name=new_name)
+            compressed_file.content_type = 'image/jpeg'
+            return compressed_file
         else:
             logger.debug(f"Skipping compression - original is smaller ({original_size} <= {compressed_size})")
             image_file.seek(0)
