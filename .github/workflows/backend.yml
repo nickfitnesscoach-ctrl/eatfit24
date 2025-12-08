@@ -147,12 +147,17 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            cd /opt/foodmind
-            git pull origin main
-            
-            # Deploy Redis, Backend, and Celery Worker
+            set -e
+            cd /opt/EatFit24
+
+            echo ">>> Updating repo"
+            git fetch origin
+            git reset --hard origin/main
+
+            echo ">>> Rebuilding and restarting backend services"
+            docker compose down redis backend celery-worker
             docker compose up -d --build redis backend celery-worker
-            
+
             echo "✅ Backend + Redis + Celery deployment completed"
 
       - name: Check deployment status
@@ -163,28 +168,28 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            cd /opt/foodmind
+            cd /opt/EatFit24
 
             # Check Redis is running
-            if ! docker ps | grep -q fm-redis; then
+            if ! docker ps | grep -q eatfit24-redis; then
               echo "❌ Redis container not running!"
-              docker logs fm-redis --tail 50
+              docker logs eatfit24-redis-1 --tail 50 || true
               exit 1
             fi
             echo "✅ Redis is running"
 
             # Check Backend container is running
-            if ! docker ps | grep -q fm-backend; then
+            if ! docker ps | grep -q eatfit24-backend; then
               echo "❌ Backend container not running!"
-              docker logs fm-backend --tail 50
+              docker logs eatfit24-backend-1 --tail 50 || true
               exit 1
             fi
             echo "✅ Backend is running"
 
             # Check Celery Worker is running
-            if ! docker ps | grep -q fm-celery-worker; then
+            if ! docker ps | grep -q eatfit24-celery-worker; then
               echo "❌ Celery Worker container not running!"
-              docker logs fm-celery-worker --tail 50
+              docker logs eatfit24-celery-worker-1 --tail 50 || true
               exit 1
             fi
             echo "✅ Celery Worker is running"
@@ -199,12 +204,12 @@ jobs:
               echo "✅ Backend health check passed"
             else
               echo "❌ Backend health check failed!"
-              docker logs fm-backend --tail 50
+              docker logs eatfit24-backend-1 --tail 50 || true
               exit 1
             fi
 
             # Redis health check
-            if docker exec fm-redis redis-cli ping | grep -q PONG; then
+            if docker exec eatfit24-redis-1 redis-cli ping | grep -q PONG; then
               echo "✅ Redis health check passed"
             else
               echo "❌ Redis health check failed!"
@@ -212,13 +217,13 @@ jobs:
             fi
 
             # Celery Worker health check
-            if docker exec fm-celery-worker celery -A config inspect ping 2>/dev/null | grep -q "pong"; then
+            if docker exec eatfit24-celery-worker-1 celery -A config inspect ping 2>/dev/null | grep -q "pong"; then
               echo "✅ Celery Worker health check passed"
             else
               echo "⚠️  Celery Worker health check failed (may still be starting)"
-              docker logs fm-celery-worker --tail 30
+              docker logs eatfit24-celery-worker-1 --tail 30 || true
             fi
 
             echo ""
             echo "=== Deployment Summary ==="
-            docker ps --filter "name=fm-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --filter "name=eatfit24-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

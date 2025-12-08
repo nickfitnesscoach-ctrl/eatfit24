@@ -4,13 +4,10 @@
 # IMPORTANT: Create a .env file in the project root with all required variables
 # All services read environment variables from the root .env file
 
-version: "3.9"
-
 services:
   # PostgreSQL Database (shared by backend and bot)
   db:
     image: postgres:15
-    container_name: fm-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-foodmind}
@@ -31,7 +28,6 @@ services:
   # Redis (for Celery broker and result backend)
   redis:
     image: redis:7-alpine
-    container_name: fm-redis
     restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
@@ -54,7 +50,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: fm-backend
     ports:
       - "8000:8000"
     volumes:
@@ -111,7 +106,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: fm-celery-worker
     entrypoint: []
     command: 
       - /bin/sh
@@ -158,7 +152,6 @@ services:
     build:
       context: ./bot
       dockerfile: Dockerfile
-    container_name: fm-bot
     environment:
       - ENVIRONMENT=production
       - DB_HOST=db
@@ -185,7 +178,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: fm-frontend
     ports:
       - "3000:80"
     networks:
