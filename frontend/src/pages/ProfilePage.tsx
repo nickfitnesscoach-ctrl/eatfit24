@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Target, TrendingUp, Settings, Edit2, X, Camera, ChevronRight } from 'lucide-react';
+import { User, Settings, Edit2, X, Camera, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
@@ -8,19 +8,18 @@ import { Profile } from '../types/profile';
 import ProfileEditModal from '../components/ProfileEditModal';
 import { calculateMifflinTargets, hasRequiredProfileData, getMissingProfileFields } from '../utils/mifflin';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
+import { useWeeklyKbjuStats } from '../hooks/useWeeklyKbjuStats';
+import GoalsSection from '../components/profile/GoalsSection';
+import WeeklyStatsCard from '../components/profile/WeeklyStatsCard';
 interface UserGoals {
     calories: number;
     protein: number;
     fat: number;
     carbohydrates: number;
-    avgCalories?: number;
-    avgProtein?: number;
-    avgFat?: number;
-    avgCarbs?: number;
 }
 
 const ProfilePage: React.FC = () => {
-    const { user, logout, isBrowserDebug } = useAuth();
+    const { user, isBrowserDebug } = useAuth();
     // Use shared data from AppDataContext - loads instantly if already cached
     const { profile: contextProfile, goals: contextGoals, refreshProfile, refreshGoals, isLoading: contextLoading } = useAppData();
     const navigate = useNavigate();
@@ -41,21 +40,8 @@ const ProfilePage: React.FC = () => {
     // Local profile state (for editing/avatar)
     const [profile, setProfile] = useState<Profile | null>(null);
 
-    // Generate week days array
-    const getWeekDays = () => {
-        const days = [];
-        const today = new Date();
-        const currentDay = today.getDay();
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
-
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(monday);
-            date.setDate(monday.getDate() + i);
-            days.push(date);
-        }
-        return days;
-    };
+    // Load weekly stats using custom hook
+    const { avgCalories, avgProtein, avgFat, avgCarbs } = useWeeklyKbjuStats();
 
     // Initialize from context when available (instant, no API call)
     useEffect(() => {
@@ -70,20 +56,9 @@ const ProfilePage: React.FC = () => {
     // Initialize goals from context
     useEffect(() => {
         if (contextGoals) {
-            setGoals({
-                ...contextGoals,
-                avgCalories: 0,
-                avgProtein: 0,
-                avgFat: 0,
-                avgCarbs: 0
-            });
+            setGoals(contextGoals);
         }
     }, [contextGoals]);
-
-    // Load weekly stats once on mount (separate from main data)
-    useEffect(() => {
-        loadWeeklyStats();
-    }, []);
 
     const handleEditGoals = () => {
         setEditedGoals(goals || { calories: 2000, protein: 150, fat: 70, carbohydrates: 250 });
@@ -162,62 +137,10 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const loadWeeklyStats = async () => {
-        try {
-            const weekDaysData = getWeekDays();
-            const mealsData = await Promise.all(
-                weekDaysData.map(date => {
-                    const dateStr = date.toISOString().split('T')[0];
-                    return api.getMeals(dateStr).catch(() => []);
-                })
-            );
-
-            let totalCalories = 0;
-            let totalProtein = 0;
-            let totalFat = 0;
-            let totalCarbs = 0;
-            let daysWithData = 0;
-
-            mealsData.forEach(dayMeals => {
-                if (dayMeals && dayMeals.length > 0) {
-                    daysWithData++;
-                    dayMeals.forEach((meal: any) => {
-                        meal.food_items?.forEach((item: any) => {
-                            totalCalories += item.calories || 0;
-                            totalProtein += item.protein || 0;
-                            totalFat += item.fat || 0;
-                            totalCarbs += item.carbohydrates || 0;
-                        });
-                    });
-                }
-            });
-
-            const avgCalories = daysWithData > 0 ? Math.round(totalCalories / daysWithData) : 0;
-            const avgProtein = daysWithData > 0 ? Math.round(totalProtein / daysWithData) : 0;
-            const avgFat = daysWithData > 0 ? Math.round(totalFat / daysWithData) : 0;
-            const avgCarbs = daysWithData > 0 ? Math.round(totalCarbs / daysWithData) : 0;
-
-            setGoals(prev => ({
-                ...prev!,
-                avgCalories,
-                avgProtein,
-                avgFat,
-                avgCarbs
-            }));
-        } catch (error) {
-            console.error('Failed to load weekly stats:', error);
-        }
-    };
-
     const handleProfileUpdate = (updatedProfile: Profile) => {
         setProfile(updatedProfile);
         // Refresh context so other pages get updated profile
         refreshProfile();
-    };
-
-    const handleLogout = () => {
-        logout();
-        window.location.href = '/';
     };
 
     const handleAvatarClick = () => {
@@ -408,182 +331,28 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* Goals Section */}
-                <div className="bg-white rounded-3xl shadow-lg p-6 mb-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-                                <Target size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900">Мои цели</h2>
-                                <p className="text-sm text-gray-500">Дневные показатели КБЖУ</p>
-                            </div>
-                        </div>
-                        {!isEditingGoals && (
-                            <button
-                                onClick={handleEditGoals}
-                                className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium"
-                            >
-                                Редактировать
-                            </button>
-                        )}
-                    </div>
-
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    {contextLoading ? (
-                        <div className="flex justify-center py-8">
-                            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                        </div>
-                    ) : isEditingGoals && editedGoals ? (
-                        <div>
-                            {/* Calories - auto-calculated, shown prominently */}
-                            <div className="bg-gradient-to-br from-orange-500 to-red-500 p-5 rounded-2xl mb-4 text-white">
-                                <div className="text-sm text-white/80 mb-1">Калории (рассчитано автоматически)</div>
-                                <div className="text-4xl font-bold">{editedGoals.calories} ккал</div>
-                                <div className="text-xs text-white/60 mt-1">= Б×4 + Ж×9 + У×4</div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3 mb-4">
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border-2 border-blue-100">
-                                    <label className="text-sm text-blue-600 font-medium mb-2 block">Белки</label>
-                                    <input
-                                        type="number"
-                                        value={editedGoals.protein}
-                                        onChange={(e) => handleBJUChange('protein', parseInt(e.target.value) || 0)}
-                                        className="w-full text-2xl font-bold text-blue-700 bg-white/50 rounded-lg px-2 py-1 border-2 border-blue-200 focus:outline-none focus:border-blue-400"
-                                    />
-                                    <div className="text-xs text-blue-500 mt-1">г/день</div>
-                                </div>
-                                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-2xl border-2 border-yellow-100">
-                                    <label className="text-sm text-yellow-600 font-medium mb-2 block">Жиры</label>
-                                    <input
-                                        type="number"
-                                        value={editedGoals.fat}
-                                        onChange={(e) => handleBJUChange('fat', parseInt(e.target.value) || 0)}
-                                        className="w-full text-2xl font-bold text-yellow-700 bg-white/50 rounded-lg px-2 py-1 border-2 border-yellow-200 focus:outline-none focus:border-yellow-400"
-                                    />
-                                    <div className="text-xs text-yellow-500 mt-1">г/день</div>
-                                </div>
-                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border-2 border-green-100">
-                                    <label className="text-sm text-green-600 font-medium mb-2 block">Углеводы</label>
-                                    <input
-                                        type="number"
-                                        value={editedGoals.carbohydrates}
-                                        onChange={(e) => handleBJUChange('carbohydrates', parseInt(e.target.value) || 0)}
-                                        className="w-full text-2xl font-bold text-green-700 bg-white/50 rounded-lg px-2 py-1 border-2 border-green-200 focus:outline-none focus:border-green-400"
-                                    />
-                                    <div className="text-xs text-green-500 mt-1">г/день</div>
-                                </div>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleAutoCalculate}
-                                    className="flex-1 px-4 py-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors font-medium"
-                                >
-                                    Рассчитать по формуле Маффина-Сан Жеора
-                                </button>
-                            </div>
-                            <div className="flex gap-3 mt-3">
-                                <button
-                                    onClick={handleSaveGoals}
-                                    className="flex-1 px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors font-medium"
-                                >
-                                    Сохранить
-                                </button>
-                                <button
-                                    onClick={handleCancelEdit}
-                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
-                                >
-                                    Отменить
-                                </button>
-                            </div>
-                        </div>
-                    ) : goals ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border-2 border-orange-100">
-                                <div className="text-sm text-orange-600 font-medium mb-1">Калории</div>
-                                <div className="text-2xl font-bold text-orange-700">{goals.calories}</div>
-                                <div className="text-xs text-orange-500 mt-1">ккал/день</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border-2 border-blue-100">
-                                <div className="text-sm text-blue-600 font-medium mb-1">Белки</div>
-                                <div className="text-2xl font-bold text-blue-700">{goals.protein}</div>
-                                <div className="text-xs text-blue-500 mt-1">г/день</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-2xl border-2 border-yellow-100">
-                                <div className="text-sm text-yellow-600 font-medium mb-1">Жиры</div>
-                                <div className="text-2xl font-bold text-yellow-700">{goals.fat}</div>
-                                <div className="text-xs text-yellow-500 mt-1">г/день</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border-2 border-green-100">
-                                <div className="text-sm text-green-600 font-medium mb-1">Углеводы</div>
-                                <div className="text-2xl font-bold text-green-700">{goals.carbohydrates}</div>
-                                <div className="text-xs text-green-500 mt-1">г/день</div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <p className="text-gray-500 mb-4">Цели не установлены</p>
-                            <button
-                                onClick={handleEditGoals}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
-                            >
-                                Установить цели
-                            </button>
-                        </div>
-                    )}
-                </div>
+                <GoalsSection
+                    goals={goals}
+                    editedGoals={editedGoals}
+                    isEditingGoals={isEditingGoals}
+                    isLoading={contextLoading}
+                    error={error}
+                    onEdit={handleEditGoals}
+                    onChangeBju={handleBJUChange}
+                    onAutoCalculate={handleAutoCalculate}
+                    onSave={handleSaveGoals}
+                    onCancel={handleCancelEdit}
+                />
 
                 {/* Statistics - Average Weekly KBJU */}
-                <div className="bg-white rounded-3xl shadow-lg overflow-hidden mb-4 transition-all duration-300">
-                    <div
-                        className="py-0.5 px-4 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
-                        onClick={() => setIsWeeklyStatsOpen(!isWeeklyStatsOpen)}
-                    >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center shrink-0 mt-1">
-                                <TrendingUp size={24} className="text-white" />
-                            </div>
-                            <div className="min-w-0 flex flex-col justify-center">
-                                <h2 className="text-lg font-bold text-gray-900 truncate leading-tight">Среднее КБЖУ за неделю</h2>
-                                <p className="text-xs text-gray-500 leading-tight">Ваш прогресс</p>
-                            </div>
-                        </div>
-                        <ChevronRight
-                            size={24}
-                            className={`text-gray-400 transition-transform duration-300 shrink-0 ${isWeeklyStatsOpen ? 'rotate-90' : ''}`}
-                        />
-                    </div>
-
-                    <div className={`grid grid-cols-2 gap-2 px-4 pb-4 transition-all duration-300 origin-top ${isWeeklyStatsOpen ? 'opacity-100 max-h-[500px] mt-0' : 'opacity-0 max-h-0 overflow-hidden mt-0 pb-0'
-                        }`}>
-                        <div className="flex flex-col p-3 bg-orange-50 rounded-xl">
-                            <span className="text-gray-600 text-xs mb-0.5">Калории</span>
-                            <span className="text-xl font-bold text-orange-600">{goals?.avgCalories || 0}</span>
-                            <span className="text-xs text-gray-500">ккал/день</span>
-                        </div>
-                        <div className="flex flex-col p-3 bg-blue-50 rounded-xl">
-                            <span className="text-gray-600 text-xs mb-0.5">Белки</span>
-                            <span className="text-xl font-bold text-blue-600">{goals?.avgProtein || 0}г</span>
-                            <span className="text-xs text-gray-500">в среднем</span>
-                        </div>
-                        <div className="flex flex-col p-3 bg-yellow-50 rounded-xl">
-                            <span className="text-gray-600 text-xs mb-0.5">Жиры</span>
-                            <span className="text-xl font-bold text-yellow-600">{goals?.avgFat || 0}г</span>
-                            <span className="text-xs text-gray-500">в среднем</span>
-                        </div>
-                        <div className="flex flex-col p-3 bg-green-50 rounded-xl">
-                            <span className="text-gray-600 text-xs mb-0.5">Углеводы</span>
-                            <span className="text-xl font-bold text-green-600">{goals?.avgCarbs || 0}г</span>
-                            <span className="text-xs text-gray-500">в среднем</span>
-                        </div>
-                    </div>
-                </div>
+                <WeeklyStatsCard
+                    isOpen={isWeeklyStatsOpen}
+                    onToggle={() => setIsWeeklyStatsOpen(!isWeeklyStatsOpen)}
+                    avgCalories={avgCalories}
+                    avgProtein={avgProtein}
+                    avgFat={avgFat}
+                    avgCarbs={avgCarbs}
+                />
 
                 {/* Settings */}
                 <div
