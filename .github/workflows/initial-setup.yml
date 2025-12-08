@@ -53,9 +53,9 @@ jobs:
             echo "📦 Starting initial VPS setup..."
 
             # Create project directory
-            echo "📁 Creating /opt/foodmind directory..."
-            mkdir -p /opt/foodmind
-            cd /opt/foodmind
+            echo "📁 Creating /opt/EatFit24 directory..."
+            mkdir -p /opt/EatFit24
+            cd /opt/EatFit24
 
             # Check if git is installed
             if ! command -v git &> /dev/null; then
@@ -137,9 +137,9 @@ jobs:
             SWAGGER_AUTH_PASSWORD=CHANGE_ME
             EOF
               echo "⚠️  .env file created with placeholders!"
-              echo "⚠️  YOU MUST EDIT /opt/foodmind/.env and set real values!"
+              echo "⚠️  YOU MUST EDIT /opt/EatFit24/.env and set real values!"
               echo ""
-              echo "Run on VPS: nano /opt/foodmind/.env"
+              echo "Run on VPS: nano /opt/EatFit24/.env"
             else
               echo "✅ .env file already exists"
             fi
@@ -149,16 +149,16 @@ jobs:
             echo ""
             echo "📋 Next steps:"
             echo "1. SSH to VPS: ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}"
-            echo "2. Edit .env: nano /opt/foodmind/.env"
+            echo "2. Edit .env: nano /opt/EatFit24/.env"
             echo "3. Set real values for:"
             echo "   - POSTGRES_PASSWORD"
             echo "   - SECRET_KEY"
             echo "   - TELEGRAM_BOT_TOKEN"
             echo "   - OPENROUTER_API_KEY"
-            echo "4. Start services: cd /opt/foodmind && docker compose up -d"
+            echo "4. Start services: cd /opt/EatFit24 && docker compose up -d"
             echo ""
             echo "Current directory structure:"
-            ls -la /opt/foodmind
+            ls -la /opt/EatFit24
 
       - name: Summary
         if: always()
@@ -167,6 +167,6 @@ jobs:
           echo ""
           echo "If successful:"
           echo "1. SSH to your VPS"
-          echo "2. Configure /opt/foodmind/.env with real secrets"
-          echo "3. Run: cd /opt/foodmind && docker compose up -d"
+          echo "2. Configure /opt/EatFit24/.env with real secrets"
+          echo "3. Run: cd /opt/EatFit24 && docker compose up -d"
           echo "4. Check status: docker ps"

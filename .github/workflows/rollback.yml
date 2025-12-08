@@ -37,7 +37,7 @@ jobs:
           port: 22
           script: |
             set -e
-            cd /opt/foodmind
+            cd /opt/EatFit24
 
             echo "🔄 Starting rollback process..."
 
@@ -93,7 +93,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            cd /opt/foodmind
+            cd /opt/EatFit24
             echo "📊 Service status:"
             docker ps | grep -E "(backend|bot|frontend)" || echo "⚠️ Some services not running"
 
