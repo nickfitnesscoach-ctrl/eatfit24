@@ -516,10 +516,8 @@ const FoodLogPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pb-24 safe-area-bottom">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pt-6 pb-24 safe-area-bottom">
             <div className="max-w-lg mx-auto">
-                <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center">Дневник питания</h1>
-
                 {/* Date and Meal Type Selector */}
                 <div className="bg-white rounded-3xl shadow-sm p-4 mb-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

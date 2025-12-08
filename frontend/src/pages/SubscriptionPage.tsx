@@ -24,7 +24,51 @@ const SubscriptionPage: React.FC = () => {
         const fetchPlans = async () => {
             try {
                 setLoadingPlans(true);
-                const apiPlans = await api.getSubscriptionPlans();
+
+                // DEV MODE: Mock subscription plans for testing UI
+                const isDev = import.meta.env.DEV;
+                const mockApiPlans = [
+                    {
+                        code: 'FREE',
+                        display_name: 'Базовый',
+                        price: 0,
+                        old_price: null,
+                        is_popular: false,
+                        features: [
+                            '3 анализа еды в день',
+                            'Базовая статистика',
+                            'Дневник питания'
+                        ]
+                    },
+                    {
+                        code: 'PRO_MONTHLY',
+                        display_name: 'PRO месяц',
+                        price: 299,
+                        old_price: 499,
+                        is_popular: true,
+                        features: [
+                            'Безлимитные анализы еды',
+                            'Персональные рекомендации',
+                            'Подробная статистика',
+                            'Приоритетная поддержка'
+                        ]
+                    },
+                    {
+                        code: 'PRO_YEARLY',
+                        display_name: 'PRO год',
+                        price: 2990,
+                        old_price: 4990,
+                        is_popular: false,
+                        features: [
+                            'Все возможности PRO',
+                            'Экономия 17%',
+                            'Безлимитные анализы еды',
+                            'Персональные рекомендации'
+                        ]
+                    }
+                ];
+
+                const apiPlans = isDev ? mockApiPlans : await api.getSubscriptionPlans();
                 const uiPlans: Plan[] = apiPlans
                     .filter(p => ['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'].includes(p.code))
                     .map(p => {
@@ -172,7 +216,7 @@ const SubscriptionPage: React.FC = () => {
 
     // Header Text
     let headerTitle = "Премиум доступ";
-    let headerSubtitle = "Получи максимум от FoodMind AI";
+    let headerSubtitle = "Получи максимум от EatFit24";
     let topStatusText = "Текущий тариф: Free";
 
     if (isPro) {
@@ -209,15 +253,15 @@ const SubscriptionPage: React.FC = () => {
     }
 
     return (
-        <div className="p-4 pb-24 space-y-6">
+        <div className="p-4 pb-24 px-6">
             {/* Top Status Bar */}
-            <div className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <div className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider mb-6">
                 {topStatusText}
             </div>
 
-            <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold">{headerTitle}</h1>
-                <p className="text-gray-500">{headerSubtitle}</p>
+            <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold mb-2 leading-tight">{headerTitle}</h1>
+                <p className="text-gray-500 leading-snug">{headerSubtitle}</p>
             </div>
 
             <div className="space-y-4">
