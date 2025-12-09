@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Copy, Check, ArrowLeft, Send, UserPlus, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { TRAINER_INVITE_LINK } from '../constants/invite';
 
 const InviteClientPage = () => {
     const navigate = useNavigate();
     const [copied, setCopied] = useState(false);
 
-    // Ссылка на бота для приглашения клиентов
-    const inviteLink = 'https://t.me/nick_fitness_test_bot';
+    const inviteLink = TRAINER_INVITE_LINK;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(inviteLink);

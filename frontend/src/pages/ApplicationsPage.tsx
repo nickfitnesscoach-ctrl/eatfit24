@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApplications } from '../hooks/useApplications';
 import { ApplicationDetails } from '../components/applications/ApplicationDetails';
 import { ApplicationCard } from '../components/applications/ApplicationCard';
+import { TRAINER_INVITE_LINK } from '../constants/invite';
 
 const ApplicationsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -97,11 +98,11 @@ const ApplicationsPage: React.FC = () => {
                 <p className="text-sm text-gray-500">Разместите ее в своих соц.сетях</p>
                 <div className="flex gap-2">
                     <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex-1 truncate font-mono">
-                        https://t.me/nick_fitness_test_bot
+                        {TRAINER_INVITE_LINK}
                     </div>
                     <button
                         onClick={() => {
-                            navigator.clipboard.writeText('https://t.me/nick_fitness_test_bot');
+                            navigator.clipboard.writeText(TRAINER_INVITE_LINK);
                             const tg = window.Telegram?.WebApp;
                             if (tg?.showAlert) {
                                 tg.showAlert('Ссылка скопирована!');
