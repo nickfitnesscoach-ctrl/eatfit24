@@ -15,7 +15,7 @@ Root directory cleanup of `backend/` to remove unused files and caches.
 | `__pycache__/` | Python bytecode cache (should never be in git) |
 | `.pytest_cache/` | pytest cache (should never be in git) |
 | `check_db_data.py` | Legacy diagnostic script, not used in Docker/CI/infra |
-| `nginx.conf` | Unused Nginx config for Docker-internal nginx (project uses host nginx via `deploy/nginx-eatfit24.ru.conf`) |
+| `nginx.conf` | Unused Nginx config for Docker-internal nginx (project uses `frontend/nginx.conf` inside Docker container) |
 
 ## Kept
 
@@ -52,7 +52,7 @@ Already ignores:
 ## Infrastructure Notes
 
 - **Database**: PostgreSQL via Docker Compose (no SQLite)
-- **Nginx**: Host-based nginx using `deploy/nginx-eatfit24.ru.conf` for production
+- **Nginx**: Docker-based nginx using `frontend/nginx.conf` inside frontend container
 - **Dependencies**: Managed via `pip install -r requirements.txt` (no Poetry)
 - **Linting**: ruff configured in `pyproject.toml`
 

@@ -76,8 +76,8 @@
 - **Решение:** Унифицировать на `number` или везде использовать `String(id)`
 
 #### F-003: Отсутствие iframe CSP заголовков для Telegram Web
-- **Severity:** P0
-- **Файлы:** `nginx-eatfit24.ru.conf`
+- **Severity:** P0 (ИСПРАВЛЕНО)
+- **Файлы:** `frontend/nginx.conf`
 - **Описание:** Telegram Web может блокировать Mini App в iframe без правильных заголовков
 - **Недостающие заголовки:**
   ```nginx
@@ -342,8 +342,8 @@
 ### 0.10 DEVOPS - Критические проблемы (P0)
 
 #### D-001: Nginx не имеет iframe headers для Telegram
-- **Severity:** P0
-- **Файл:** `deploy/nginx-eatfit24.ru.conf`
+- **Severity:** P0 (ИСПРАВЛЕНО)
+- **Файл:** `frontend/nginx.conf`
 
 #### D-002: Redis не имеет persistence конфигурации
 - **Severity:** P0
@@ -396,13 +396,12 @@
   - `frontend/src/services/api/ai.ts` - добавить type guard
 
 ### 1.3 Nginx iframe headers (D-001)
-- **Приоритет:** P0
+- **Приоритет:** P0 (ИСПРАВЛЕНО)
 - **Время:** 30 минут
-- **Файл:** `deploy/nginx-eatfit24.ru.conf`
-- **Добавить:**
+- **Файл:** `frontend/nginx.conf`
+- **Статус:** Добавлено в строке 85:
   ```nginx
-  add_header X-Frame-Options "ALLOW-FROM https://web.telegram.org" always;
-  add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org" always;
+  add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.web.telegram.org https://telegram.org https://*.telegram.org;" always;
   ```
 
 ### 1.4 Celery task не должен удалять meal (B-001)

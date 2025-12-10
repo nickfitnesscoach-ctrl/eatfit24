@@ -45,9 +45,8 @@ fitness-app/
 │   ├── API_DOCS.md     # API documentation
 │   └── project_overview.md
 │
-├── deploy/              # Deployment configs
-│   ├── scripts/        # Deploy scripts
-│   └── nginx-eatfit24.ru.conf
+├── scripts/             # Utility scripts
+│   └── debug/          # Debug & deploy scripts
 │
 ├── .github/
 │   └── workflows/       # CI/CD pipelines

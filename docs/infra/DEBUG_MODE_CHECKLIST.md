@@ -157,7 +157,7 @@ docker-compose restart backend celery-worker
 
 **Документация:**
 - Подробная инструкция: [PRODUCTION_DEBUG_MODE_DEPLOY.md](PRODUCTION_DEBUG_MODE_DEPLOY.md)
-- Quick deploy скрипт: [QUICK_DEBUG_DEPLOY.sh](QUICK_DEBUG_DEPLOY.sh)
+- Quick deploy скрипт: [production_debug_deploy.sh](../../scripts/debug/production_debug_deploy.sh)
 - Browser Debug Mode описание: [BROWSER_DEBUG_MODE.md](BROWSER_DEBUG_MODE.md)
 
 **Автор:** Claude Code
