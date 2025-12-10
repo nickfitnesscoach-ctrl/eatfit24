@@ -4,14 +4,15 @@
  * Handles Telegram authentication.
  */
 
-import { 
-    fetchWithRetry, 
+import {
+    fetchWithRetry,
     fetchWithTimeout,
     getHeaders,
     log
 } from './client';
 import { URLS } from './urls';
 import type { TrainerPanelAuthResponse, AuthResponse } from './types';
+import { TELEGRAM_BOT_NAME } from '../../config/env';
 
 // ============================================================
 // Authentication
@@ -160,7 +161,7 @@ export const getInviteLink = async () => {
         return data.link;
     } catch (error) {
         console.error('Error fetching invite link:', error);
-        return 'https://t.me/Fit_Coach_bot?start=default';
+        return `https://t.me/${TELEGRAM_BOT_NAME}?start=default`;
     }
 };
 
