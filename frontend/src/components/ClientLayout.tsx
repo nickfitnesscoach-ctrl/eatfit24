@@ -1,25 +1,20 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { Home, Camera, CreditCard, User } from 'lucide-react';
-import { DebugBanner } from '../features/debug';
 
 /**
  * ClientLayout - Persistent layout wrapper
- * 
+ *
  * This component:
  * - Mounts ONCE and stays mounted throughout the app session
- * - Contains DebugBanner (fixed position, no layout reflow)
  * - Contains bottom navigation
  * - Renders page content via <Outlet />
- * 
+ *
  * NO artificial delays, overlays or transitions that mask loading states.
  */
 const ClientLayout: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Debug Mode Banner - fixed position, no layout reflow */}
-            <DebugBanner />
-
             <main className="flex-1 pb-16 md:pb-20">
                 <Outlet />
             </main>

@@ -52,16 +52,10 @@ export function shouldInitMockTelegram(): boolean {
 }
 
 /**
- * Check if debug banner should be displayed
- */
-export function shouldShowDebugBanner(): boolean {
-  return IS_DEBUG;
-}
-
-/**
  * Get debug info for logging
  */
 export function getDebugInfo() {
+  const searchParams = new URLSearchParams(window.location.search);
   return {
     isDebug: IS_DEBUG,
     isDev: import.meta.env.DEV,
