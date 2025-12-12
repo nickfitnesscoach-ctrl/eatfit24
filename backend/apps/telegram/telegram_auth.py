@@ -30,7 +30,7 @@ def _forbidden_response():
 
 
 def _get_raw_init_data(request) -> Optional[str]:
-    return request.META.get("HTTP_X_TG_INIT_DATA") or request.headers.get("X-TG-INIT-DATA")
+    return request.META.get("HTTP_X_TELEGRAM_INIT_DATA") or request.headers.get("X-Telegram-Init-Data")
 
 
 def _is_telegram_admin(request) -> bool:
