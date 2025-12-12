@@ -31,8 +31,8 @@ def get_applications_api(request):
     """
     clients = TelegramUser.objects.filter(ai_test_completed=True).only(
         'id', 'telegram_id', 'first_name', 'last_name', 'username',
-        'ai_test_completed', 'recommended_calories', 'recommended_protein',
-        'recommended_fat', 'recommended_carbs', 'created_at'
+        'ai_test_completed', 'ai_test_answers', 'recommended_calories', 'recommended_protein',
+        'recommended_fat', 'recommended_carbs', 'created_at', 'is_client'
     ).order_by('-created_at')
 
     data = []
@@ -43,8 +43,11 @@ def get_applications_api(request):
             "first_name": client.first_name or "",
             "last_name": client.last_name or "",
             "username": client.username or "",
+            "photo_url": "",  # TODO: Add photo support
+            "status": "contacted" if client.is_client else "new",
             "display_name": client.display_name,
             "ai_test_completed": client.ai_test_completed,
+            "details": client.ai_test_answers or {},
             "recommended_calories": client.recommended_calories,
             "recommended_protein": client.recommended_protein,
             "recommended_fat": client.recommended_fat,
@@ -76,10 +79,10 @@ def clients_list(request):
             is_client=True
         ).only(
             'id', 'telegram_id', 'first_name', 'last_name', 'username',
-            'ai_test_completed', 'recommended_calories', 'recommended_protein',
-            'recommended_fat', 'recommended_carbs', 'created_at'
+            'ai_test_completed', 'ai_test_answers', 'recommended_calories', 'recommended_protein',
+            'recommended_fat', 'recommended_carbs', 'created_at', 'is_client'
         ).order_by('-created_at')
-        
+
         data = []
         for client in clients:
             data.append({
@@ -88,8 +91,11 @@ def clients_list(request):
                 "first_name": client.first_name or "",
                 "last_name": client.last_name or "",
                 "username": client.username or "",
+                "photo_url": "",  # TODO: Add photo support
+                "status": "contacted",
                 "display_name": client.display_name,
                 "ai_test_completed": client.ai_test_completed,
+                "details": client.ai_test_answers or {},
                 "recommended_calories": client.recommended_calories,
                 "recommended_protein": client.recommended_protein,
                 "recommended_fat": client.recommended_fat,
