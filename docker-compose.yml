@@ -1,4 +1,4 @@
-# FoodMind - Unified Docker Compose for all services
+# EatFit24 - Unified Docker Compose for all services
 # Production-ready configuration with Redis + Celery async processing
 #
 # IMPORTANT: Create a .env file in the project root with all required variables
@@ -10,8 +10,8 @@ services:
     image: postgres:15
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-foodmind}
-      POSTGRES_USER: ${POSTGRES_USER:-foodmind}
+      POSTGRES_DB: ${POSTGRES_DB:-eatfit24}
+      POSTGRES_USER: ${POSTGRES_USER:-eatfit24}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -20,7 +20,7 @@ services:
     networks:
       - backend-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-foodmind} -d ${POSTGRES_DB:-foodmind}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eatfit24} -d ${POSTGRES_DB:-eatfit24}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,8 +58,8 @@ services:
       - ./backend/logs:/app/logs
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      - POSTGRES_DB=${POSTGRES_DB:-foodmind}
-      - POSTGRES_USER=${POSTGRES_USER:-foodmind}
+      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
+      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
@@ -118,8 +118,8 @@ services:
       - ./backend/media:/app/media
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      - POSTGRES_DB=${POSTGRES_DB:-foodmind}
-      - POSTGRES_USER=${POSTGRES_USER:-foodmind}
+      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
+      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
@@ -156,12 +156,17 @@ services:
       - ENVIRONMENT=production
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-foodmind}
-      - DB_USER=${POSTGRES_USER:-foodmind}
+      - DB_NAME=${POSTGRES_DB:-eatfit24}
+      - DB_USER=${POSTGRES_USER:-eatfit24}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - BOT_ADMIN_ID=${BOT_ADMIN_ID}
+      - ADMIN_IDS=${ADMIN_IDS}
+      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - TRAINER_PANEL_BASE_URL=${TRAINER_PANEL_BASE_URL}
+      - DJANGO_API_URL=${DJANGO_API_URL:-http://backend:8000/api/v1}
     depends_on:
       db:
         condition: service_healthy
@@ -194,7 +199,7 @@ services:
       timeout: 10s
       retries: 3
     labels:
-      - "com.foodmind.service=frontend"
+      - "com.eatfit24.service=frontend"
 
 networks:
   backend-net:
