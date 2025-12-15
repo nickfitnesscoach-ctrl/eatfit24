@@ -1,246 +1,122 @@
-# Trainer Panel Audit Report
+# AUDIT_REPORT — Рефакторинг Trainer Panel
 
-**Дата аудита:** 2025-12-15  
-**Цель:** Привести Trainer Panel в состояние production-ready без изменения бизнес-логики
-
----
-
-## Executive Summary
-
-✅ **Аудит завершён успешно.**
-
-Trainer Panel приведён в production-ready состояние:
-- API слой централизован в `services/api/trainer.ts`
-- Типы нормализованы и вынесены в отдельные файлы
-- Исправлены ошибки импортов
-- Создана документация
+> **Frozen state:** 2025-12-15  
+> Рефакторинг завершён. Изменения дальше только инкрементальные.
 
 ---
 
-## Найденные проблемы
+## Итоговое состояние
 
-### 1. Неправильный импорт типа Application
+### Архитектура ✅
 
-**Статус:** ✅ Исправлено
-
-**Описание:**  
-`contexts/ClientsContext.tsx` импортировал `Application` из несуществующего пути:
-```typescript
-// ❌ Было
-import { Application } from '../types/application';
-
-// ✅ Стало  
-import type { Application } from '../features/trainer-panel/types';
+```
+Backend API → services/api/* → hooks/contexts (transform) → UI components
 ```
 
-**Файлы затронуты:**
-- `contexts/ClientsContext.tsx`
+- Чёткое разделение слоёв
+- Типы разделены: API vs UI
+- Обратных зависимостей нет
+- Трансформация происходит в хуках/контекстах
 
----
+### Типы ✅
 
-### 2. API функции Trainer смешаны с Auth
+| Тип | Назначение |
+|-----|------------|
+| `ApplicationResponse` | API response (сырые данные) |
+| `Application` | UI model (трансформированные данные) |
+| `ClientDetailsApi` | Детали с backend |
+| `ClientDetailsUi` | Детали для UI |
+| `ApplicationStatusApi` | `'new' \| 'viewed' \| 'contacted'` |
+| `ApplicationStatusUi` | `ApplicationStatusApi \| 'client'` |
 
-**Статус:** ✅ Исправлено
+### Импорты ✅
 
-**Описание:**  
-Функции `getApplications`, `getClients`, `getSubscribers` и др. находились в `auth.ts` вместе с функциями аутентификации.
+- Типы: из `features/trainer-panel/types`
+- API: через `api` объект из `services/api`
+- Trainer функции из `auth.ts` — deprecated
 
-**Решение:**  
-Создан выделенный модуль `services/api/trainer.ts` с:
-- Типизированными функциями API
-- Типами для ответов (Client, Subscriber, ApplicationResponse)
-- Логированием запросов
-
-`auth.ts` теперь содержит только функции аутентификации + временный re-export для обратной совместимости.
-
-**Файлы созданы:**
-- `services/api/trainer.ts`
-
-**Файлы изменены:**
-- `services/api/auth.ts`
-- `services/api/index.ts`
-
----
-
-### 3. Неполный тип Application
-
-**Статус:** ✅ Исправлено
-
-**Описание:**  
-Тип `Application` не включал:
-- Статус `'client'` (используется в ClientsContext)
-- Опциональные поля diet_type, meals_per_day, allergies и др.
-
-**Решение:**  
-Обновлен `features/trainer-panel/types/application.ts`:
-- Добавлен `'client'` в union type статуса
-- Сделаны опциональными diet-related поля
-- Вынесен отдельный интерфейс `ApplicationDetails`
-
-**Файлы изменены:**
-- `features/trainer-panel/types/application.ts`
-- `features/trainer-panel/types/index.ts`
-
----
-
-### 4. Отсутствие документации
-
-**Статус:** ✅ Исправлено
-
-**Описание:**  
-Не было документации по структуре Trainer Panel и API.
-
-**Решение:**  
-Создана директория `features/trainer-panel/docs/` с файлами:
-- `TRAINER_PANEL.md` — карта папки, flows, debug guide
-- `TRAINER_API.md` — endpoints, типы, error handling
-- `AUDIT_REPORT.md` — этот файл
-
----
-
-### 5. Побочная проблема: unused imports в BatchResultsModal
-
-**Статус:** ✅ Исправлено
-
-**Описание:**  
-При type-check обнаружены неиспользуемые импорты:
-- `ChevronRight` — не использовался
-- `onOpenDiary` — параметр не использовался
-
-**Файлы изменены:**
-- `components/BatchResultsModal.tsx`
-
----
-
-## Файлы затронутые рефакторингом
-
-### Созданные файлы
-
-| Файл | Описание |
-|------|----------|
-| `services/api/trainer.ts` | Выделенный API модуль для Trainer Panel |
-| `features/trainer-panel/types/index.ts` | Re-export типов для стабильных импортов |
-| `features/trainer-panel/docs/TRAINER_PANEL.md` | Документация панели |
-| `features/trainer-panel/docs/TRAINER_API.md` | Документация API |
-| `features/trainer-panel/docs/AUDIT_REPORT.md` | Этот отчёт |
-
-### Изменённые файлы
-
-| Файл | Изменения |
-|------|-----------|
-| `services/api/auth.ts` | Убраны trainer функции, добавлен re-export |
-| `services/api/index.ts` | Добавлен экспорт trainer модуля |
-| `contexts/ClientsContext.tsx` | Исправлен импорт Application |
-| `features/trainer-panel/types/application.ts` | Расширен тип, добавлены опциональные поля |
-| `components/BatchResultsModal.tsx` | Удалены unused imports |
-
----
-
-## Команды и результаты
+### Quality Gates ✅
 
 | Команда | Результат |
 |---------|-----------|
-| `npm run type-check` | ✅ Успешно (0 ошибок) |
-| `npm run build` | ✅ Успешно (built in 3.99s) |
-| `npm run lint` | ✅ Успешно (0 ошибок) |
+| `npm run type-check` | ✅ 0 ошибок |
+| `npm run lint` | ✅ 0 ошибок |
+| `npm run build` | ✅ Успешно |
 
 ---
 
-## Post-change Verification (2025-12-15)
+## Выполненные исправления
 
-> [!NOTE]
-> Результаты проверки архитектуры после рефакторинга
+### 1. Разделение типов
 
-### 1. Направление зависимостей
+**До:** Один `ClientDetails` для всего  
+**После:** `ClientDetailsApi` (backend) + `ClientDetailsUi` (UI)
 
-| Проверка | Результат |
-|---------|----------|
-| `features/trainer-panel/types` → `services/api/**` | ✅ No imports found |
-| `services/api/trainer.ts` imports from `features/trainer-panel/types` | ✅ Correct |
-| `features/trainer-panel/types/index.ts` re-exports from `./application` only | ✅ Correct |
+### 2. Статусы
 
-### 2. Канон импортов
+**До:** Неявное смешение API и UI статусов  
+**После:** Явное разделение `ApplicationStatusApi` / `ApplicationStatusUi`
 
-| Проверка | Результат |
-|---------|----------|
-| `ApplicationFromApi` в коде | ✅ Not found |
-| Trainer functions imported from `auth.ts` | ✅ Not found (only deprecated re-exports exist) |
-| `../../../services/api/trainer` в types | ✅ Not found |
+### 3. Импорты
 
-### 3. Типы и null-safety
+**До:** Смешанные пути импортов  
+**После:** Единый канон через `features/trainer-panel/types`
 
-**Исправления (44 type errors → 0):**
+### 4. Null Safety
 
-- Расширен `ClientDetails` UI-полями: `limitations`, `body_type`, `desired_body_type`
-- Добавлен `BodyTypeInfo` interface
-- Добавлены optional chaining и fallback в UI компонентах
-- `Application.date` добавлен как optional поле
+**До:** Отсутствие проверок на undefined  
+**После:** Optional chaining + fallback во всех UI компонентах
 
-### 4. Auth consistency
+### 5. Документация
 
-| Параметр | `authenticate()` | `trainerPanelAuth()` |
-|---------|-----------------|---------------------|
-| Header `X-Telegram-Init-Data` | ✅ | ✅ |
-| Body | `{ initData }` | `{ init_data: initData }` |
-| Method | POST | POST |
-
-> [!IMPORTANT]
-> Body field names differ: `initData` vs `init_data`. This is intentional for backend compatibility.
+**До:** Неактуальная, описывала "будущее"  
+**После:** Frozen state, 1:1 с кодом
 
 ---
 
-## Post-audit Follow Up
+## Deprecated (v2.0 cleanup)
 
-> [!NOTE]
-> Что нужно сделать для полного завершения миграции
+В `services/api/auth.ts` остаются re-exports trainer функций:
 
-### v2.0: Финальная миграция
-
-**Чеклист для удаления deprecated re-exports:**
-
-- [ ] Удалить deprecated re-export блок из `services/api/auth.ts`
-- [ ] Проверить отсутствие импортов trainer функций из `auth.ts`
-- [ ] Обновить TRAINER_API.md → Migration Notes (снять статус deprecated)
-- [ ] Обновить этот файл (AUDIT_REPORT.md)
-
-**Код для удаления из `auth.ts`:**
 ```typescript
-// ⚠️  DEPRECATED: Backward Compatibility Re-exports
-// ...
+// ⚠️ DEPRECATED — будет удалено в v2.0
 export {
     getApplications,
     deleteApplication,
+    updateApplicationStatus,
+    getClients,
+    addClient,
+    removeClient,
     // ...
 } from './trainer';
 ```
 
-### Опционально: добавить @ alias
-
-Добавить в `tsconfig.json` и `vite.config.js`:
-```json
-"paths": {
-    "@/*": ["./src/*"]
-}
-```
-
-Это позволит использовать стабильные импорты:
-```typescript
-import type { Application } from '@/features/trainer-panel/types';
-```
+**Чеклист для v2.0:**
+- [ ] Удалить deprecated re-exports из `auth.ts`
+- [ ] Проверить отсутствие импортов из `auth.ts`
+- [ ] Обновить документацию
 
 ---
 
-## Acceptance Criteria
+## Acceptance Criteria ✅
 
 | Критерий | Статус |
 |----------|--------|
-| Trainer Panel — цельная фича-папка без "висяков" | ✅ |
-| Shared-компоненты не смешаны с feature | ✅ |
-| Все trainer-запросы идут через trainer.ts | ✅ |
-| Ошибки нормализованы и типизированы | ✅ |
-| Нет старых импортов на прежние пути | ✅ |
-| npm run build успешно | ✅ |
-| Документация создана и согласована | ✅ |
-| Status types разделены (API vs UI) | ✅ |
-| Import Policy задокументирована | ✅ |
+| Trainer Panel — цельная feature папка | ✅ |
+| Типы разделены (API vs UI) | ✅ |
+| Все trainer-запросы через `trainer.ts` | ✅ |
+| Import policy задокументирована | ✅ |
+| Статус `client` — только UI | ✅ |
+| TypeScript strict — зелёный | ✅ |
+| Документация соответствует коду | ✅ |
 
+---
+
+## Заключение
+
+Рефакторинг Trainer Panel завершён. Текущее состояние зафиксировано.
+
+Любые будущие изменения должны:
+1. Следовать установленным канонам импортов
+2. Поддерживать разделение API/UI типов
+3. Обновлять документацию при структурных изменениях

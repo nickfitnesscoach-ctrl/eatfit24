@@ -1,194 +1,158 @@
-# Trainer Panel
+# Trainer Panel — Архитектурный канон
 
-Панель тренера для управления клиентами, заявками и подписчиками.
+> **Frozen state:** 2025-12-15  
+> Документация отражает текущий код после рефакторинга.
 
-## Purpose
+---
 
-Trainer Panel — это отдельная подсистема приложения EatFit24, предназначенная для тренеров:
-
-- Просмотр и управление заявками (лиды)
-- Ведение списка клиентов
-- Генерация ссылок-приглашений
-- Аналитика подписчиков и доходов
-
-## Folder Map
+## Архитектура данных
 
 ```
-features/trainer-panel/
-├── components/           # UI компоненты
-│   ├── Dashboard.tsx          # Главная дашборд
-│   ├── Layout.tsx             # Layout с навигацией
-│   ├── applications/          # Компоненты заявок
-│   │   ├── ApplicationCard.tsx
-│   │   └── ApplicationDetails.tsx
-│   └── clients/               # Компоненты клиентов
-│       ├── ClientCard.tsx
-│       └── ClientDetails.tsx
-├── pages/                # Страницы
-│   ├── ApplicationsPage.tsx   # Список заявок
-│   ├── ClientsPage.tsx        # Список клиентов
-│   ├── InviteClientPage.tsx   # Приглашение клиента
-│   └── SubscribersPage.tsx    # Подписчики и статистика
-├── hooks/                # Хуки
-│   ├── useApplications.ts     # Управление заявками
-│   └── useClientsList.ts      # Управление клиентами
-├── constants/            # Константы
-│   ├── applications.ts        # Маппинги данных
-│   └── invite.ts              # Ссылка приглашения
-├── types/                # Типы TypeScript
-│   ├── application.ts         # Application, ApplicationDetails, Status types
-│   └── index.ts               # Re-export всех типов
-└── docs/                 # Документация
-    ├── TRAINER_PANEL.md       # Этот файл
-    ├── TRAINER_API.md         # Документация API
-    ├── AUDIT_REPORT.md        # Отчёт аудита
-    └── FILE_MAP.md            # Карта всех файлов
+Backend API
+     ↓
+services/api/* (fetch, raw response)
+     ↓
+hooks / contexts (data transformation)
+     ↓
+UI components (consume UI-ready data)
 ```
 
-## Key Pages
+### Ключевой принцип
 
-| Page | Responsibility | Uses Hooks | Uses API |
-|------|----------------|-----------|----------|
-| `ApplicationsPage` | Список заявок с фильтрами и поиском | `useApplications` | `api.getApplications`, `api.updateApplicationStatus`, `api.deleteApplication` |
-| `ClientsPage` | Список клиентов с поиском | `useClientsList` | через `ClientsContext` → `api.getClients` |
-| `InviteClientPage` | Форма генерации ссылки-приглашения | — | `api.getInviteLink` (при необходимости) |
-| `SubscribersPage` | Статистика подписчиков | — | `api.getSubscribers` |
+**Backend API возвращает сырые данные → хуки/контексты трансформируют → UI компоненты получают готовые данные.**
 
-## Key Flows
+| Слой | Типы | Ответственность |
+|------|------|-----------------|
+| API | `ApplicationResponse`, `ClientDetailsApi` | Fetch + передача сырых данных |
+| Transform | `mapDetailsApiToUi()`, `mapApplicationFromApi()` | Преобразование API → UI |
+| UI | `Application`, `ClientDetailsUi` | Отображение готовых данных |
 
-### 1. Applications Flow
-```
-ApplicationsPage → useApplications hook → api.* → UI
-  ├── Загрузка: getApplications()
-  ├── Смена статуса: updateApplicationStatus()
-  ├── Удаление: deleteApplication()
-  └── Конвертация в клиента: addClient() через ClientsContext
-```
+---
 
-### 2. Clients Flow
-```
-ClientsPage → useClientsList → ClientsContext → api.* → UI
-  ├── Загрузка: getClients()
-  ├── Удаление: removeClient()
-  └── Открытие чата: через Telegram WebApp
+## Типы (SSOT)
+
+**Источник истины:** `features/trainer-panel/types/`
+
+### Status Types
+
+```typescript
+// Backend возвращает ТОЛЬКО эти статусы
+type ApplicationStatusApi = 'new' | 'viewed' | 'contacted';
+
+// UI добавляет 'client' (никогда не отправляется на backend)
+type ApplicationStatusUi = ApplicationStatusApi | 'client';
 ```
 
-### 3. Invite Flow
-```
-InviteClientPage → TRAINER_INVITE_LINK (из env) → UI
-  └── Копирование или отправка в Telegram
+> **Важно:** Backend **НИКОГДА** не возвращает `'client'`. Этот статус устанавливается локально в `ClientsContext` когда заявка конвертируется в клиента.
+
+### Details Types
+
+```typescript
+// Сырые данные с backend
+interface ClientDetailsApi {
+    gender?: 'male' | 'female';
+    health_restrictions?: string[];
+    current_body_type?: number;
+    // ...
+}
+
+// После трансформации для UI
+interface ClientDetailsUi {
+    gender?: string;        // "Мужской" / "Женский"
+    limitations: string[];  // Локализованные ограничения
+    body_type?: BodyTypeInfo;  // { id, description, image_url }
+    // ...
+}
 ```
 
-### 4. Subscribers Flow
+### Application Types
+
+```typescript
+// API response (строгий статус)
+interface ApplicationResponse {
+    status: ApplicationStatusApi;
+    details: ClientDetailsApi;
+    // ...
+}
+
+// UI model (расширенный статус)
+interface Application {
+    status?: ApplicationStatusUi;
+    details: ClientDetailsUi;
+    date?: string;  // UI-formatted
+    // ...
+}
 ```
-SubscribersPage → api.getSubscribers() → UI
-  └── Фильтрация по типу подписки (free/monthly/yearly)
-```
+
+---
 
 ## Import Policy
 
-> [!IMPORTANT]
-> Строгие правила импортов для Trainer Panel
-
-### Types
-
-**SSOT:** `features/trainer-panel/types/`
+### Типы
 
 ```typescript
-// ✅ Правильно — из внешнего файла (contexts/, services/)
-import type { Application, ApplicationStatusApi } from 'features/trainer-panel/types';
+// ✅ Канон — из features/trainer-panel/types
+import type { Application, ClientDetailsUi } from '../features/trainer-panel/types';
 
-// ✅ Правильно — внутри feature (hooks, components)
-import { Application } from '../types/application';
-// или через re-export:
+// ✅ Внутри feature — относительный путь
 import type { Application } from '../types';
 ```
 
-> [!NOTE]
-> **Status types:**
-> - `ApplicationStatusApi = 'new' | 'viewed' | 'contacted'` — from backend
-> - `ApplicationStatusUi = ApplicationStatusApi | 'client'` — includes UI-derived state
-> - Backend **NEVER** returns `'client'` — this is set locally in `ClientsContext`
-
 ### API
 
-**SSOT:** `services/api/trainer.ts`
-
 ```typescript
-// ✅ Canon — через api объект
-import { api } from 'services/api';
+// ✅ Канон — через api объект
+import { api } from '../services/api';
 await api.getApplications();
 
-// ✅ Допустимо — прямой импорт из trainer
-import { getApplications } from 'services/api/trainer';
-
-// ❌ Запрещено — из auth.ts (deprecated, will be removed in v2.0)
-import { getApplications } from 'services/api/auth';
+// ❌ Запрещено — импорт из auth.ts
+import { getApplications } from '../services/api/auth';
 ```
 
-### Constants
+---
 
-**SSOT:** `features/trainer-panel/constants/`
+## Трансформация данных
 
-```typescript
-// ✅ Правильно — из feature constants (относительно компонента внутри feature)
-import { ACTIVITY_DESCRIPTIONS } from '../constants/applications';
-import { TRAINER_INVITE_LINK } from '../constants/invite';
+### Где происходит
 
-// ✅ Правильно — из внешнего файла (например contexts/)
-import { ACTIVITY_DESCRIPTIONS } from '../features/trainer-panel/constants/applications';
+| Файл | Что делает |
+|------|------------|
+| `hooks/useApplications.ts` | `mapApplicationFromApi()` — API → UI для заявок |
+| `contexts/ClientsContext.tsx` | Трансформация клиентов при загрузке |
+
+### Что трансформируется
+
+| API поле | UI поле | Пример |
+|----------|---------|--------|
+| `gender: 'male'` | `gender: 'Мужской'` | Локализация |
+| `health_restrictions[]` | `limitations[]` | Переименование + локализация |
+| `current_body_type: 3` | `body_type: { id, description, image_url }` | Обогащение данных |
+| `created_at` | `date` | Форматирование даты |
+
+---
+
+## Структура feature
+
+```
+features/trainer-panel/
+├── components/
+│   ├── applications/     # Карточки и детали заявок
+│   └── clients/          # Карточки и детали клиентов
+├── constants/            # Маппинги (ACTIVITY_MAP, GOALS_MAP, etc.)
+├── docs/                 # Эта документация
+├── hooks/                # useApplications, useClientsList
+├── pages/                # ApplicationsPage, ClientsPage
+└── types/                # SSOT для типов
+    ├── application.ts    # Все интерфейсы
+    └── index.ts          # Re-export
 ```
 
-### Прямой fetch запрещён
+---
 
-```typescript
-// ❌ Запрещено в UI компонентах
-fetch('/api/v1/telegram/applications/');
+## Правила для разработчиков
 
-// ✅ Только через api объект
-api.getApplications();
-```
-
-> [!WARNING]
-> `auth.ts` trainer re-exports are **DEPRECATED** and will be removed in v2.0.
-> See TRAINER_API.md → Migration Notes.
-
-## Safe Edits
-
-✅ **Можно безопасно менять:**
-- Стили и верстку компонентов
-- Тексты и лейблы
-- Добавление новых фильтров/сортировок
-- Расширение типов новыми полями
-
-⚠️ **Осторожно:**
-- Изменение API endpoints — требует синхронизации с backend
-- Изменение структуры типов — проверить все места использования
-- Изменение `ClientsContext` — используется глобально
-
-## Debug Guide
-
-### DevTools Network
-
-Что смотреть:
-- `GET /api/v1/telegram/applications/` — заявки
-- `GET /api/v1/telegram/clients/` — клиенты
-- `GET /api/v1/telegram/subscribers/` — подписчики
-- `PATCH /api/v1/telegram/applications/{id}/status/` — смена статуса
-- `POST /api/v1/telegram/clients/{id}/add/` — добавление клиента
-
-### Типичные ошибки
-
-| Ошибка | Причина | Решение |
-|--------|---------|---------|
-| 401 Unauthorized | Истекла сессия Telegram | Переоткрыть приложение из бота |
-| 403 Forbidden | Нет прав тренера | Проверить роль пользователя на backend |
-| Пустой список | Нет данных | Проверить есть ли заявки/клиенты в БД |
-
-## Related Files Outside Feature
-
-- `contexts/ClientsContext.tsx` — глобальный контекст клиентов
-- `services/api/trainer.ts` — **SSOT** API слой trainer panel
-- `services/api/auth.ts` — авторизация в панель тренера (+ deprecated re-exports)
-- `App.tsx` — маршрутизация `/panel/*`
-
+1. **Типы** — импортировать только из `features/trainer-panel/types`
+2. **API** — использовать `api.method()`, не прямые импорты из `auth.ts`
+3. **Трансформация** — происходит в хуках/контекстах, не в компонентах
+4. **Статус `client`** — существует только в UI, backend его не знает
+5. **UI компоненты** — получают только `Application` с `ClientDetailsUi`
