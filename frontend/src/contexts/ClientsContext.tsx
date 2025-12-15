@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Application } from '../types/application';
+import type { Application } from '../features/trainer-panel/types';
 import { api } from '../services/api';
 
 interface ClientsContextType {
@@ -83,7 +83,8 @@ export const ClientsProvider: React.FC<{ children: ReactNode }> = ({ children })
                             description: 'Желаемая форма',
                             image_url: details.ideal_body_type ? `/assets/body_types/${details.gender === 'male' ? 'm' : 'f'}_type_after_${details.ideal_body_type}.jpg` : ''
                         },
-                        timezone: details.timezone || 'UTC+3'
+                        timezone: details.timezone || 'UTC+3',
+                        allergies: Array.isArray(details.allergies) ? details.allergies : (details.allergies ? [details.allergies] : [])
                     }
                 };
             });
