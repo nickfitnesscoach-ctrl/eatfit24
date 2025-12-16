@@ -2,20 +2,20 @@
 URL configuration for FoodMind AI project.
 """
 
+import base64
+import os
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from django.contrib.auth.decorators import user_passes_test
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
-from apps.common.views import health_check, readiness_check, liveness_check
-from apps.telegram import views as telegram_views
-import base64
-import os
+
+from apps.common.views import health_check, liveness_check, readiness_check
 
 
 def basic_auth_required(view_func):
@@ -83,9 +83,6 @@ urlpatterns = [
     
     # Trainer panel (includes auth endpoint)
     path("api/v1/trainer-panel/", include("apps.telegram.trainer_panel.urls")),
-
-    # Legacy alias for old frontend versions
-    path("api/trainer-panel/auth/", telegram_views.trainer_panel_auth),
 
     # API Schema and Documentation (protected with Basic Auth)
     path("api/schema/", basic_auth_required(SpectacularAPIView.as_view()), name="schema"),
