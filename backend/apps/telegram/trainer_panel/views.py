@@ -207,32 +207,73 @@ def get_subscribers_api(request):
 
     Returns:
         {
-            "counts": {
-                "free": 123,
-                "monthly": 45,
-                "yearly": 12,
-                "paid_total": 57
-            },
-            "revenue": {
-                "total": 999999.00,
-                "mtd": 12345.00,
-                "last_30d": 23456.00,
-                "currency": "RUB"
+            "subscribers": [
+                {
+                    "id": 1,
+                    "telegram_id": 123456,
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "username": "johndoe",
+                    "plan_type": "monthly",
+                    "subscribed_at": "2025-01-01T00:00:00Z",
+                    "expires_at": "2025-02-01T00:00:00Z",
+                    "is_active": true
+                }
+            ],
+            "stats": {
+                "total": 100,
+                "free": 50,
+                "monthly": 30,
+                "yearly": 20,
+                "revenue": 50000
             }
         }
     """
+    # Get metrics
     counts = get_subscribers_metrics()
     revenue = get_revenue_metrics()
 
-    # Convert Decimal to float for JSON serialization
-    revenue_data = {
-        'total': float(revenue['total']),
-        'mtd': float(revenue['mtd']),
-        'last_30d': float(revenue['last_30d']),
-        'currency': revenue['currency']
+    # Get all users with subscriptions
+    users = TelegramUser.objects.filter(
+        ai_test_completed=True
+    ).select_related('user').order_by('-created_at')
+
+    # Batch fetch subscription data
+    user_ids = [u.user_id for u in users]
+    subscriptions_map = get_subscriptions_for_users(user_ids)
+
+    # Build subscribers list
+    subscribers = []
+    for telegram_user in users:
+        subscription_info = subscriptions_map.get(telegram_user.user_id, {
+            'plan_type': 'free',
+            'is_paid': False,
+            'status': 'unknown',
+            'paid_until': None
+        })
+
+        subscribers.append({
+            'id': telegram_user.id,
+            'telegram_id': telegram_user.telegram_id,
+            'first_name': telegram_user.first_name or '',
+            'last_name': telegram_user.last_name or '',
+            'username': telegram_user.username or '',
+            'plan_type': subscription_info['plan_type'],
+            'subscribed_at': telegram_user.created_at.isoformat(),
+            'expires_at': subscription_info['paid_until'],
+            'is_active': subscription_info['status'] == 'active'
+        })
+
+    # Build stats (frontend expects revenue as a single number)
+    stats = {
+        'total': counts['free'] + counts['monthly'] + counts['yearly'],
+        'free': counts['free'],
+        'monthly': counts['monthly'],
+        'yearly': counts['yearly'],
+        'revenue': float(revenue['total'])  # Total revenue as single number
     }
 
     return Response({
-        'counts': counts,
-        'revenue': revenue_data
+        'subscribers': subscribers,
+        'stats': stats
     }, status=status.HTTP_200_OK)
