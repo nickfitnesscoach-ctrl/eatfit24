@@ -47,7 +47,20 @@
       "Bash(git pull:*)",
       "Bash(git merge:*)",
       "Bash(git branch:*)",
-      "Bash(rm -f frontend/src/nul nul)"
+      "Bash(rm -f frontend/src/nul nul)",
+      "Bash(python manage.py check:*)",
+      "Bash(timeout 5 python manage.py runserver:*)",
+      "Bash(python:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=config.settings python:*)",
+      "Bash(tree:*)",
+      "Bash(scp:*)",
+      "Bash(find:*)",
+      "Bash(timeout 10 python:*)",
+      "Bash(test:*)",
+      "Bash(ruff check:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git remote:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
