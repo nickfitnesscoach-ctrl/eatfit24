@@ -82,9 +82,11 @@ def yookassa_webhook(request):
 
     # 2️⃣ Парсинг JSON
     try:
-        payload: Dict[str, Any] = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        logger.error("Invalid JSON payload from YooKassa")
+        body_str = request.body.decode("utf-8")
+        logger.debug(f"[WEBHOOK] Raw body (first 500 chars): {body_str[:500]}")
+        payload: Dict[str, Any] = json.loads(body_str)
+    except Exception as e:
+        logger.error(f"Invalid JSON payload from YooKassa: {type(e).__name__}: {e}. Body length: {len(request.body)}")
         return JsonResponse(
             {"error": "invalid_json"},
             status=400
