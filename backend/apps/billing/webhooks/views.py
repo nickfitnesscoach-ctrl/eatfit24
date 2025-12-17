@@ -160,31 +160,74 @@ def yookassa_webhook(request):
 # helpers (локальные, не бизнес-логика)
 # ---------------------------------------------------------------------
 
+def _is_trusted_proxy(ip: str) -> bool:
+    """
+    Проверяет, является ли IP адрес доверенным прокси (nginx, docker gateway).
+
+    Поддерживает:
+    - Одиночные IP: "127.0.0.1"
+    - CIDR подсети: "172.23.0.0/16"
+    """
+    import ipaddress
+
+    trusted_proxies = getattr(settings, "WEBHOOK_TRUSTED_PROXIES", ["127.0.0.1"])
+
+    try:
+        ip_obj = ipaddress.ip_address(ip)
+        for proxy in trusted_proxies:
+            try:
+                # Проверяем CIDR подсеть
+                if "/" in proxy:
+                    network = ipaddress.ip_network(proxy, strict=False)
+                    if ip_obj in network:
+                        return True
+                # Проверяем точное совпадение IP
+                elif ip == proxy:
+                    return True
+            except ValueError:
+                logger.warning(f"[WEBHOOK_SECURITY] Invalid proxy IP/CIDR: {proxy}")
+                continue
+    except ValueError:
+        logger.warning(f"[WEBHOOK_SECURITY] Invalid IP address: {ip}")
+        return False
+
+    return False
+
+
 def _get_client_ip_secure(request: HttpRequest) -> str | None:
     """
     Безопасное извлечение IP клиента.
 
-    [SECURITY FIX 2024-12]:
+    [SECURITY FIX 2024-12-17]:
     По умолчанию НЕ доверяем X-Forwarded-For, так как его можно подделать.
     Используем XFF только если:
     - settings.WEBHOOK_TRUST_XFF == True (явно включено)
-    - И сервер за доверенным reverse proxy (Nginx/Cloudflare)
+    - И REMOTE_ADDR принадлежит доверенным прокси (settings.WEBHOOK_TRUSTED_PROXIES)
 
     Если WEBHOOK_TRUST_XFF=False (default) → используем только REMOTE_ADDR.
     """
+    remote_addr = request.META.get("REMOTE_ADDR", "")
     trust_xff = getattr(settings, "WEBHOOK_TRUST_XFF", False)
 
     if trust_xff:
-        # Доверенный прокси: берём первый IP из XFF
-        xff = request.META.get("HTTP_X_FORWARDED_FOR")
-        if xff:
-            real_ip = xff.split(",")[0].strip()
-            logger.debug(f"[WEBHOOK] Using X-Forwarded-For IP: {real_ip}")
-            return real_ip
+        # Проверяем, что запрос пришёл от доверенного прокси
+        if not _is_trusted_proxy(remote_addr):
+            logger.warning(
+                f"[WEBHOOK_SECURITY] X-Forwarded-For ignored: REMOTE_ADDR={remote_addr} "
+                f"not in trusted proxies list"
+            )
+        else:
+            # Доверенный прокси: берём первый IP из XFF
+            xff = request.META.get("HTTP_X_FORWARDED_FOR")
+            if xff:
+                real_ip = xff.split(",")[0].strip()
+                logger.info(
+                    f"[WEBHOOK] Using X-Forwarded-For IP: {real_ip} "
+                    f"(from trusted proxy {remote_addr})"
+                )
+                return real_ip
 
     # По умолчанию или если XFF отсутствует: используем REMOTE_ADDR
-    remote_addr = request.META.get("REMOTE_ADDR")
-
     # Логируем, если XFF присутствует, но мы его игнорируем
     if not trust_xff and request.META.get("HTTP_X_FORWARDED_FOR"):
         logger.warning(

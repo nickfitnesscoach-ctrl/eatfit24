@@ -597,6 +597,15 @@ YOOKASSA_WEBHOOK_SECRET = os.environ.get("YOOKASSA_WEBHOOK_SECRET", "")
 # По умолчанию False — безопаснее, используем REMOTE_ADDR.
 WEBHOOK_TRUST_XFF = os.environ.get("WEBHOOK_TRUST_XFF", "false").lower() == "true"
 
+# Список доверенных прокси (nginx, docker gateway), которым разрешено передавать X-Forwarded-For
+# Формат: comma-separated list IP адресов или CIDR подсетей
+# Пример: "127.0.0.1,172.23.0.0/16"
+WEBHOOK_TRUSTED_PROXIES = [
+    ip.strip()
+    for ip in os.environ.get("WEBHOOK_TRUSTED_PROXIES", "127.0.0.1,172.23.0.0/16").split(",")
+    if ip.strip()
+]
+
 # [SECURITY 2024-12] Allowed return_url domains for payments
 # Защита от open redirect: разрешаем redirect только на эти домены.
 ALLOWED_RETURN_URL_DOMAINS = [
