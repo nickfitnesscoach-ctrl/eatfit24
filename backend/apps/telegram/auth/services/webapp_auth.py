@@ -105,26 +105,23 @@ class TelegramWebAppAuthService:
         try:
             parsed, received_hash = self._parse_init_data(raw_init_data)
             if not received_hash:
-                logger.warning("[DEBUG-VALIDATION] No hash found in initData")
                 return None
 
             auth_date = self._extract_auth_date(parsed)
             if auth_date is None:
-                logger.warning("[DEBUG-VALIDATION] No auth_date found")
                 return None
 
             if not self._check_ttl(auth_date, max_age_seconds=max_age_seconds):
-                logger.warning("[DEBUG-VALIDATION] TTL check failed")
                 return None
 
             data_check_string = self._build_data_check_string(parsed)
             calculated_hash = self._calculate_hash(data_check_string)
 
             if not hmac.compare_digest(calculated_hash, received_hash):
-                logger.warning("[DEBUG-VALIDATION] Hash mismatch - signature validation failed")
+                # Не пишем calculated/received в лог (это лишнее)
+                logger.warning("[WebAppAuth] Hash mismatch")
                 return None
 
-            logger.warning("[DEBUG-VALIDATION] initData validation SUCCESS")
             return ValidationResult(parsed=parsed, auth_date=auth_date)
 
         except Exception:

@@ -224,18 +224,12 @@ class TelegramWebAppAuthentication(authentication.BaseAuthentication):
         if not init_data and request.method in {"POST", "PUT", "PATCH"}:
             init_data = (request.data.get("initData") or request.data.get("init_data") or "").strip()
 
-        # TEMPORARY DEBUG LOGGING
-        logger.warning(f"[DEBUG-AUTH] Path: {request.path}, Method: {request.method}")
-        logger.warning(f"[DEBUG-AUTH] initData present: {bool(init_data)}, length: {len(init_data) if init_data else 0}")
-
         if not init_data:
-            logger.warning("[DEBUG-AUTH] No initData found, returning None")
             return None
 
         auth_service = get_webapp_auth_service()
         parsed = auth_service.validate_init_data(init_data)
         if not parsed:
-            logger.warning("[DEBUG-AUTH] initData validation FAILED")
             raise exceptions.AuthenticationFailed("Invalid Telegram initData signature")
 
         user_data = auth_service.get_user_data_from_init_data(parsed)
