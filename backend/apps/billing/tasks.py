@@ -7,5 +7,7 @@ It imports all tasks from submodules (webhooks, etc.)
 
 # Import webhook tasks so Celery can discover them
 from apps.billing.webhooks.tasks import process_yookassa_webhook  # noqa: F401
+from apps.billing.webhooks.tasks import retry_stuck_webhooks  # noqa: F401
 
-__all__ = ["process_yookassa_webhook"]
+__all__ = ["process_yookassa_webhook", "retry_stuck_webhooks"]
+
