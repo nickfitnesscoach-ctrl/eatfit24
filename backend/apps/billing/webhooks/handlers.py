@@ -83,9 +83,11 @@ def _handle_payment_succeeded(payload: Dict[str, Any]) -> None:
         raise ValueError("payment.succeeded payload has no object.id")
 
     with transaction.atomic():
+        # IMPORTANT: do NOT select_related("subscription") here.
+        # subscription is nullable -> LEFT OUTER JOIN -> PostgreSQL forbids FOR UPDATE on nullable side.
         payment = (
             Payment.objects.select_for_update()
-            .select_related("user", "plan", "subscription")
+            .select_related("user", "plan")
             .get(yookassa_payment_id=yk_payment_id)
         )
 
