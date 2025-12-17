@@ -23,8 +23,6 @@ Webhook endpoint для YooKassa.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from typing import Any, Dict
 
@@ -34,6 +32,7 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.exceptions import ParseError
 from rest_framework.permissions import AllowAny
 
 from apps.billing.models import WebhookLog
@@ -43,109 +42,6 @@ from .handlers import handle_yookassa_event
 from .utils import is_ip_allowed
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_webhook_body(request: HttpRequest) -> tuple[Dict[str, Any] | None, JsonResponse | None]:
-    """
-    Безопасный парсинг webhook body с подробным логированием.
-
-    Returns:
-        (payload, error_response)
-        - Если успешно: (parsed_dict, None)
-        - Если ошибка: (None, JsonResponse с 400)
-
-    Обрабатывает:
-    - Пустое body
-    - BOM (UTF-8-SIG)
-    - Некорректная кодировка
-    - Невалидный JSON
-    - Неподдерживаемый Content-Type
-    """
-    # Метаданные запроса для безопасного логирования
-    content_type = request.META.get("CONTENT_TYPE", "")
-    content_length = len(request.body)
-
-    # SHA256 хеш для идентификации дубликатов (без раскрытия содержимого)
-    body_hash = hashlib.sha256(request.body).hexdigest()[:16]
-
-    logger.info(
-        f"[WEBHOOK_BODY] "
-        f"Content-Type={content_type}, "
-        f"Length={content_length}, "
-        f"SHA256={body_hash}"
-    )
-
-    # 1. Проверка: пустое body
-    if content_length == 0:
-        logger.error("[WEBHOOK_ERROR] EMPTY_BODY: Request body is empty")
-        return None, JsonResponse(
-            {"error": "EMPTY_BODY", "message": "Request body cannot be empty"},
-            status=400
-        )
-
-    # 2. Проверка Content-Type (опционально, но рекомендуется)
-    if content_type and "application/json" not in content_type.lower():
-        logger.warning(
-            f"[WEBHOOK_WARNING] Unexpected Content-Type: {content_type}. "
-            f"Expected application/json"
-        )
-
-    # 3. Декодирование с поддержкой BOM (utf-8-sig)
-    try:
-        # utf-8-sig автоматически удаляет BOM (Byte Order Mark) если он есть
-        body_str = request.body.decode("utf-8-sig")
-    except UnicodeDecodeError as e:
-        logger.error(
-            f"[WEBHOOK_ERROR] BAD_ENCODING: Failed to decode body as UTF-8: {e}. "
-            f"Length={content_length}, Hash={body_hash}"
-        )
-        return None, JsonResponse(
-            {"error": "BAD_ENCODING", "message": "Body must be valid UTF-8"},
-            status=400
-        )
-
-    # 4. Логирование snippet (первые 200 символов) для debugging
-    snippet = body_str[:200]
-    if len(body_str) > 200:
-        snippet += "..."
-    logger.debug(f"[WEBHOOK_SNIPPET] {snippet}")
-
-    # 5. Парсинг JSON
-    try:
-        payload = json.loads(body_str)
-    except json.JSONDecodeError as e:
-        logger.error(
-            f"[WEBHOOK_ERROR] INVALID_JSON: {e}. "
-            f"Line={e.lineno}, Column={e.colno}, "
-            f"Length={content_length}, Hash={body_hash}, "
-            f"Snippet={snippet[:100]}"
-        )
-        return None, JsonResponse(
-            {
-                "error": "INVALID_JSON",
-                "message": f"Invalid JSON: {e.msg}",
-                "line": e.lineno,
-                "column": e.colno
-            },
-            status=400
-        )
-
-    # 6. Проверка что результат - dictionary
-    if not isinstance(payload, dict):
-        logger.error(
-            f"[WEBHOOK_ERROR] NOT_OBJECT: Parsed JSON is not an object. "
-            f"Type={type(payload).__name__}, Hash={body_hash}"
-        )
-        return None, JsonResponse(
-            {
-                "error": "NOT_OBJECT",
-                "message": f"Expected JSON object, got {type(payload).__name__}"
-            },
-            status=400
-        )
-
-    logger.info(f"[WEBHOOK_PARSED] Successfully parsed payload with {len(payload)} keys")
-    return payload, None
 
 
 @csrf_exempt
@@ -184,23 +80,74 @@ def yookassa_webhook(request):
             status=403
         )
 
-    # 2️⃣ Парсинг JSON (безопасный парсер с детальными ошибками)
-    payload, error_response = _parse_webhook_body(request)
-    if error_response is not None:
-        return error_response
+    # 2️⃣ Парсинг JSON через DRF request.data
+    content_type = request.META.get("CONTENT_TYPE", "")
+    logger.info(f"[WEBHOOK] Content-Type={content_type}")
 
+    try:
+        # DRF автоматически парсит JSON и кладёт в request.data
+        payload = request.data
+
+        # Проверяем что payload это dict
+        if not isinstance(payload, dict):
+            logger.error(
+                f"[WEBHOOK_ERROR] Payload is not a dict, got {type(payload).__name__}"
+            )
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "INVALID_JSON",
+                        "message": f"Expected JSON object, got {type(payload).__name__}"
+                    }
+                },
+                status=400
+            )
+
+        logger.info(f"[WEBHOOK] Payload parsed OK, type=dict, keys={len(payload)}")
+
+    except ParseError as e:
+        # DRF выбрасывает ParseError если JSON невалиден
+        logger.error(f"[WEBHOOK_ERROR] JSON parse failed: {str(e)}")
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "INVALID_JSON",
+                    "message": "Invalid JSON payload"
+                }
+            },
+            status=400
+        )
+    except Exception as e:
+        # Любая другая ошибка парсинга
+        logger.error(f"[WEBHOOK_ERROR] Unexpected parse error: {str(e)}", exc_info=True)
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "INVALID_JSON",
+                    "message": "Invalid JSON payload"
+                }
+            },
+            status=400
+        )
+
+    # 3️⃣ Валидация структуры payload
     event_type = payload.get("event")
     event_object = payload.get("object", {})
     event_id = event_object.get("id")  # payment_id или refund_id
 
     if not event_type or not event_id:
-        logger.error(f"Malformed webhook payload: {payload}")
+        logger.error(f"[WEBHOOK_ERROR] Malformed payload: missing event or event_id")
         return JsonResponse(
-            {"error": "invalid_payload"},
+            {
+                "error": {
+                    "code": "INVALID_PAYLOAD",
+                    "message": "Missing required fields: event, object.id"
+                }
+            },
             status=400
         )
 
-    # 3️⃣ Идемпотентность по event_id
+    # 4️⃣ Идемпотентность по event_id
     # Один webhook от YooKassa = один WebhookLog
     with transaction.atomic():
         webhook_log, created = WebhookLog.objects.select_for_update().get_or_create(
