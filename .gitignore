@@ -84,7 +84,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.admin-credentials.txt
+admin-credentials.txt
 
 # Separate repositories (not tracked in main repo)
 eatfit24-ai-proxy/
