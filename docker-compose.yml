@@ -111,12 +111,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     entrypoint: []
-    command:
-      - /bin/sh
-      - -c
-      - |
-        python manage.py migrate --noinput
-        celery -A config worker -l info -Q ai,billing,default --concurrency=4 --soft-time-limit=120 --time-limit=150
+    # P2-DEP-04: Removed migrate to avoid race condition with backend
+    # Backend container handles migrations via entrypoint.sh
+    command: celery -A config worker -l info -Q ai,billing,default --concurrency=4 --soft-time-limit=120 --time-limit=150
     volumes:
       - ./backend/logs:/app/logs
       - ./backend/media:/app/media
