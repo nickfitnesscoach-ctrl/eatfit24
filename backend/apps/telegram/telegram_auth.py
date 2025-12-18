@@ -115,6 +115,41 @@ def _is_telegram_admin(request) -> bool:
     setattr(request, _REQ_CACHE_FLAG, True)
 
     raw_init_data = _get_init_data_from_request(request)
+    
+    # [DEV] Debug Mode Bypass
+    # Если включен режим отладки и пришел заголовок X-Debug-Mode = true
+    if getattr(settings, "DEBUG_MODE_ENABLED", False):
+        is_debug = request.headers.get("X-Debug-Mode") == "true"
+        if not is_debug:
+            # Fallback for Django META (sometimes headers are there)
+            is_debug = request.META.get("HTTP_X_DEBUG_MODE") == "true"
+            
+        if is_debug:
+            # В дебаге берем ID из заголовка или дефолтный 999999999
+            try:
+                debug_id = int(request.headers.get("X-Telegram-User-Id", 999999999))
+            except (ValueError, TypeError):
+                debug_id = 999999999
+                
+            admins = _parse_telegram_admins()
+            allowed = debug_id in admins
+            
+            # [DEBUG LOG]
+            logger.warning(f"DEBUG AUTH CHECK: ID={debug_id}, Allowed={allowed}, Admins={admins}")
+            
+            if allowed:
+                # Mock objects for view usage
+                request.telegram_init_data = {"user": {"id": debug_id}, "auth_date": 0}
+                request.telegram_user_id = debug_id
+            
+            setattr(request, _REQ_CACHE_ALLOWED, allowed)
+            return allowed
+        else:
+             logger.warning(f"DEBUG AUTH FAIL: X-Debug-Mode header missing or false. Headers: {request.headers}")
+    else:
+         pass
+         # logger.warning("DEBUG AUTH SKIPPED: DEBUG_MODE_ENABLED is False")
+
     if not raw_init_data:
         setattr(request, _REQ_CACHE_ALLOWED, False)
         return False
