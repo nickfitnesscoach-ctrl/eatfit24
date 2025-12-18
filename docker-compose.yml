@@ -133,6 +133,8 @@ services:
       - AI_ASYNC_ENABLED=${AI_ASYNC_ENABLED:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - DEBUG_MODE_ENABLED=${DEBUG_MODE_ENABLED:-False}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
     depends_on:
       db:
         condition: service_healthy
