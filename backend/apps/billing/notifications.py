@@ -92,7 +92,27 @@ def send_pro_subscription_notification(
     # Извлекаем данные для карточки
     tg_id = profile.telegram_id if profile else None
     tg_username = profile.telegram_username if profile else None
-    full_name = profile.full_name if profile and profile.full_name else subscription.user.username
+    
+    # Fallback: если telegram_id пустой, пробуем извлечь из username (формат tg_XXXXXXXX)
+    username = subscription.user.username or ""
+    if not tg_id and username.startswith("tg_"):
+        try:
+            tg_id = int(username[3:])  # Извлекаем число после "tg_"
+        except (ValueError, IndexError):
+            pass
+    
+    # Для имени: приоритет full_name, затем first_name, иначе "Пользователь"
+    # НЕ показываем tg_XXXXXX как имя
+    full_name = None
+    if profile and profile.full_name:
+        full_name = profile.full_name
+    elif subscription.user.first_name:
+        full_name = subscription.user.first_name
+    elif not username.startswith("tg_"):
+        full_name = username
+    
+    if not full_name:
+        full_name = "Пользователь"
 
     # Дата окончания подписки
     end_date_str = _format_date(subscription.end_date)
