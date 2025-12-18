@@ -143,3 +143,128 @@ def retry_stuck_webhooks():
 
     logger.info("[WEBHOOK_RECOVERY] requeued %s stuck webhooks", count)
 
+
+def _send_telegram_alert(message: str) -> bool:
+    """
+    Отправка алерта в Telegram админам.
+    
+    Используем HTTP API напрямую, чтобы не зависеть от bot модуля.
+    """
+    import requests
+    from django.conf import settings
+    
+    bot_token = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
+    admin_ids = getattr(settings, "TELEGRAM_ADMINS", set())
+    
+    if not bot_token or not admin_ids:
+        logger.warning("[TELEGRAM_ALERT] bot_token or admin_ids not configured")
+        return False
+    
+    # TELEGRAM_ADMINS может быть строкой с ID через запятую или set/list
+    if isinstance(admin_ids, str):
+        admin_ids = [x.strip() for x in admin_ids.split(",") if x.strip()]
+    
+    success = False
+    for admin_id in admin_ids:
+        try:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            resp = requests.post(
+                url,
+                json={
+                    "chat_id": admin_id,
+                    "text": message,
+                    "parse_mode": "HTML",
+                },
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                success = True
+            else:
+                logger.error("[TELEGRAM_ALERT] failed to send to %s: %s", admin_id, resp.text)
+        except Exception as e:
+            logger.error("[TELEGRAM_ALERT] error sending to %s: %s", admin_id, e)
+    
+    return success
+
+
+@shared_task(queue='billing')
+def alert_failed_webhooks():
+    """
+    P2-WH-02: Alerting для FAILED webhooks.
+    
+    Находит FAILED webhooks за последний час и отправляет alert админам.
+    Рекомендуется запускать через Celery Beat каждые 15 минут.
+    """
+    from datetime import timedelta
+    
+    since = timezone.now() - timedelta(hours=1)
+    
+    failed = WebhookLog.objects.filter(
+        status="FAILED",
+        processed_at__gte=since
+    )
+    
+    count = failed.count()
+    if count == 0:
+        logger.info("[WEBHOOK_ALERT] no failed webhooks in last hour")
+        return
+    
+    # Собираем детали для алерта
+    details = []
+    for log in failed[:5]:  # Максимум 5 примеров
+        details.append(f"• {log.event_type}: {log.error_message[:100] if log.error_message else 'no message'}")
+    
+    message = (
+        f"🚨 <b>BILLING ALERT</b>\n\n"
+        f"⚠️ {count} failed webhooks за последний час!\n\n"
+        f"Примеры:\n" + "\n".join(details) + "\n\n"
+        f"Проверьте логи: <code>docker logs eatfit24-celery-worker-1</code>"
+    )
+    
+    _send_telegram_alert(message)
+    logger.warning("[WEBHOOK_ALERT] sent alert for %s failed webhooks", count)
+
+
+@shared_task(queue='billing')
+def cleanup_pending_payments():
+    """
+    P2-PL-01: Cleanup для PENDING платежей старше 24 часов.
+    
+    PENDING платежи, которые не получили webhook более 24 часов,
+    считаются "мёртвыми" и переводятся в CANCELED.
+    
+    Рекомендуется запускать через Celery Beat раз в час.
+    """
+    from datetime import timedelta
+    from apps.billing.models import Payment
+    
+    threshold = timezone.now() - timedelta(hours=24)
+    
+    old_pending = Payment.objects.filter(
+        status="PENDING",
+        created_at__lt=threshold
+    )
+    
+    count = old_pending.count()
+    if count == 0:
+        logger.info("[PAYMENT_CLEANUP] no stuck pending payments found")
+        return
+    
+    # Обновляем статус
+    updated = old_pending.update(
+        status="CANCELED",
+        error_message="Auto-canceled: no webhook received within 24 hours"
+    )
+    
+    logger.warning("[PAYMENT_CLEANUP] canceled %s stuck pending payments", updated)
+    
+    # Отправляем алерт если много
+    if updated >= 3:
+        message = (
+            f"⚠️ <b>BILLING CLEANUP</b>\n\n"
+            f"Отменено {updated} PENDING платежей (старше 24ч)\n\n"
+            f"Возможно, webhooks не доходят!"
+        )
+        _send_telegram_alert(message)
+
+
