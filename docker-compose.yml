@@ -20,7 +20,7 @@ services:
     networks:
       - backend-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eatfit24} -d ${POSTGRES_DB:-eatfit24}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eatfit24} -d ${POSTGRES_DB:-eatfit24}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,7 +40,7 @@ services:
     # volatile-lru only evicts keys with TTL set, preserving task results
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -99,7 +99,7 @@ services:
       - backend-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -111,7 +111,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     entrypoint: []
-    command: 
+    command:
       - /bin/sh
       - -c
       - |
@@ -145,11 +145,41 @@ services:
       - backend-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      test: [ "CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Celery Beat (periodic task scheduler)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    entrypoint: []
+    command: celery -A config beat -l info
+    volumes:
+      - ./backend/logs:/app/logs
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
+      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=${SECRET_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-net
+    restart: unless-stopped
 
   # Telegram Bot
   bot:
@@ -199,7 +229,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:80/" ]
       interval: 30s
       timeout: 10s
       retries: 3
