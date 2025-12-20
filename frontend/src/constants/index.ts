@@ -30,30 +30,9 @@ export const PLAN_CODES = {
     FREE: 'FREE',
     PRO_MONTHLY: 'PRO_MONTHLY',
     PRO_YEARLY: 'PRO_YEARLY',
-    // Legacy codes (for backward compatibility)
-    MONTHLY: 'MONTHLY',
-    YEARLY: 'YEARLY',
 } as const;
 
 export type PlanCode = typeof PLAN_CODES[keyof typeof PLAN_CODES];
-
-/**
- * Normalize plan code to new format
- */
-export function normalizePlanCode(code: string): 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY' {
-    const normalized = code.toUpperCase();
-    
-    // Legacy mapping
-    if (normalized === 'MONTHLY') return 'PRO_MONTHLY';
-    if (normalized === 'YEARLY') return 'PRO_YEARLY';
-    
-    // Valid codes
-    if (['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'].includes(normalized)) {
-        return normalized as 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY';
-    }
-    
-    return 'FREE';
-}
 
 // ============================================================
 // API Error Codes (from backend)
@@ -69,12 +48,12 @@ export const API_ERROR_CODES = {
     AI_EMPTY_RESULT: 'AI_EMPTY_RESULT',
     INVALID_IMAGE: 'INVALID_IMAGE',
     TASK_ERROR: 'TASK_ERROR',
-    
+
     // Auth
     UNAUTHORIZED: 'UNAUTHORIZED',
     FORBIDDEN: 'FORBIDDEN',
     TELEGRAM_INVALID: 'TELEGRAM_INVALID',
-    
+
     // Billing (new codes from backend)
     NO_SUBSCRIPTION: 'NO_SUBSCRIPTION',
     INVALID_PLAN: 'INVALID_PLAN',
@@ -82,7 +61,7 @@ export const API_ERROR_CODES = {
     NO_PAYMENT_METHOD: 'NO_PAYMENT_METHOD',
     NOT_AVAILABLE_FOR_FREE: 'NOT_AVAILABLE_FOR_FREE',
     ACTIVE_SUBSCRIPTION: 'ACTIVE_SUBSCRIPTION',
-    
+
     // General
     NOT_FOUND: 'NOT_FOUND',
     VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -109,12 +88,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
     [API_ERROR_CODES.AI_EMPTY_RESULT]: 'Ошибка обработки. Попробуйте ещё раз.',
     [API_ERROR_CODES.INVALID_IMAGE]: 'Неверный формат изображения. Используйте JPEG или PNG.',
     [API_ERROR_CODES.TASK_ERROR]: 'Ошибка обработки задачи',
-    
+
     // Auth errors
     [API_ERROR_CODES.UNAUTHORIZED]: 'Сессия истекла. Откройте приложение заново.',
     [API_ERROR_CODES.FORBIDDEN]: 'Доступ запрещён',
     [API_ERROR_CODES.TELEGRAM_INVALID]: 'Ошибка авторизации Telegram',
-    
+
     // Billing errors
     [API_ERROR_CODES.NO_SUBSCRIPTION]: 'Подписка не найдена',
     [API_ERROR_CODES.INVALID_PLAN]: 'Выбранный тариф недоступен',
@@ -122,7 +101,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     [API_ERROR_CODES.NO_PAYMENT_METHOD]: 'Привяжите карту для включения автопродления.',
     [API_ERROR_CODES.NOT_AVAILABLE_FOR_FREE]: 'Эта функция доступна только в PRO подписке.',
     [API_ERROR_CODES.ACTIVE_SUBSCRIPTION]: 'У вас уже есть активная подписка.',
-    
+
     // General errors
     [API_ERROR_CODES.NOT_FOUND]: 'Данные не найдены',
     [API_ERROR_CODES.VALIDATION_ERROR]: 'Некорректные данные',
@@ -131,7 +110,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     [API_ERROR_CODES.NETWORK_ERROR]: 'Ошибка сети. Проверьте интернет-соединение.',
     [API_ERROR_CODES.TIMEOUT]: 'Превышено время ожидания. Проверьте интернет-соединение.',
     [API_ERROR_CODES.UNKNOWN_ERROR]: 'Произошла неизвестная ошибка',
-    
+
     // Common English errors from backend (for partial matching)
     'No food items recognized': 'Мы не смогли распознать еду на фото. Попробуйте сделать фото крупнее.',
     'Meal not found': 'Приём пищи не найден',
@@ -141,7 +120,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     'Failed to fetch': 'Не удалось соединиться с сервером',
     'Unauthorized': 'Требуется авторизация',
     'Forbidden': 'Доступ запрещён',
-    
+
     // Default
     'default': 'Произошла ошибка. Попробуйте ещё раз.',
 };
@@ -153,12 +132,12 @@ export function getErrorMessage(errorCode: string | undefined, fallback?: string
     if (!errorCode) {
         return fallback || ERROR_MESSAGES['default'];
     }
-    
+
     // Пробуем найти точное совпадение
     if (ERROR_MESSAGES[errorCode]) {
         return ERROR_MESSAGES[errorCode];
     }
-    
+
     // Пробуем найти частичное совпадение (для длинных сообщений)
     const lowerCode = errorCode.toLowerCase();
     for (const [key, message] of Object.entries(ERROR_MESSAGES)) {
@@ -166,7 +145,7 @@ export function getErrorMessage(errorCode: string | undefined, fallback?: string
             return message;
         }
     }
-    
+
     return fallback || errorCode || ERROR_MESSAGES['default'];
 }
 

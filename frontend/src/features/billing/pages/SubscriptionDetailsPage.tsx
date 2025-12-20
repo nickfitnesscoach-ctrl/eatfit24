@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import PageHeader from '../components/PageHeader';
+import PageHeader from '../../../components/PageHeader';
 import AdminTestPaymentCard from '../components/billing/AdminTestPaymentCard';
 import { useSubscriptionDetails } from '../hooks/useSubscriptionDetails';
 
@@ -47,14 +47,12 @@ const SubscriptionDetailsPage: React.FC = () => {
                             <button
                                 onClick={handleToggleAutoRenew}
                                 disabled={togglingAutoRenew || !autoRenewAvailable}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                                    autoRenewEnabled ? 'bg-green-500' : 'bg-gray-200'
-                                } ${(!autoRenewAvailable || togglingAutoRenew) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${autoRenewEnabled ? 'bg-green-500' : 'bg-gray-200'
+                                    } ${(!autoRenewAvailable || togglingAutoRenew) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                        autoRenewEnabled ? 'translate-x-6' : 'translate-x-1'
-                                    }`}
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoRenewEnabled ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
                                 />
                             </button>
                         </div>

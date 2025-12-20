@@ -15,15 +15,14 @@ import Layout from './features/trainer-panel/components/Layout';
 import ClientLayout from './components/ClientLayout';
 import ClientDashboard from './pages/ClientDashboard';
 import FoodLogPage from './pages/FoodLogPage';
-import SubscriptionPage from './pages/SubscriptionPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
-import SubscriptionDetailsPage from './pages/SubscriptionDetailsPage';
-import PaymentHistoryPage from './pages/PaymentHistoryPage';
 import SubscribersPage from './features/trainer-panel/pages/SubscribersPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineIndicator from './components/OfflineIndicator';
 import MealDetailsPage from './pages/MealDetailsPage';
+// Billing feature module
+import { SubscriptionPage, SubscriptionDetailsPage, PaymentHistoryPage } from './features/billing';
 function App() {
   const [isReady, setIsReady] = useState(false);
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plan } from '../components/PlanCard';
-import { api } from '../services/api';
-import { IS_DEV } from '../config/env';
+import type { Plan } from '../components/PlanCard';
+import { api } from '../../../services/api';
+import { IS_DEV } from '../../../config/env';
+import { mockSubscriptionPlans } from '../__mocks__/plans';
 
 interface UseSubscriptionPlansResult {
     plans: Plan[];
@@ -19,49 +20,9 @@ export const useSubscriptionPlans = (): UseSubscriptionPlansResult => {
             try {
                 setLoading(true);
 
-                // DEV MODE: Mock subscription plans for testing UI
-                const mockApiPlans = [
-                    {
-                        code: 'FREE',
-                        display_name: 'Базовый',
-                        price: 0,
-                        old_price: null,
-                        is_popular: false,
-                        features: [
-                            '3 анализа еды в день',
-                            'Базовая статистика',
-                            'Дневник питания'
-                        ]
-                    },
-                    {
-                        code: 'PRO_MONTHLY',
-                        display_name: 'PRO месяц',
-                        price: 299,
-                        old_price: 499,
-                        is_popular: true,
-                        features: [
-                            'Безлимитные анализы еды',
-                            'Персональные рекомендации',
-                            'Подробная статистика',
-                            'Приоритетная поддержка'
-                        ]
-                    },
-                    {
-                        code: 'PRO_YEARLY',
-                        display_name: 'PRO год',
-                        price: 2990,
-                        old_price: 4990,
-                        is_popular: false,
-                        features: [
-                            'Все возможности PRO',
-                            'Экономия 17%',
-                            'Безлимитные анализы еды',
-                            'Персональные рекомендации'
-                        ]
-                    }
-                ];
+                // DEV MODE: Use mock plans from separate file
+                const apiPlans = IS_DEV ? mockSubscriptionPlans : await api.getSubscriptionPlans();
 
-                const apiPlans = IS_DEV ? mockApiPlans : await api.getSubscriptionPlans();
                 const uiPlans: Plan[] = apiPlans
                     .filter(p => ['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'].includes(p.code))
                     .map(p => {

@@ -1,15 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import PlanCard from '../components/PlanCard';
-import { useBilling } from '../contexts/BillingContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useBilling } from '../../../contexts/BillingContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
+import { useTelegramWebApp } from '../../../hooks/useTelegramWebApp';
 import { useSubscriptionPlans } from '../hooks/useSubscriptionPlans';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { useSubscriptionActions } from '../hooks/useSubscriptionActions';
 import { SubscriptionHeader } from '../components/subscription/SubscriptionHeader';
-import { buildPlanCardState } from '../utils/buildPlanCardState';
+import { buildPlanCardState } from '../utils/planCardState';
 
 const SubscriptionPage: React.FC = () => {
     const billing = useBilling();

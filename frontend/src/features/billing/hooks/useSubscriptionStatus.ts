@@ -1,4 +1,5 @@
-import { SubscriptionDetails } from '../types/billing';
+import type { SubscriptionDetails } from '../../../types/billing';
+import { formatDate } from '../utils/date';
 
 interface SubscriptionStatus {
     isPro: boolean;
@@ -7,15 +8,6 @@ interface SubscriptionStatus {
     headerTitle: string;
     headerSubtitle: string;
 }
-
-const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'numeric',
-        year: 'numeric'
-    });
-};
 
 export const useSubscriptionStatus = (subscription: SubscriptionDetails | null): SubscriptionStatus => {
     const isPro = subscription?.plan === 'pro' && subscription?.is_active;

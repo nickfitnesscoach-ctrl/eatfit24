@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { PlanId, Plan } from '../components/PlanCard';
-import { api } from '../services/api';
-import { useBilling } from '../contexts/BillingContext';
+import { useState, useRef } from 'react';
+import type { PlanId, Plan } from '../components/PlanCard';
+import { api } from '../../../services/api';
+import { useBilling } from '../../../contexts/BillingContext';
+import { showToast } from '../utils/notify';
 
 interface UseSubscriptionActionsParams {
     plans: Plan[];
@@ -20,6 +21,7 @@ interface UseSubscriptionActionsResult {
 /**
  * Hook for managing subscription actions (payments, auto-renew, card binding)
  * Encapsulates all payment-related business logic for reusability across components
+ * Includes anti-double-click protection via in-flight request tracking
  */
 export const useSubscriptionActions = ({
     plans,
@@ -30,23 +32,20 @@ export const useSubscriptionActions = ({
     const [loadingPlanId, setLoadingPlanId] = useState<PlanId | null>(null);
     const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
 
-    /**
-     * Show toast notification using Telegram WebApp API or browser alert
-     */
-    const showToast = (message: string) => {
-        const tg = window.Telegram?.WebApp;
-        if (tg?.showAlert) {
-            tg.showAlert(message);
-        } else {
-            alert(message);
-        }
-    };
+    // In-flight request lock to prevent double-clicks
+    const inFlightRef = useRef<Set<string>>(new Set());
 
     /**
      * Handle plan selection and payment flow
+     * Protected against double-click via in-flight lock
      */
     const handleSelectPlan = async (planId: PlanId) => {
-        if (loadingPlanId) return;
+        const lockKey = `payment-${planId}`;
+
+        // Check both loading state and in-flight lock
+        if (loadingPlanId || inFlightRef.current.has(lockKey)) {
+            return;
+        }
 
         // Block payments in browser debug mode
         if (isBrowserDebug || webAppBrowserDebug) {
@@ -55,6 +54,9 @@ export const useSubscriptionActions = ({
         }
 
         const isTMA = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData;
+
+        // Acquire lock
+        inFlightRef.current.add(lockKey);
 
         try {
             setLoadingPlanId(planId);
@@ -77,15 +79,25 @@ export const useSubscriptionActions = ({
             const errorMessage = error instanceof Error ? error.message : "Ошибка при оформлении подписки";
             showToast(errorMessage);
         } finally {
+            // Release lock
+            inFlightRef.current.delete(lockKey);
             setLoadingPlanId(null);
         }
     };
 
     /**
      * Toggle auto-renew for subscription
+     * Protected against double-click
      */
     const handleToggleAutoRenew = async () => {
-        if (togglingAutoRenew) return;
+        const lockKey = 'toggle-autorenew';
+
+        if (togglingAutoRenew || inFlightRef.current.has(lockKey)) {
+            return;
+        }
+
+        inFlightRef.current.add(lockKey);
+
         try {
             setTogglingAutoRenew(true);
             await billing.toggleAutoRenew(true);
@@ -93,15 +105,24 @@ export const useSubscriptionActions = ({
         } catch (error) {
             showToast("Не удалось изменить настройки автопродления");
         } finally {
+            inFlightRef.current.delete(lockKey);
             setTogglingAutoRenew(false);
         }
     };
 
     /**
      * Add payment method (bind card)
+     * Protected against double-click
      */
     const handleAddCard = async () => {
-        if (togglingAutoRenew) return;
+        const lockKey = 'bind-card';
+
+        if (togglingAutoRenew || inFlightRef.current.has(lockKey)) {
+            return;
+        }
+
+        inFlightRef.current.add(lockKey);
+
         try {
             setTogglingAutoRenew(true);
             await billing.addPaymentMethod();
@@ -115,6 +136,7 @@ export const useSubscriptionActions = ({
             }
             showToast(errorMessage);
         } finally {
+            inFlightRef.current.delete(lockKey);
             setTogglingAutoRenew(false);
         }
     };

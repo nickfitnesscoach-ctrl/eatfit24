@@ -1,7 +1,8 @@
 import React from 'react';
-import { Plan, PlanId } from '../components/PlanCard';
+import type { Plan, PlanId } from '../components/PlanCard';
 import { Loader2 } from 'lucide-react';
-import { SubscriptionDetails, BillingMe } from '../types/billing';
+import type { SubscriptionDetails, BillingMe } from '../../../types/billing';
+import { formatDate } from './date';
 
 interface BillingContextData {
     subscription: SubscriptionDetails | null;
@@ -30,15 +31,6 @@ interface BuildPlanCardStateParams {
     navigate: (path: string) => void;
 }
 
-const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'numeric',
-        year: 'numeric'
-    });
-};
-
 export const buildPlanCardState = ({
     plan,
     subscription,
@@ -62,8 +54,9 @@ export const buildPlanCardState = ({
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
+    // Use proper plan codes - no legacy MONTHLY/YEARLY
     const userPlanCode = billing.billingMe?.plan_code ||
-        (subscription.plan === 'free' ? 'FREE' : 'MONTHLY');
+        (subscription.plan === 'free' ? 'FREE' : 'PRO_MONTHLY');
 
     // FREE CARD
     if (plan.id === 'free') {
@@ -78,7 +71,8 @@ export const buildPlanCardState = ({
     }
     // PRO CARDS
     else {
-        const planCode = plan.id === 'pro_monthly' ? 'MONTHLY' : 'YEARLY';
+        // Map plan.id to proper plan codes (not legacy)
+        const planCode = plan.id === 'pro_monthly' ? 'PRO_MONTHLY' : 'PRO_YEARLY';
 
         // If this specific PRO plan is active
         if (userPlanCode === planCode) {

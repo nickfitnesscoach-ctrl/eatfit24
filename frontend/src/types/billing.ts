@@ -2,7 +2,7 @@
  * Типы для Billing API
  */
 
-export type BillingPlanCode = 'FREE' | 'MONTHLY' | 'YEARLY' | 'PRO_MONTHLY' | 'PRO_YEARLY';
+export type BillingPlanCode = 'FREE' | 'PRO_MONTHLY' | 'PRO_YEARLY';
 
 /**
  * GET /api/v1/billing/me/
