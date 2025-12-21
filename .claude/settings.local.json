@@ -76,7 +76,9 @@
       "Bash(if [ -f backend/.env ])",
       "Bash(then echo \"backend/.env exists\")",
       "Bash(else echo \"backend/.env not found\")",
-      "Bash(timeout 30 python manage.py test:*)"
+      "Bash(timeout 30 python manage.py test:*)",
+      "Bash(openssl rand:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
