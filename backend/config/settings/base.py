@@ -284,8 +284,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
-        "user": "1000/day",
+        "anon": "500/hour",  # Anonymous users: 500 req/hour
+        "user": "5000/hour",  # Authenticated users: 5000 req/hour (was 1000/day - too restrictive)
         "ai_per_minute": "10/minute",  # AI recognition rate limit
         "ai_per_day": "100/day",  # AI recognition rate limit
         "webhook": "100/hour",  # Webhook rate limit (YooKassa)

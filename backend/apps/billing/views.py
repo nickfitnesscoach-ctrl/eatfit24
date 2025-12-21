@@ -339,15 +339,13 @@ def get_subscription_status(request):
 # Settings screen endpoints
 # =====================================================================
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_subscription_details(request):
+def _build_subscription_details_response(user) -> Response:
     """
-    GET /api/v1/billing/subscription/
-    Полная карточка подписки для настроек.
+    Внутренняя логика для построения ответа с деталями подписки.
+    Вынесено для переиспользования в get_subscription_details и set_auto_renew.
     """
     try:
-        sub = request.user.subscription
+        sub = user.subscription
     except Subscription.DoesNotExist:
         # Нет подписки — возвращаем "как FREE"
         return Response(
@@ -391,6 +389,16 @@ def get_subscription_details(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_subscription_details(request):
+    """
+    GET /api/v1/billing/subscription/
+    Полная карточка подписки для настроек.
+    """
+    return _build_subscription_details_response(request.user)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def set_auto_renew(request):
@@ -424,7 +432,8 @@ def set_auto_renew(request):
     sub.auto_renew = enabled
     sub.save(update_fields=["auto_renew", "updated_at"])
 
-    return get_subscription_details(request)
+    # FIX: Вызываем внутреннюю функцию вместо view (избегаем AssertionError с DRF Request)
+    return _build_subscription_details_response(request.user)
 
 
 @api_view(["GET"])
