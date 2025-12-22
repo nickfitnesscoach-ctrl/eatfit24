@@ -56,6 +56,7 @@ frontend/.env
 *.swo
 *~
 .DS_Store
+.claude/
 
 # Testing
 .tox/
@@ -75,6 +76,7 @@ logs/
 # Docker
 *.env.docker
 docker-compose.override.yml
+docker-compose.dev.yml
 
 # OS
 Thumbs.db

@@ -33,3 +33,7 @@ logs/
 media/
 staticfiles/
 *.log
+*.pid
+gunicorn.pid
+celerybeat-schedule
+celerybeat.pid
