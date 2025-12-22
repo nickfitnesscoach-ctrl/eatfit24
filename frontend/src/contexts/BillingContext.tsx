@@ -51,6 +51,7 @@ export const useBilling = () => {
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const auth = useAuth(); // Get full auth context for initialization check
     const mounted = useRef(true);
+    const isRefreshing = useRef(false); // Prevent concurrent refresh calls
 
     const [state, setState] = useState<{
         subscription: SubscriptionDetails | null;
@@ -76,6 +77,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             console.log('[BillingProvider] Waiting for auth initialization...');
             return;
         }
+
+        // Prevent concurrent refresh calls
+        if (isRefreshing.current) {
+            console.log('[BillingProvider] Refresh already in progress, skipping...');
+            return;
+        }
+
+        isRefreshing.current = true;
 
         try {
             if (mounted.current) {
@@ -108,6 +117,8 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     // But for safety, let's leave them as is or provide basic fallbacks if critical
                 }));
             }
+        } finally {
+            isRefreshing.current = false;
         }
     }, [auth.isInitialized]);
 
@@ -171,7 +182,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isPro: !!isPro,
         isLimitReached: !!isLimitReached,
         data: state.billingMe // Alias for legacy support
-    }), [state, refresh, toggleAutoRenew, setAutoRenew, addPaymentMethod, isPro, isLimitReached]);
+    }), [state, isPro, isLimitReached, refresh, toggleAutoRenew, setAutoRenew, addPaymentMethod]);
 
     return (
         <BillingContext.Provider value={value}>

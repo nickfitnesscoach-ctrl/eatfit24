@@ -170,6 +170,7 @@ export const getTaskStatus = async (taskId: string): Promise<TaskStatusResponse>
  * Map API result to UI display format
  * Converts API's amount_grams → UI's grams
  * Converts API's items → UI's recognized_items
+ * Falls back to calculating totals from items if not provided
  */
 export const mapToAnalysisResult = (
     result: TaskStatusResponse['result'],
@@ -188,13 +189,31 @@ export const mapToAnalysisResult = (
         carbohydrates: item.carbohydrates,
     }));
 
+    // Check if totals are provided and non-zero
+    const hasValidTotals = result.totals && (
+        result.totals.calories > 0 ||
+        result.totals.protein > 0 ||
+        result.totals.fat > 0 ||
+        result.totals.carbohydrates > 0
+    );
+
+    // Calculate totals from items as fallback
+    const calculateFromItems = () => ({
+        calories: recognizedItems.reduce((sum, item) => sum + (item.calories || 0), 0),
+        protein: recognizedItems.reduce((sum, item) => sum + (item.protein || 0), 0),
+        fat: recognizedItems.reduce((sum, item) => sum + (item.fat || 0), 0),
+        carbohydrates: recognizedItems.reduce((sum, item) => sum + (item.carbohydrates || 0), 0),
+    });
+
+    const totals = hasValidTotals ? result.totals! : calculateFromItems();
+
     return {
         meal_id: mealId ?? result.meal_id,
         recognized_items: recognizedItems,
-        total_calories: result.totals?.calories ?? 0,
-        total_protein: result.totals?.protein ?? 0,
-        total_fat: result.totals?.fat ?? 0,
-        total_carbohydrates: result.totals?.carbohydrates ?? 0,
+        total_calories: totals.calories,
+        total_protein: totals.protein,
+        total_fat: totals.fat,
+        total_carbohydrates: totals.carbohydrates,
         photo_url: photoUrl,
     };
 };
