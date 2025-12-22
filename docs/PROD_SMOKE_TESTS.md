@@ -194,40 +194,61 @@ sudo tail -50 /var/log/nginx/error.log
 
 ## Quick Check Script
 
-Создайте файл `smoke_test.sh`:
+**Основной smoke test скрипт:** `ops/smoke_test.sh`
+
+### Запуск локально
 
 ```bash
-#!/bin/bash
-set -e
-
-BASE_URL="${1:-https://eatfit24.ru}"
-
-echo "=== EatFit24 PROD Smoke Test ==="
-echo "Target: $BASE_URL"
-echo
-
-echo "1. Health check..."
-curl -sS "$BASE_URL/health/" | head -c 200
-echo -e "\n✅ Health OK\n"
-
-echo "2. Billing plans..."
-PLANS=$(curl -sS "$BASE_URL/api/v1/billing/plans/" | head -c 500)
-echo "$PLANS"
-if echo "$PLANS" | grep -q "code"; then
-    echo -e "✅ Plans OK\n"
-else
-    echo -e "❌ Plans FAILED\n"
-    exit 1
-fi
-
-echo "=== All checks passed ==="
+bash ops/smoke_test.sh https://eatfit24.ru
 ```
 
-Запуск:
+### Запуск на сервере с сохранением лога
+
 ```bash
-chmod +x smoke_test.sh
-./smoke_test.sh https://eatfit24.ru
+cd /opt/EatFit24
+mkdir -p ops/smoke_runs
+bash ops/smoke_test.sh https://eatfit24.ru | tee "ops/smoke_runs/smoke_$(date +%Y%m%d_%H%M%S).log"
 ```
+
+### Что проверяет скрипт
+
+1. **Health Check** - `/health/` возвращает 200
+2. **Billing Plans** - `/api/v1/billing/plans/` возвращает 200 + валидный JSON с планами
+3. **CORS Headers** - проверяет наличие `Access-Control-Allow-Origin` и `Access-Control-Allow-Headers`
+4. **Auth Check** - `/api/v1/billing/me/` возвращает 401/403 без авторизации (защита работает)
+5. **Summary** - общий результат PASS/FAIL
+
+### Выходные коды
+
+- `0` - все проверки прошли успешно (PASS)
+- `1` - одна или несколько проверок провалились (FAIL)
+
+### Особенности скрипта
+
+- **Таймауты:** `--connect-timeout 5s`, `--max-time 10s`
+- **Fail-fast:** `set -euo pipefail` - скрипт останавливается при первой ошибке
+- **JSON валидация:** проверяет что response от `/plans/` - валидный JSON
+- **Одиночный запрос:** каждый endpoint запрашивается один раз (получаем и status, и body)
+- **Нет зависимостей:** только bash, curl, python3 (для json.tool)
+
+### Интерпретация ошибок
+
+| Ошибка | Причина | Действие |
+|--------|---------|----------|
+| Health FAILED | Backend не работает | `docker compose ps`, `docker compose logs backend` |
+| Plans FAILED (404) | Nginx routing | Проверить `location /api/v1/` в nginx.conf |
+| Plans invalid JSON | Backend возвращает HTML/error | Проверить логи backend |
+| CORS headers missing | CORS_ALLOW_HEADERS неверный | Проверить `backend/config/settings/production.py` |
+| Auth returns 200 | Debug mode включен в PROD | **КРИТИЧНО!** Проверить `WEBAPP_DEBUG_MODE_ENABLED=False` |
+
+### Логи прогонов
+
+На сервере логи сохраняются в:
+```
+/opt/EatFit24/ops/smoke_runs/smoke_YYYYMMDD_HHMMSS.log
+```
+
+Пример имени файла: `smoke_20250122_143025.log`
 
 ---
 
@@ -292,5 +313,7 @@ timedatectl | grep -E "synchronized|Local time"
 
 Используйте готовый скрипт:
 ```bash
-./scripts/smoke_test.sh https://eatfit24.ru
+bash ops/smoke_test.sh https://eatfit24.ru
 ```
+
+См. подробности в разделе "Quick Check Script" выше.
