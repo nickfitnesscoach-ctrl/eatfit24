@@ -72,7 +72,8 @@ const FoodLogPage: React.FC = () => {
             setSelectedFiles([]);
             billing.refresh();
         }
-    }, [results, isProcessing, billing]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [results, isProcessing]); // Removed billing to prevent infinite loop
 
     // Handle file selection from UploadDropzone
     const handleFilesSelected = async (files: File[]) => {
