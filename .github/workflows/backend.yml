@@ -70,6 +70,7 @@ jobs:
       - name: Django checks
         env:
           DJANGO_SETTINGS_MODULE: config.settings.local
+          SECRET_KEY: test-secret-key-for-ci-only-not-for-production
           POSTGRES_DB: foodmind
           POSTGRES_USER: foodmind
           POSTGRES_PASSWORD: supersecret
@@ -83,6 +84,7 @@ jobs:
       - name: Run migrations (PostgreSQL)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.local
+          SECRET_KEY: test-secret-key-for-ci-only-not-for-production
           POSTGRES_DB: foodmind
           POSTGRES_USER: foodmind
           POSTGRES_PASSWORD: supersecret
@@ -96,6 +98,7 @@ jobs:
       - name: Run tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings.local
+          SECRET_KEY: test-secret-key-for-ci-only-not-for-production
           POSTGRES_DB: foodmind
           POSTGRES_USER: foodmind
           POSTGRES_PASSWORD: supersecret
