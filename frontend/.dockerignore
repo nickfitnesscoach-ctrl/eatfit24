@@ -3,8 +3,7 @@ dist
 .git
 .gitignore
 README.md
-.env
-.env.local
+.env*
 .vscode
 *.log
 npm-debug.log*

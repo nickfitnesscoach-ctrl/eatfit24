@@ -12,13 +12,19 @@ RUN npm ci
 # Копируем исходный код
 COPY . .
 
-# Копируем .env.production (игнорируется в .gitignore, но нужен для сборки)
-COPY .env.production .
+# Принимаем build args для Vite (переданы из docker-compose.yml)
+ARG VITE_API_URL=/api/v1
+ARG VITE_TELEGRAM_BOT_NAME=EatFit24_bot
+ARG VITE_TRAINER_INVITE_LINK=https://t.me/EatFit24_bot
 
-# Debug: проверяем содержимое .env.production и список файлов
-RUN ls -la .env* && cat .env.production && echo "==== Checking VITE env ====" && grep VITE .env.production || echo "No VITE vars found"
+# Делаем их доступными как environment variables для npm run build
+# Vite подхватит их автоматически благодаря префиксу VITE_
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_TELEGRAM_BOT_NAME=$VITE_TELEGRAM_BOT_NAME
+ENV VITE_TRAINER_INVITE_LINK=$VITE_TRAINER_INVITE_LINK
 
-# Собираем production build (Vite использует .env.production)
+# Собираем production build
+# Vite встроит значения VITE_* переменных в JS bundle
 RUN npm run build
 
 # Этап 2: Production образ с nginx

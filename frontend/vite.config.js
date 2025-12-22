@@ -6,6 +6,19 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/app',
+  // Fallback values for production build
+  // These are used if env vars are not provided during build
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(
+      process.env.VITE_API_URL || '/api/v1'
+    ),
+    'import.meta.env.VITE_TELEGRAM_BOT_NAME': JSON.stringify(
+      process.env.VITE_TELEGRAM_BOT_NAME || 'EatFit24_bot'
+    ),
+    'import.meta.env.VITE_TRAINER_INVITE_LINK': JSON.stringify(
+      process.env.VITE_TRAINER_INVITE_LINK || 'https://t.me/EatFit24_bot'
+    ),
+  },
   server: {
     proxy: {
       '/api/v1': {

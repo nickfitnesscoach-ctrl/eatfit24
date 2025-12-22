@@ -218,6 +218,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # VITE build-time variables (embedded into JS bundle during build)
+        - VITE_API_URL=/api/v1
+        - VITE_TELEGRAM_BOT_NAME=EatFit24_bot
+        - VITE_TRAINER_INVITE_LINK=https://t.me/EatFit24_bot
     ports:
       - "3000:80"
     networks:
