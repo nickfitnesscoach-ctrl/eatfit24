@@ -281,6 +281,12 @@ AI_PROXY_SECRET = os.environ.get("AI_PROXY_SECRET", "")
 
 
 # -----------------------------------------------------------------------------
+# Telegram Bot
+# -----------------------------------------------------------------------------
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+
+
+# -----------------------------------------------------------------------------
 # Celery
 # -----------------------------------------------------------------------------
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -348,6 +354,7 @@ __all__ = [
     "AI_PROXY_URL",
     "AI_PROXY_SECRET",
     "AI_ASYNC_ENABLED",
+    "TELEGRAM_BOT_TOKEN",
     "CELERY_BROKER_URL",
     "CELERY_RESULT_BACKEND",
     "CELERY_ACCEPT_CONTENT",
