@@ -52,7 +52,8 @@
       "Bash(where:*)",
       "Bash(wsl --list:*)",
       "Bash(docker-compose:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []
