@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # YooKassa payload builder
 # ---------------------------------------------------------------------
 
+
 def build_yookassa_payment_payload(
     *,
     amount: Decimal,
@@ -96,6 +97,7 @@ def build_yookassa_payment_payload(
 # YooKassa SDK wrapper
 # ---------------------------------------------------------------------
 
+
 class YooKassaService:
     """
     Тонкая обертка над YooKassa SDK.
@@ -122,7 +124,9 @@ class YooKassaService:
             )
 
         # секрет обычно начинается с test_/live_
-        if not (str(self.secret_key).startswith("test_") or str(self.secret_key).startswith("live_")):
+        if not (
+            str(self.secret_key).startswith("test_") or str(self.secret_key).startswith("live_")
+        ):
             raise ImproperlyConfigured(
                 "Invalid YOOKASSA_SECRET_KEY format. Must start with 'test_' or 'live_'."
             )
@@ -182,7 +186,9 @@ class YooKassaService:
                 "amount": payment.amount.value,
                 "currency": payment.amount.currency,
                 "confirmation_url": payment.confirmation.confirmation_url,
-                "payment_method_id": getattr(payment.payment_method, "id", None) if payment.payment_method else None,
+                "payment_method_id": getattr(payment.payment_method, "id", None)
+                if payment.payment_method
+                else None,
             }
         except Exception as e:
             # Секреты не логируем. Достаточно текста исключения.
@@ -195,12 +201,21 @@ class YooKassaService:
         amount: Decimal,
         description: str,
         payment_method_id: str,
+        idempotency_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Создать рекуррентный платеж по сохраненному payment_method_id.
+
+        Args:
+            amount: Сумма платежа
+            description: Описание платежа
+            payment_method_id: ID сохранённого способа оплаты
+            idempotency_key: Ключ идемпотентности (для предотвращения дублей)
+            metadata: Дополнительные данные
         """
-        idempotence_key = str(uuid.uuid4())
+        # Если idempotency_key не передан — генерируем случайный
+        final_idempotency_key = idempotency_key or str(uuid.uuid4())
 
         payload: Dict[str, Any] = {
             "amount": {"value": str(amount), "currency": "RUB"},
@@ -211,7 +226,7 @@ class YooKassaService:
         }
 
         try:
-            payment = YooKassaPayment.create(payload, idempotence_key)
+            payment = YooKassaPayment.create(payload, final_idempotency_key)
             return {
                 "id": payment.id,
                 "status": payment.status,
@@ -234,7 +249,9 @@ class YooKassaService:
                 "status": payment.status,
                 "amount": payment.amount.value,
                 "currency": payment.amount.currency,
-                "payment_method_id": getattr(payment.payment_method, "id", None) if payment.payment_method else None,
+                "payment_method_id": getattr(payment.payment_method, "id", None)
+                if payment.payment_method
+                else None,
                 "paid": payment.paid,
                 "created_at": payment.created_at,
             }
@@ -254,6 +271,7 @@ class YooKassaService:
 # ---------------------------------------------------------------------
 # План/подписка: источник истины
 # ---------------------------------------------------------------------
+
 
 def _get_free_plan() -> SubscriptionPlan:
     """
@@ -313,6 +331,7 @@ def ensure_subscription_exists(user) -> Subscription:
 # ---------------------------------------------------------------------
 # Создание платежа (локальная запись + YooKassa)
 # ---------------------------------------------------------------------
+
 
 def create_subscription_payment(
     *,
@@ -395,18 +414,23 @@ def create_subscription_payment(
     return payment, confirmation_url
 
 
-def create_monthly_subscription_payment(*, user, return_url: Optional[str] = None) -> Tuple[Payment, str]:
+def create_monthly_subscription_payment(
+    *, user, return_url: Optional[str] = None
+) -> Tuple[Payment, str]:
     """
     Legacy helper.
     Раньше был MONTHLY, сейчас рекомендуется PRO_MONTHLY.
     Оставляем для совместимости.
     """
-    return create_subscription_payment(user=user, plan_code="MONTHLY", return_url=return_url, save_payment_method=True)
+    return create_subscription_payment(
+        user=user, plan_code="MONTHLY", return_url=return_url, save_payment_method=True
+    )
 
 
 # ---------------------------------------------------------------------
 # Активация / продление подписки
 # ---------------------------------------------------------------------
+
 
 def activate_or_extend_subscription(*, user, plan_code: str, duration_days: int) -> Subscription:
     """
@@ -459,6 +483,7 @@ def activate_or_extend_subscription(*, user, plan_code: str, duration_days: int)
 # ---------------------------------------------------------------------
 # Определение действующего плана (с кешем)
 # ---------------------------------------------------------------------
+
 
 def invalidate_user_plan_cache(user_id: int) -> None:
     """

@@ -33,6 +33,7 @@ from django.utils import timezone
 # SubscriptionPlan
 # ---------------------------------------------------------------------
 
+
 class SubscriptionPlan(models.Model):
     """
     Тарифный план.
@@ -135,6 +136,7 @@ class SubscriptionPlan(models.Model):
 # ---------------------------------------------------------------------
 # Subscription
 # ---------------------------------------------------------------------
+
 
 class Subscription(models.Model):
     """
@@ -263,6 +265,7 @@ class Subscription(models.Model):
 # Payment
 # ---------------------------------------------------------------------
 
+
 class Payment(models.Model):
     """
     Платёж пользователя.
@@ -317,7 +320,9 @@ class Payment(models.Model):
 
     status = models.CharField("Статус", max_length=50, choices=STATUS_CHOICES, default="PENDING")
 
-    provider = models.CharField("Платёжный провайдер", max_length=50, choices=PROVIDER_CHOICES, default="YOOKASSA")
+    provider = models.CharField(
+        "Платёжный провайдер", max_length=50, choices=PROVIDER_CHOICES, default="YOOKASSA"
+    )
 
     yookassa_payment_id = models.CharField(
         "ID платежа ЮKassa",
@@ -346,6 +351,15 @@ class Payment(models.Model):
     updated_at = models.DateTimeField("Обновлён", auto_now=True)
     paid_at = models.DateTimeField("Дата оплаты", null=True, blank=True)
 
+    # Для DB guard рекуррентных платежей
+    billing_period_end = models.DateTimeField(
+        "Окончание периода оплаты",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Для recurring: end_date подписки на момент создания платежа. Используется для DB guard.",
+    )
+
     webhook_processed_at = models.DateTimeField(
         "Webhook обработан",
         null=True,
@@ -362,6 +376,8 @@ class Payment(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["status"]),
             models.Index(fields=["yookassa_payment_id"]),
+            # DB guard для recurring: предотвращает двойное списание за один период
+            models.Index(fields=["subscription", "billing_period_end", "status"]),
         ]
 
     def __str__(self) -> str:
@@ -396,6 +412,7 @@ class Payment(models.Model):
 # ---------------------------------------------------------------------
 # Refund
 # ---------------------------------------------------------------------
+
 
 class Refund(models.Model):
     """Возврат средств по платежу."""
@@ -447,6 +464,7 @@ class Refund(models.Model):
 # WebhookLog
 # ---------------------------------------------------------------------
 
+
 class WebhookLog(models.Model):
     """
     Лог входящих webhook.
@@ -482,7 +500,9 @@ class WebhookLog(models.Model):
         db_index=True,
     )
 
-    status = models.CharField("Статус обработки", max_length=20, choices=STATUS_CHOICES, default="RECEIVED")
+    status = models.CharField(
+        "Статус обработки", max_length=20, choices=STATUS_CHOICES, default="RECEIVED"
+    )
     attempts = models.PositiveIntegerField("Попытки обработки", default=0)
     error_message = models.TextField("Сообщение об ошибке", blank=True)
 
@@ -510,6 +530,7 @@ class WebhookLog(models.Model):
 # Signals
 # ---------------------------------------------------------------------
 
+
 @receiver(post_save, sender=User)
 def create_free_subscription(sender, instance: User, created: bool, **kwargs):
     """
@@ -526,6 +547,7 @@ def create_free_subscription(sender, instance: User, created: bool, **kwargs):
         return
 
     import logging
+
     log = logging.getLogger(__name__)
 
     try:
@@ -535,7 +557,9 @@ def create_free_subscription(sender, instance: User, created: bool, **kwargs):
             free_plan = SubscriptionPlan.objects.get(name="FREE", is_active=True)
 
         # end_date берём из settings, если задано, иначе — 10 лет "вперёд"
-        end_date = getattr(settings, "FREE_SUBSCRIPTION_END_DATE", None) or (timezone.now() + timedelta(days=365 * 10))
+        end_date = getattr(settings, "FREE_SUBSCRIPTION_END_DATE", None) or (
+            timezone.now() + timedelta(days=365 * 10)
+        )
 
         Subscription.objects.create(
             user=instance,

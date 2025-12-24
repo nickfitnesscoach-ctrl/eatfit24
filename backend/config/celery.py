@@ -49,6 +49,11 @@ app.conf.beat_schedule = {
         "task": "apps.billing.webhooks.tasks.cleanup_pending_payments",
         "schedule": crontab(minute=0, hour="*/1"),  # каждый час в :00
     },
+    # Recurring: Auto-renew subscriptions
+    "billing-process-due-renewals": {
+        "task": "apps.billing.tasks_recurring.process_due_renewals",
+        "schedule": crontab(minute=0, hour="*/1"),  # каждый час в :00
+    },
 }
 
 
@@ -81,8 +86,7 @@ def log_celery_config(sender, **kwargs):
     # Warn if empty in production
     if task_count == 0:
         logger.warning(
-            "[CELERY CONFIG] ⚠️  WARNING: beat_schedule is EMPTY! "
-            "No periodic tasks will run."
+            "[CELERY CONFIG] ⚠️  WARNING: beat_schedule is EMPTY! No periodic tasks will run."
         )
     else:
         logger.info("  Periodic tasks:")
