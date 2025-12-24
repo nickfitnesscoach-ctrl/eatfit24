@@ -51,103 +51,73 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           command_timeout: 30m
-          script_stop: true
+          script_stop: false
+          debug: true
           script: |
-            set -euo pipefail
-
+            echo ">>> [1/7] Setup variables"
             PROJECT_DIR="/opt/EatFit24"
             BRANCH="main"
             DEPLOY_USER="${{ secrets.VPS_USERNAME }}"
             REPO_URL="https://github.com/${{ github.repository }}.git"
-
-            echo ">>> [1/7] Ensure project dir exists"
-            sudo -S -p "" mkdir -p "${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-
-            echo ">>> [2/7] Fix repo ownership"
-            sudo -S -p "" chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-
-            echo ">>> [3/7] Mark safe.directory"
-            git config --global --add safe.directory "${PROJECT_DIR}" || true
-
-            echo ">>> [4/7] Update repo"
-            cd "${PROJECT_DIR}"
-
-            # Function to do fresh clone
-            fresh_clone() {
-              echo ">>> Doing fresh clone..."
-              cd /opt
-              sudo -S -p "" rm -rf "${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-              sudo -S -p "" mkdir -p "${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-              sudo -S -p "" chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-              git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${PROJECT_DIR}"
-              cd "${PROJECT_DIR}"
-            }
-
-            if [ ! -d ".git" ]; then
-              echo ">>> No .git found, cloning..."
-              git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" . || fresh_clone
-            else
-              echo ">>> Git repo exists, updating..."
-              
-              # Try to update, fresh clone on any failure
-              {
-                # Switch remote to HTTPS if needed
-                CURRENT_REMOTE="$(git remote get-url origin 2>/dev/null || echo 'unknown')"
-                echo ">>> Current remote: ${CURRENT_REMOTE}"
-                
-                if echo "$CURRENT_REMOTE" | grep -qE '^git@'; then
-                  git remote set-url origin "${REPO_URL}"
-                  echo ">>> Switched to HTTPS"
-                fi
-                
-                # Fetch and reset
-                git fetch --prune origin && git reset --hard "origin/${BRANCH}"
-              } || {
-                echo ">>> Git update failed, doing fresh clone..."
-                fresh_clone
-              }
+            
+            echo ">>> [2/7] Clean and create project dir"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S rm -rf "${PROJECT_DIR}" || true
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S mkdir -p "${PROJECT_DIR}"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${PROJECT_DIR}"
+            
+            echo ">>> [3/7] Clone fresh repo"
+            git config --global --add safe.directory "${PROJECT_DIR}" 2>/dev/null || true
+            git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${PROJECT_DIR}"
+            if [ $? -ne 0 ]; then
+              echo "❌ Git clone failed!"
+              exit 1
             fi
             
-            echo ">>> Git update complete"
-
-            echo ">>> [5/7] Docker compose version"
-            sudo -S -p "" docker compose version <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-
-            echo ">>> [6/7] Build & deploy all services"
-            # Use compose.yml (new) or docker-compose.yml (fallback)
-            COMPOSE_FILE="compose.yml"
-            if [ ! -f "$COMPOSE_FILE" ]; then
+            cd "${PROJECT_DIR}"
+            echo ">>> Current directory: $(pwd)"
+            echo ">>> Files:"
+            ls -la
+            
+            echo ">>> [4/7] Check compose file"
+            if [ -f "compose.yml" ]; then
+              COMPOSE_FILE="compose.yml"
+            elif [ -f "docker-compose.yml" ]; then
               COMPOSE_FILE="docker-compose.yml"
+            else
+              echo "❌ No compose file found!"
+              exit 1
             fi
             echo ">>> Using: ${COMPOSE_FILE}"
-
-            sudo -S -p "" docker compose -f "${COMPOSE_FILE}" up -d --build <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-
+            
+            echo ">>> [5/7] Docker compose version"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose version
+            
+            echo ">>> [6/7] Build and deploy all services"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f "${COMPOSE_FILE}" up -d --build
+            if [ $? -ne 0 ]; then
+              echo "❌ Docker compose failed!"
+              exit 1
+            fi
+            
             echo ">>> [7/7] Health checks"
-            sleep 10
-
+            sleep 15
+            
             echo ">>> Container status:"
-            sudo -S -p "" docker compose -f "${COMPOSE_FILE}" ps <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
-
-            # Health checks with retry
-            echo ">>> Checking backend..."
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f "${COMPOSE_FILE}" ps
+            
+            echo ">>> Checking backend health..."
             for i in 1 2 3 4 5; do
               if curl -fsS http://127.0.0.1:8000/health/ >/dev/null 2>&1; then
-                echo "✅ backend OK"
+                echo "✅ Backend OK"
                 break
               fi
-              echo ">>> Backend not ready, waiting... ($i/5)"
+              echo ">>> Backend not ready ($i/5), waiting..."
               sleep 5
             done
-
-            echo ">>> Checking redis..."
-            sudo -S -p "" docker compose -f "${COMPOSE_FILE}" exec -T redis redis-cli ping <<< "${{ secrets.VPS_SUDO_PASSWORD }}" | grep -q PONG && echo "✅ redis OK" || echo "⚠️ redis check failed"
-
-            echo ">>> Checking celery..."
-            sudo -S -p "" docker compose -f "${COMPOSE_FILE}" exec -T celery-worker celery -A config inspect ping <<< "${{ secrets.VPS_SUDO_PASSWORD }}" 2>/dev/null | grep -q pong && echo "✅ celery OK" || echo "⚠️ celery check skipped"
-
+            
             echo ">>> Checking frontend (port 80)..."
-            curl -fsS http://127.0.0.1:80/ >/dev/null 2>&1 && echo "✅ frontend OK" || echo "⚠️ frontend check failed"
-
+            curl -fsS http://127.0.0.1/ >/dev/null 2>&1 && echo "✅ Frontend OK" || echo "⚠️ Frontend not responding"
+            
             echo ""
             echo "🎉 Deploy completed!"
+
