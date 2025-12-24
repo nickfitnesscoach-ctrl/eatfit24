@@ -5,8 +5,9 @@ Provides abstraction layer for file storage with easy migration to cloud service
 """
 
 import os
-from django.core.files.storage import FileSystemStorage
+
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 
 
 class CustomFileStorage(FileSystemStorage):
@@ -18,8 +19,8 @@ class CustomFileStorage(FileSystemStorage):
     """
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault('location', settings.MEDIA_ROOT)
-        kwargs.setdefault('base_url', settings.MEDIA_URL)
+        kwargs.setdefault("location", settings.MEDIA_ROOT)
+        kwargs.setdefault("base_url", settings.MEDIA_URL)
         super().__init__(*args, **kwargs)
 
     def get_available_name(self, name, max_length=None):
@@ -28,7 +29,7 @@ class CustomFileStorage(FileSystemStorage):
         """
         if self.exists(name):
             # Remove file extension
-            name_parts = name.rsplit('.', 1)
+            name_parts = name.rsplit(".", 1)
             if len(name_parts) > 1:
                 base_name, extension = name_parts
                 name = f"{base_name}_{self._get_timestamp()}.{extension}"
@@ -38,8 +39,9 @@ class CustomFileStorage(FileSystemStorage):
 
     def _get_timestamp(self):
         """Generate timestamp for unique filenames."""
-        from datetime import datetime
-        return datetime.now().strftime('%Y%m%d_%H%M%S')
+        from django.utils import timezone
+
+        return timezone.now().strftime("%Y%m%d_%H%M%S")
 
 
 # Ready for S3 migration:
@@ -76,7 +78,7 @@ def upload_to_user_photos(instance, filename):
 
     Returns: 'uploads/users/{user_id}/photos/{filename}'
     """
-    return os.path.join('uploads', 'users', str(instance.user.id), 'photos', filename)
+    return os.path.join("uploads", "users", str(instance.user.id), "photos", filename)
 
 
 def upload_to_food_photos(instance, filename):
@@ -85,7 +87,7 @@ def upload_to_food_photos(instance, filename):
 
     Returns: 'uploads/users/{user_id}/food/{filename}'
     """
-    return os.path.join('uploads', 'users', str(instance.user.id), 'food', filename)
+    return os.path.join("uploads", "users", str(instance.user.id), "food", filename)
 
 
 def upload_to_meal_photos(instance, filename):
@@ -94,4 +96,6 @@ def upload_to_meal_photos(instance, filename):
 
     Returns: 'uploads/users/{user_id}/meals/{meal_id}/{filename}'
     """
-    return os.path.join('uploads', 'users', str(instance.user.id), 'meals', str(instance.id), filename)
+    return os.path.join(
+        "uploads", "users", str(instance.user.id), "meals", str(instance.id), filename
+    )
