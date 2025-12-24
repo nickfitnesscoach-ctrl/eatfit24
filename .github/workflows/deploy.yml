@@ -90,12 +90,15 @@ jobs:
             echo ">>> [5/9] Update code from repository"
             git config --global --add safe.directory "${PROJECT_DIR}" 2>/dev/null || true
 
-            # Clean any local changes (from previous manual edits on server)
-            git clean -fd || true
-            git checkout -- . || true
+            # Clean any local changes (temporarily disable set -e for git commands)
+            set +e
+            git clean -fd
+            git checkout -- .
+            git fetch origin "${BRANCH}"
+            FETCH_EXIT=$?
+            set -e
 
-            # Fetch latest changes
-            if ! git fetch origin "${BRANCH}"; then
+            if [ ${FETCH_EXIT} -ne 0 ]; then
               echo "⚠️ Git fetch failed, trying fresh clone as fallback..."
               cd /tmp
               TEMP_CLONE="/tmp/eatfit24_fresh_clone"
