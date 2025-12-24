@@ -64,10 +64,12 @@ services:
     volumes:
       - backend_static:/app/staticfiles
       - backend_media:/app/media
-    expose:
-      - "8000"
+    ports:
+      # Bind to localhost only (not exposed to internet, only accessible from host)
+      - "127.0.0.1:8000:8000"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
+      # Use Host header to bypass SSL redirect and match ALLOWED_HOSTS
+      test: [ "CMD", "curl", "-f", "-H", "Host: eatfit24.ru", "http://localhost:8000/health/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -152,7 +154,8 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "80:80"
+      # Bind to localhost:3000 (Nginx will proxy to this)
+      - "127.0.0.1:3000:80"
     restart: unless-stopped
     networks:
       - eatfit24-network

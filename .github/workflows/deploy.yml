@@ -43,7 +43,7 @@ jobs:
 
           echo "✅ Secrets OK"
 
-      - name: Deploy all services to VPS
+      - name: Deploy to VPS (safe in-place update)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -51,98 +51,148 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           command_timeout: 30m
-          script_stop: false
+          script_stop: true  # Stop on first error
           debug: true
           script: |
-            echo ">>> [1/8] Setup variables"
+            set -e  # Exit on any error
+
+            echo ">>> [1/9] Setup variables"
             PROJECT_DIR="/opt/EatFit24"
-            ENV_BACKUP="/tmp/eatfit24_env_backup"
             BRANCH="main"
-            DEPLOY_USER="${{ secrets.VPS_USERNAME }}"
             REPO_URL="https://github.com/${{ github.repository }}.git"
-            
-            echo ">>> [2/8] Backup .env file if exists"
-            if [ -f "${PROJECT_DIR}/.env" ]; then
-              cp "${PROJECT_DIR}/.env" "${ENV_BACKUP}"
-              echo ">>> .env backed up to ${ENV_BACKUP}"
-            else
-              echo ">>> No .env file found to backup"
-            fi
-            
-            echo ">>> [3/8] Clean and create project dir"
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S rm -rf "${PROJECT_DIR}" || true
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S mkdir -p "${PROJECT_DIR}"
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${PROJECT_DIR}"
-            
-            echo ">>> [4/8] Clone fresh repo"
-            git config --global --add safe.directory "${PROJECT_DIR}" 2>/dev/null || true
-            git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${PROJECT_DIR}"
-            if [ $? -ne 0 ]; then
-              echo "❌ Git clone failed!"
+
+            echo ">>> [2/9] Check project directory exists"
+            if [ ! -d "${PROJECT_DIR}" ]; then
+              echo "❌ Project directory ${PROJECT_DIR} does not exist!"
+              echo ">>> Creating directory and cloning repo for first-time setup..."
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S mkdir -p "${PROJECT_DIR}"
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S chown -R "${{ secrets.VPS_USERNAME }}:${{ secrets.VPS_USERNAME }}" "${PROJECT_DIR}"
+              git clone --branch "${BRANCH}" "${REPO_URL}" "${PROJECT_DIR}"
+              cd "${PROJECT_DIR}"
+              echo ">>> ⚠️ First-time setup complete. You MUST configure .env manually!"
               exit 1
             fi
-            
+
             cd "${PROJECT_DIR}"
-            
-            echo ">>> [5/8] Restore .env file"
-            if [ -f "${ENV_BACKUP}" ]; then
-              cp "${ENV_BACKUP}" "${PROJECT_DIR}/.env"
-              rm -f "${ENV_BACKUP}"
-              echo ">>> .env restored from backup"
-            else
-              echo ">>> ⚠️ No .env backup found!"
-              echo ">>> Creating minimal .env from .env.example..."
-              if [ -f ".env.example" ]; then
-                cp .env.example .env
-                echo ">>> Created .env from .env.example - YOU NEED TO UPDATE IT ON SERVER!"
-              else
-                echo ">>> ❌ No .env.example found! Deploy may fail!"
-              fi
-            fi
-            
-            echo ">>> Files:"
-            ls -la
-            
-            echo ">>> [6/8] Check compose file"
-            if [ -f "compose.yml" ]; then
-              COMPOSE_FILE="compose.yml"
-            elif [ -f "docker-compose.yml" ]; then
-              COMPOSE_FILE="docker-compose.yml"
-            else
-              echo "❌ No compose file found!"
+
+            echo ">>> [3/9] Check .env file exists"
+            if [ ! -f ".env" ]; then
+              echo "❌ .env file missing! Cannot deploy without configuration."
+              echo ">>> Copy .env.example to .env and configure it on the server."
               exit 1
             fi
-            echo ">>> Using: ${COMPOSE_FILE}"
-            
-            echo ">>> [7/8] Docker compose version"
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose version
-            
-            echo ">>> [8/8] Build and deploy all services"
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f "${COMPOSE_FILE}" up -d --build
+            echo ">>> .env file exists ✅"
+
+            echo ">>> [4/9] Save current commit (for rollback)"
+            PREV_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+            echo ">>> Current commit: ${PREV_COMMIT}"
+
+            echo ">>> [5/9] Update code from repository"
+            git config --global --add safe.directory "${PROJECT_DIR}" 2>/dev/null || true
+
+            # Try git pull first (safe update)
+            git fetch origin "${BRANCH}"
             if [ $? -ne 0 ]; then
-              echo "❌ Docker compose failed!"
+              echo "⚠️ Git fetch failed, trying fresh clone as fallback..."
+              cd /tmp
+              TEMP_CLONE="/tmp/eatfit24_fresh_clone"
+              rm -rf "${TEMP_CLONE}"
+              git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${TEMP_CLONE}"
+
+              # Preserve .env and backups/
+              echo ">>> Preserving .env and backups..."
+              cp "${PROJECT_DIR}/.env" "${TEMP_CLONE}/.env"
+              [ -d "${PROJECT_DIR}/backups" ] && cp -r "${PROJECT_DIR}/backups" "${TEMP_CLONE}/"
+
+              # Replace project dir
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S rm -rf "${PROJECT_DIR}.old" || true
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S mv "${PROJECT_DIR}" "${PROJECT_DIR}.old"
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S mv "${TEMP_CLONE}" "${PROJECT_DIR}"
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S chown -R "${{ secrets.VPS_USERNAME }}:${{ secrets.VPS_USERNAME }}" "${PROJECT_DIR}"
+              cd "${PROJECT_DIR}"
+            else
+              # Normal update path
+              git reset --hard "origin/${BRANCH}"
+              echo ">>> Code updated to latest ${BRANCH} ✅"
+            fi
+
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo ">>> New commit: ${NEW_COMMIT}"
+
+            echo ">>> [6/9] Verify compose file"
+            if [ ! -f "compose.yml" ]; then
+              echo "❌ compose.yml not found!"
               exit 1
             fi
-            
-            echo ">>> Health checks"
-            sleep 15
-            
+
+            echo ">>> [7/9] Rebuild and restart services"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f compose.yml up -d --build
+
+            DEPLOY_EXIT_CODE=$?
+
+            if [ ${DEPLOY_EXIT_CODE} -ne 0 ]; then
+              echo "❌ Docker compose failed with exit code ${DEPLOY_EXIT_CODE}"
+
+              if [ "${PREV_COMMIT}" != "none" ]; then
+                echo ">>> Attempting rollback to ${PREV_COMMIT}..."
+                git reset --hard "${PREV_COMMIT}"
+                echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f compose.yml up -d --build
+
+                if [ $? -eq 0 ]; then
+                  echo "✅ Rollback successful"
+                else
+                  echo "❌ Rollback also failed! Manual intervention required."
+                fi
+              fi
+
+              exit 1
+            fi
+
+            echo ">>> [8/9] Wait for services to start"
+            sleep 20
+
+            echo ">>> [9/9] Health checks"
             echo ">>> Container status:"
-            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose -f "${COMPOSE_FILE}" ps
-            
-            echo ">>> Checking backend health..."
-            for i in 1 2 3 4 5; do
-              if curl -fsS http://127.0.0.1:8000/health/ >/dev/null 2>&1; then
-                echo "✅ Backend OK"
+            echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker compose ps
+
+            echo ""
+            echo ">>> Backend health check..."
+            BACKEND_OK=0
+            for i in 1 2 3 4 5 6; do
+              if curl -fsS -H "Host: eatfit24.ru" http://127.0.0.1:8000/health/ >/dev/null 2>&1; then
+                echo "✅ Backend healthy"
+                BACKEND_OK=1
                 break
               fi
-              echo ">>> Backend not ready ($i/5), waiting..."
+              echo ">>> Backend not ready ($i/6), waiting..."
               sleep 5
             done
-            
-            echo ">>> Checking frontend (port 80)..."
-            curl -fsS http://127.0.0.1/ >/dev/null 2>&1 && echo "✅ Frontend OK" || echo "⚠️ Frontend not responding"
-            
-            echo ""
-            echo "🎉 Deploy completed!"
 
+            if [ ${BACKEND_OK} -eq 0 ]; then
+              echo "❌ Backend health check failed!"
+              echo ">>> Backend logs:"
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker logs --tail 50 eatfit24-backend
+              exit 1
+            fi
+
+            echo ""
+            echo ">>> Frontend health check..."
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "✅ Frontend healthy (port 3000)"
+            else
+              echo "⚠️ Frontend not responding on port 3000"
+              echo ">>> Frontend logs:"
+              echo "${{ secrets.VPS_SUDO_PASSWORD }}" | sudo -S docker logs --tail 30 eatfit24-frontend
+            fi
+
+            echo ""
+            echo ">>> Public HTTPS check..."
+            if curl -fsS https://eatfit24.ru/health/ >/dev/null 2>&1; then
+              echo "✅ Public website healthy (https://eatfit24.ru/health/)"
+            else
+              echo "⚠️ Public website not responding"
+            fi
+
+            echo ""
+            echo "🎉 Deploy completed successfully!"
+            echo ">>> Deployed commit: ${NEW_COMMIT}"
