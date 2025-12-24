@@ -10,13 +10,16 @@ test_async_flow.py — тесты async API (202 + Celery).
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
+import pytest
 from django.urls import reverse
 from django.utils import timezone
-import pytest
 from rest_framework.test import APIClient
 
+from apps.billing.models import Subscription, SubscriptionPlan
+from apps.billing.usage import DailyUsage
 from apps.nutrition.models import Meal
 
 
@@ -152,10 +155,6 @@ class TestAIAsyncFlow:
 
     def test_limit_exceeded_returns_429_no_meal_created(self, django_user_model):
         """P1-4: When limit exceeded, 429 returned and Meal NOT created."""
-        from decimal import Decimal
-        from apps.billing.models import Subscription, SubscriptionPlan
-        from apps.billing.usage import DailyUsage
-
         user = django_user_model.objects.create_user(username="u_limit", password="pass")
         self.client.force_authenticate(user=user)
 
