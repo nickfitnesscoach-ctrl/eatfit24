@@ -1,17 +1,7 @@
 """
 Pydantic схемы для валидации данных.
+
+Note: Django API schemas были удалены - бот использует BackendAPIClient напрямую.
 """
 
-from .django_api import (
-    DjangoAPIError,
-    SaveTestRequest,
-    SaveTestResponse,
-    TestAnswers,
-)
-
-__all__ = [
-    "TestAnswers",
-    "SaveTestRequest",
-    "SaveTestResponse",
-    "DjangoAPIError",
-]
+__all__: list[str] = []

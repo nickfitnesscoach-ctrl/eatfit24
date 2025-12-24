@@ -1,251 +1,90 @@
-# EatFit24 - Unified Docker Compose for all services
-# Production-ready configuration with Redis + Celery async processing
-#
-# IMPORTANT: Create a .env file in the project root with all required variables
-# All services read environment variables from the root .env file
+name: Deploy to VPS (EatFit24)
 
-services:
-  # PostgreSQL Database (shared by backend and bot)
-  db:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-eatfit24}
-      POSTGRES_USER: ${POSTGRES_USER:-eatfit24}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5433:5432"
-    networks:
-      - backend-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eatfit24} -d ${POSTGRES_DB:-eatfit24}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
 
-  # Redis (for Celery broker and result backend)
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
-    networks:
-      - backend-net
-    volumes:
-      - redis-data:/data
-    # D-002 FIX: Changed from allkeys-lru to volatile-lru
-    # allkeys-lru could delete Celery task results before they're read
-    # volatile-lru only evicts keys with TTL set, preserving task results
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
 
-  # Django Backend API
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "127.0.0.1:8000:8000"
-    volumes:
-      - ./backend/staticfiles:/app/staticfiles
-      - ./backend/media:/app/media
-      - ./backend/logs:/app/logs
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
-      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_BOT_API_SECRET=${TELEGRAM_BOT_API_SECRET}
-      - BOT_ADMIN_ID=${BOT_ADMIN_ID}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
-      - SWAGGER_AUTH_USERNAME=${SWAGGER_AUTH_USERNAME:-admin}
-      - SWAGGER_AUTH_PASSWORD=${SWAGGER_AUTH_PASSWORD}
-      - YOOKASSA_MODE=${YOOKASSA_MODE:-test}
-      - YOOKASSA_SHOP_ID_TEST=${YOOKASSA_SHOP_ID_TEST}
-      - YOOKASSA_API_KEY_TEST=${YOOKASSA_API_KEY_TEST}
-      - YOOKASSA_SHOP_ID_PROD=${YOOKASSA_SHOP_ID_PROD}
-      - YOOKASSA_API_KEY_PROD=${YOOKASSA_API_KEY_PROD}
-      - YOOKASSA_RETURN_URL=${YOOKASSA_RETURN_URL}
-      - WEBHOOK_TRUST_XFF=${WEBHOOK_TRUST_XFF:-false}
-      - WEBHOOK_TRUSTED_PROXIES=${WEBHOOK_TRUSTED_PROXIES:-127.0.0.1,172.23.0.0/16}
-      - BILLING_RECURRING_ENABLED=${BILLING_RECURRING_ENABLED:-false}
-      - AI_PROXY_URL=${AI_PROXY_URL}
-      - AI_PROXY_SECRET=${AI_PROXY_SECRET}
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - AI_ASYNC_ENABLED=${AI_ASYNC_ENABLED:-True}
-      - REDIS_URL=redis://redis:6379/1
-      - DEBUG_MODE_ENABLED=${DEBUG_MODE_ENABLED:-False}
-      - WEBAPP_DEBUG_MODE_ENABLED=${WEBAPP_DEBUG_MODE_ENABLED:-False}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - backend-net
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-  # Celery Worker (async AI processing)
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    entrypoint: []
-    # P2-DEP-04: Removed migrate to avoid race condition with backend
-    # Backend container handles migrations via entrypoint.sh
-    command: celery -A config worker -l info -Q ai,billing,default --concurrency=4 --soft-time-limit=120 --time-limit=150
-    volumes:
-      - ./backend/logs:/app/logs
-      - ./backend/media:/app/media
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
-      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - SECRET_KEY=${SECRET_KEY}
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - AI_PROXY_URL=${AI_PROXY_URL}
-      - AI_PROXY_SECRET=${AI_PROXY_SECRET}
-      - AI_ASYNC_ENABLED=${AI_ASYNC_ENABLED:-True}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - DEBUG_MODE_ENABLED=${DEBUG_MODE_ENABLED:-False}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - backend-net
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  # Celery Beat (periodic task scheduler)
-  celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    entrypoint: []
-    command: celery -A config beat -l info
-    volumes:
-      - ./backend/logs:/app/logs
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - POSTGRES_DB=${POSTGRES_DB:-eatfit24}
-      - POSTGRES_USER=${POSTGRES_USER:-eatfit24}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - SECRET_KEY=${SECRET_KEY}
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - backend-net
-    restart: unless-stopped
+      # (Опционально) - быстрый тест, если есть
+      # - name: Run tests
+      #   run: |
+      #     echo "TODO: add tests"
 
-  # Telegram Bot
-  bot:
-    build:
-      context: ./bot
-      dockerfile: Dockerfile
-    environment:
-      - ENVIRONMENT=production
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-eatfit24}
-      - DB_USER=${POSTGRES_USER:-eatfit24}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_BOT_API_SECRET=${TELEGRAM_BOT_API_SECRET}
-      - BOT_ADMIN_ID=${BOT_ADMIN_ID}
-      - ADMIN_IDS=${ADMIN_IDS}
-      - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - WEB_APP_URL=${WEB_APP_URL}
-      - TRAINER_PANEL_BASE_URL=${TRAINER_PANEL_BASE_URL}
-      - DJANGO_API_URL=${DJANGO_API_URL:-http://backend:8000/api/v1}
-    depends_on:
-      db:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    networks:
-      - backend-net
-    restart: unless-stopped
-    volumes:
-      - ./bot/logs:/app/logs
+      - name: Deploy via SSH (sudo)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 30m
+          script_stop: true
+          script: |
+            set -euo pipefail
 
-  # React Frontend (Nginx)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # VITE build-time variables (embedded into JS bundle during build)
-        - VITE_API_URL=/api/v1
-        - VITE_TELEGRAM_BOT_NAME=EatFit24_bot
-        - VITE_TRAINER_INVITE_LINK=https://t.me/EatFit24_bot
-    ports:
-      - "3000:80"
-    networks:
-      - backend-net
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:80/" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    labels:
-      - "com.eatfit24.service=frontend"
+            PROJECT_DIR="/opt/EatFit24"
+            BRANCH="main"
 
-networks:
-  backend-net:
-    driver: bridge
+            echo ">>> Who am I"
+            whoami
+            pwd
 
-volumes:
-  db-data:
-  redis-data:
+            echo ">>> Ensuring project dir exists"
+            sudo -S -p "" bash -c "mkdir -p ${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> Fixing ownership (prevents 'dubious ownership' forever)"
+            sudo -S -p "" bash -c "chown -R ${USER}:${USER} ${PROJECT_DIR}" <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> Mark as safe directory for git (extra safety)"
+            git config --global --add safe.directory "${PROJECT_DIR}" || true
+
+            echo ">>> Updating repo"
+            cd "${PROJECT_DIR}"
+
+            # Если репо ещё не инициализировано на сервере (первый деплой)
+            if [ ! -d ".git" ]; then
+              echo ">>> Repo not found, cloning..."
+              git clone --branch "${BRANCH}" --depth 1 "https://github.com/${{ github.repository }}.git" .
+            else
+              git fetch origin
+              git reset --hard "origin/${BRANCH}"
+            fi
+
+            echo ">>> Docker compose version"
+            sudo -S -p "" docker compose version <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> Pull/build/restart services (db не трогаем)"
+            # Важно: db обычно не билдится и его перезапускать без нужды не надо
+            sudo -S -p "" docker compose up -d --build redis backend celery-worker celery-beat <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> (Optional) restart bot too"
+            # Если бот живёт в этом же compose - раскомментируй
+            sudo -S -p "" docker compose up -d --build bot <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> Show containers"
+            sudo -S -p "" docker compose ps <<< "${{ secrets.VPS_SUDO_PASSWORD }}"
+
+            echo ">>> Basic health checks"
+            # backend health
+            curl -fsS http://127.0.0.1:8000/health/ >/dev/null && echo "✅ backend health OK"
+
+            # redis ping
+            sudo -S -p "" docker compose exec -T redis redis-cli ping <<< "${{ secrets.VPS_SUDO_PASSWORD }}" | grep -q PONG && echo "✅ redis OK"
+
+            # celery ping (через worker контейнер)
+            sudo -S -p "" docker compose exec -T celery-worker celery -A config inspect ping <<< "${{ secrets.VPS_SUDO_PASSWORD }}" | grep -q pong && echo "✅ celery worker OK"
+
+            echo "✅ Deploy completed"

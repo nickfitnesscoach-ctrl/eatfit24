@@ -9,19 +9,19 @@ from typing import Any, Optional
 import httpx
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 from app.config import settings
-
 
 logger = logging.getLogger(__name__)
 
 
 class BackendAPIError(Exception):
     """Базовое исключение для ошибок Backend API."""
+
     pass
 
 
@@ -30,18 +30,21 @@ class BackendAPIClient:
     Async HTTP клиент для взаимодействия с Django Backend API.
 
     Использует httpx для async запросов и tenacity для retry логики.
+    Все запросы аутентифицируются через X-Bot-Secret header.
     """
 
-    def __init__(self, base_url: Optional[str] = None, timeout: int = 30):
+    def __init__(self, base_url: Optional[str] = None, timeout: int = 30, secret: Optional[str] = None):
         """
         Инициализация клиента.
 
         Args:
             base_url: Базовый URL Django API (по умолчанию из settings.DJANGO_API_URL)
             timeout: Таймаут для запросов в секундах
+            secret: Секретный ключ для X-Bot-Secret header
         """
         self.base_url = base_url or settings.DJANGO_API_URL
         self.timeout = timeout
+        self.secret = secret or getattr(settings, "TELEGRAM_BOT_API_SECRET", None)
 
         if not self.base_url:
             raise ValueError(
@@ -50,11 +53,19 @@ class BackendAPIClient:
             )
 
         # Убираем trailing slash для единообразия
-        self.base_url = self.base_url.rstrip('/')
+        self.base_url = self.base_url.rstrip("/")
+
+        # Предупреждение если секрет не задан
+        if not self.secret:
+            logger.warning(
+                "[BackendAPI] TELEGRAM_BOT_API_SECRET не задан! API вызовы могут быть отклонены в production."
+            )
 
         logger.info(
-            "[BackendAPI] Инициализирован клиент: base_url=%s, timeout=%ds",
-            self.base_url, self.timeout
+            "[BackendAPI] Инициализирован клиент: base_url=%s, timeout=%ds, secret=%s",
+            self.base_url,
+            self.timeout,
+            "***" if self.secret else "NOT SET",
         )
 
     def _get_retry_decorator(self):
@@ -97,21 +108,24 @@ class BackendAPIClient:
         # Применяем retry декоратор динамически
         @self._get_retry_decorator()
         async def _do_request():
+            # Формируем заголовки с секретом бота
+            headers = {}
+            if self.secret:
+                headers["X-Bot-Secret"] = self.secret
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.request(
                     method=method,
                     url=url,
                     params=params,
                     json=json,
+                    headers=headers,
                 )
                 response.raise_for_status()
                 return response.json()
 
         try:
-            logger.debug(
-                "[BackendAPI] %s %s | params=%s | json=%s",
-                method, url, params, json
-            )
+            logger.debug("[BackendAPI] %s %s | params=%s | json=%s", method, url, params, json)
             result = await _do_request()
             logger.debug("[BackendAPI] Успешный ответ: %s", result)
             return result
@@ -120,17 +134,12 @@ class BackendAPIClient:
             error_detail = "Unknown error"
             try:
                 error_data = e.response.json()
-                error_detail = error_data.get('error') or error_data.get('detail') or str(error_data)
+                error_detail = error_data.get("error") or error_data.get("detail") or str(error_data)
             except Exception:
                 error_detail = e.response.text
 
-            logger.error(
-                "[BackendAPI] HTTP ошибка %d: %s | URL: %s",
-                e.response.status_code, error_detail, url
-            )
-            raise BackendAPIError(
-                f"HTTP {e.response.status_code}: {error_detail}"
-            ) from e
+            logger.error("[BackendAPI] HTTP ошибка %d: %s | URL: %s", e.response.status_code, error_detail, url)
+            raise BackendAPIError(f"HTTP {e.response.status_code}: {error_detail}") from e
 
         except (httpx.TimeoutException, httpx.ConnectError) as e:
             logger.error("[BackendAPI] Сетевая ошибка при обращении к %s: %s", url, e)

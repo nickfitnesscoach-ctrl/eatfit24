@@ -91,11 +91,15 @@ AI_PROXY_SECRET=***
 
 ---
 
-### `env/bot.env` — секреты бота
+### `env/bot.env` — секреты бота (API-only)
+
+> **Updated 2025-12-24:** Бот больше не требует DB_* переменных — работает только через Django API.
 
 ```env
 TELEGRAM_BOT_TOKEN=***
 TELEGRAM_BOT_API_SECRET=***
+OPENROUTER_API_KEY=***
+DJANGO_API_URL=http://backend:8000/api/v1
 ```
 
 ---

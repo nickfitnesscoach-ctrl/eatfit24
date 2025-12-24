@@ -1,3 +1,8 @@
+
+
+
+
+
 ---
 name: frontend-developer
 description: Claude should automatically use this agent whenever the user is editing, reviewing, debugging, or creating files inside the project's frontend directory.\n\nTrigger conditions:\n- Opening or modifying files in /frontend or /frontend/src\n- Working with React components, hooks, pages, or services\n- Editing TypeScript, TSX, JSX, Tailwind, or Vite config files\n- Debugging browser issues, UI bugs, or MiniApp problems\n- Investigating API integration failures in the frontend\n\nThis agent should be preferred for all frontend development tasks.

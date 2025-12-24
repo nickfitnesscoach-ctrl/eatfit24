@@ -162,77 +162,71 @@ RUN npm run build
 ### 5. Bot Runtime Secrets
 
 > [!NOTE]
-> **Current Implementation:** Bot receives all variables via `docker-compose.yml` environment mapping.
-> **Recommended (Future):** Separate `env/bot.env` file following least-privilege principle.
+> **Updated 2025-12-24:** Bot is now **API-only**. 
+> Direct database access has been removed. All data operations go through Django API.
 
-**Location (Current):** `docker-compose.yml` environment section
-**Location (Recommended):** `/env/bot.env` (NOT in git)
+**Location:** `docker-compose.yml` environment section
 **Purpose:** Telegram bot runtime secrets and configuration
 
-#### Current State (docker-compose.yml)
+#### Current State (API-only architecture)
 
-The bot container currently receives variables through explicit environment mapping in `docker-compose.yml`:
+The bot communicates with Django backend via HTTP API (`BackendAPIClient`):
 
-```yaml
-bot:
-  environment:
-    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-    - TELEGRAM_BOT_API_SECRET=${TELEGRAM_BOT_API_SECRET}
-    - DB_HOST=db
-    - DB_NAME=${POSTGRES_DB}
-    - DB_USER=${POSTGRES_USER}
-    - DB_PASSWORD=${POSTGRES_PASSWORD}
-    # ... and more
+```
+┌───────────┐    X-Bot-Secret    ┌───────────┐    ┌──────────┐
+│    Bot    │ ─────────────────▶ │  Django   │───▶│ Postgres │
+└───────────┘    (httpx)         │  Backend  │    └──────────┘
+                                 └───────────┘
 ```
 
 #### Required Variables
 
-| Variable | Source | Type | Description |
-|----------|--------|------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Secret | string | Telegram bot API token |
-| `TELEGRAM_BOT_API_SECRET` | Secret | string | Bot API authentication secret |
-| `OPENROUTER_API_KEY` | Secret | string | AI API key for bot |
-| `DB_HOST` | Config | string | Database host (service name) |
-| `DB_PORT` | Config | int | Database port |
-| `DB_NAME` | Config | string | Database name |
-| `DB_USER` | Secret | string | Database username |
-| `DB_PASSWORD` | Secret | string | Database password |
-| `WEB_APP_URL` | Config | url | Telegram Mini App URL |
-| `TRAINER_PANEL_BASE_URL` | Config | url | Trainer panel base URL |
-| `DJANGO_API_URL` | Config | url | Internal backend API URL |
-| `BOT_ADMIN_ID` | Config | int | Primary admin Telegram ID |
-| `ADMIN_IDS` | Config | csv | Additional admin IDs (legacy) |
-| `TELEGRAM_ADMINS` | Config | csv | Admin Telegram IDs |
-| `ENVIRONMENT` | Config | string | "production" or "development" |
+| Variable | Type | Required | Description |
+|----------|------|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Secret | ✅ | Telegram bot API token |
+| `TELEGRAM_BOT_API_SECRET` | Secret | ✅ | Shared secret for X-Bot-Secret header |
+| `OPENROUTER_API_KEY` | Secret | ✅ | AI API key for plan generation |
+| `DJANGO_API_URL` | Config | ✅ | Backend API URL (e.g., `http://backend:8000/api/v1`) |
+| `WEB_APP_URL` | Config | ⚠️ | Telegram Mini App URL |
+| `TRAINER_PANEL_BASE_URL` | Config | ⚠️ | Trainer panel base URL |
+| `BOT_ADMIN_ID` | Config | ⚠️ | Primary admin Telegram ID |
+| `TELEGRAM_ADMINS` | Config | ⚠️ | Admin Telegram IDs (csv) |
+| `ENVIRONMENT` | Config | ⚠️ | `production` or `development` |
+
+#### Removed Variables (no longer needed)
+
+| Variable | Status | Reason |
+|----------|--------|--------|
+| `DB_HOST` | ❌ Removed | Bot uses Django API, not direct DB |
+| `DB_PORT` | ❌ Removed | Bot uses Django API, not direct DB |
+| `DB_NAME` | ❌ Removed | Bot uses Django API, not direct DB |
+| `DB_USER` | ❌ Removed | Bot uses Django API, not direct DB |
+| `DB_PASSWORD` | ❌ Removed | Bot uses Django API, not direct DB |
+
+#### docker-compose.yml Example
+
+```yaml
+bot:
+  environment:
+    - ENVIRONMENT=production
+    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    - TELEGRAM_BOT_API_SECRET=${TELEGRAM_BOT_API_SECRET}
+    - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    - DJANGO_API_URL=http://backend:8000/api/v1
+    - WEB_APP_URL=${WEB_APP_URL}
+    - BOT_ADMIN_ID=${BOT_ADMIN_ID}
+    - TELEGRAM_ADMINS=${TELEGRAM_ADMINS}
+  depends_on:
+    backend:
+      condition: service_healthy  # Bot depends on backend, not db
+```
 
 #### Principle: Least Privilege
 
 Bot should ONLY receive secrets it actually needs:
 - ✅ Bot needs: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_API_SECRET`, `OPENROUTER_API_KEY`
-- ✅ Bot needs: Database credentials (for direct DB access)
-- ❌ Bot does NOT need: `YOOKASSA_*`, `SECRET_KEY`, `SWAGGER_*`
-
-#### Recommended Migration
-
-Create `/env/bot.env` with ONLY bot-specific secrets:
-
-```env
-# env/bot.env (NOT in git)
-TELEGRAM_BOT_TOKEN=***
-TELEGRAM_BOT_API_SECRET=***
-OPENROUTER_API_KEY=***
-DB_USER=***
-DB_PASSWORD=***
-```
-
-Update `docker-compose.yml`:
-
-```yaml
-bot:
-  env_file:
-    - .env                 # Non-sensitive config
-    - env/bot.env          # Bot-specific secrets
-```
+- ✅ Bot needs: `DJANGO_API_URL` (backend connection)
+- ❌ Bot does NOT need: `DB_*`, `YOOKASSA_*`, `SECRET_KEY`, `SWAGGER_*`
 
 ---
 
@@ -472,6 +466,28 @@ After migration, remove inline secrets from compose.
 ---
 
 ## Changelog
+
+### Version 2.1 - 2025-12-24
+
+**Updated:** Bot migrated to API-only architecture
+
+**Major Changes:**
+1. **Bot Runtime Secrets (Critical):**
+   - Bot no longer requires `DB_*` variables (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
+   - Bot communicates ONLY via Django API (`BackendAPIClient`)
+   - Added `X-Bot-Secret` header authentication between Bot and Backend
+   - Updated docker-compose.yml to remove db dependency from bot service
+
+2. **Removed from Bot:**
+   - SQLAlchemy/Alembic (models, migrations, database services)
+   - Direct PostgreSQL access
+   - `django_integration.py` legacy service
+
+3. **Security:**
+   - `TELEGRAM_BOT_API_SECRET` is now required for Bot → Backend communication
+   - Backend validates `X-Bot-Secret` header on all `/telegram/*` endpoints
+
+---
 
 ### Version 2.0 - 2025-12-22
 

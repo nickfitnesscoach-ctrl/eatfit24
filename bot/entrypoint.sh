@@ -3,21 +3,22 @@ set -e
 
 echo "🚀 Starting bot entrypoint..."
 
-# Ждём доступности базы данных
-echo "⏳ Waiting for database to be ready..."
-until pg_isready -h "${DB_HOST:-localhost}" -p "${DB_PORT:-5432}" -U "${DB_USER:-postgres}" -q; do
-    echo "Database is unavailable - sleeping"
+# Ждём доступности Django Backend API
+echo "⏳ Waiting for Backend API to be ready..."
+BACKEND_URL="${DJANGO_API_URL:-http://backend:8000/api/v1}"
+HEALTH_URL="${BACKEND_URL%/api/v1}/health/"
+
+for i in {1..30}; do
+    if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+        echo "✅ Backend API is ready!"
+        break
+    fi
+    echo "Backend API is unavailable - attempt $i/30, sleeping..."
     sleep 2
 done
-echo "✅ Database is ready!"
 
-# Применяем миграции с обработкой ошибок
-echo "📦 Running Alembic migrations..."
-if alembic upgrade head; then
-    echo "✅ Migrations applied successfully"
-else
-    echo "⚠️ Migration failed, but continuing to start the bot"
-    echo "   You may need to fix migrations manually"
+if ! curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+    echo "⚠️ Backend API health check failed, but continuing to start the bot"
 fi
 
 # Запускаем бота

@@ -1,17 +1,9 @@
 """
-!5@28AK 1>B0.
+Сервисы бота.
 """
 
 from .ai import OpenRouterClient, openrouter_client
-from .database import (
-    PlanRepository,
-    SurveyRepository,
-    UserRepository,
-    async_session_maker,
-    close_db,
-    get_session,
-    init_db,
-)
+from .backend_api import BackendAPIClient, BackendAPIError, get_backend_api
 from .events import (
     event_logger,
     log_ai_error,
@@ -26,13 +18,9 @@ from .image_sender import ImageSender, image_sender
 __all__ = [
     "OpenRouterClient",
     "openrouter_client",
-    "get_session",
-    "init_db",
-    "close_db",
-    "async_session_maker",
-    "UserRepository",
-    "SurveyRepository",
-    "PlanRepository",
+    "BackendAPIClient",
+    "BackendAPIError",
+    "get_backend_api",
     "event_logger",
     "log_survey_started",
     "log_survey_step_completed",

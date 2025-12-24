@@ -11,25 +11,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Настройки приложения из переменных окружения."""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
 
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_BOT_API_SECRET: Optional[str] = None  # Секрет для X-Bot-Secret header
     BOT_ADMIN_ID: Optional[int] = None
     ADMIN_IDS: Optional[str] = None
     TELEGRAM_ADMINS: Optional[str] = None
-
-    # Database
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_NAME: str = "calorie_bot_db"
-    DB_USER: str = "postgres"
-    DB_PASSWORD: str = "postgres"
 
     # Redis
     REDIS_HOST: str = "localhost"
@@ -70,8 +59,8 @@ class Settings(BaseSettings):
     TRAINER_USERNAME: str = "NicolasBatalin"  # Telegram username тренера (без @)
     PROJECT_URL: str = "https://github.com/your-username/ai-lead-magnet-bot"  # URL проекта для OpenRouter
 
-    # Django API Integration
-    DJANGO_API_URL: Optional[str] = None  # URL Django API (например, "http://backend:8000/api/v1" в Docker или "https://eatfit24.ru/api/v1" снаружи)
+    # Django API Integration (единственный способ работы с данными)
+    DJANGO_API_URL: Optional[str] = None  # URL Django API (например, "http://backend:8000/api/v1" в Docker)
 
     # Django API Retry Configuration
     DJANGO_RETRY_ATTEMPTS: int = 3  # Количество попыток при ошибке
@@ -81,19 +70,11 @@ class Settings(BaseSettings):
     DJANGO_API_TIMEOUT: int = 30  # Timeout для запросов к Django API (сек)
 
     # Telegram Mini App
-    WEB_APP_URL: Optional[str] = None  # URL для Telegram Mini App (e.g., "https://your-domain.com" or ngrok URL)
-    TRAINER_PANEL_BASE_URL: Optional[str] = None  # Базовый URL панели тренера (например, https://my-domain.com)
+    WEB_APP_URL: Optional[str] = None  # URL для Telegram Mini App
+    TRAINER_PANEL_BASE_URL: Optional[str] = None  # Базовый URL панели тренера
 
     # Environment
     ENVIRONMENT: str = "development"
-
-    @property
-    def database_url(self) -> str:
-        """Формирует DATABASE_URL для async SQLAlchemy."""
-        return (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
 
     @property
     def is_personal_plan_enabled(self) -> bool:
@@ -115,16 +96,14 @@ class Settings(BaseSettings):
             if not admin_list:
                 continue
 
-            for raw_id in admin_list.split(','):
+            for raw_id in admin_list.split(","):
                 raw_id = raw_id.strip()
                 if not raw_id:
                     continue
                 try:
                     ids.append(int(raw_id))
                 except ValueError:
-                    logging.getLogger(__name__).warning(
-                        "[CONFIG] ADMIN_IDS содержит некорректное значение: %s", raw_id
-                    )
+                    logging.getLogger(__name__).warning("[CONFIG] ADMIN_IDS содержит некорректное значение: %s", raw_id)
 
         if self.BOT_ADMIN_ID:
             ids.append(int(self.BOT_ADMIN_ID))
