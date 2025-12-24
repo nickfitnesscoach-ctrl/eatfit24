@@ -112,7 +112,6 @@ jobs:
             else
               RESET_EXIT=1
             fi
-            set -e
 
             echo ">>> Checking if git update succeeded..."
             echo ">>> FETCH_EXIT=${FETCH_EXIT}, RESET_EXIT=${RESET_EXIT:-1}"
@@ -144,6 +143,9 @@ jobs:
             echo ">>> New commit: ${NEW_COMMIT}"
             echo ">>> Current working directory: $(pwd)"
             echo ">>> Continuing to next step..."
+
+            # Re-enable exit on error after all git operations complete
+            set -e
 
             echo ">>> [6/9] Verify compose file"
             if [ ! -f "compose.yml" ]; then
