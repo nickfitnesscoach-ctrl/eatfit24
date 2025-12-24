@@ -136,22 +136,31 @@ jobs:
             fi
 
             echo ">>> [7/9] Rebuild and restart services"
-            docker compose -f compose.yml up -d --build
-
+            set +e  # Temporarily disable exit on error to capture exit code
+            docker compose -f compose.yml up -d --build 2>&1
             DEPLOY_EXIT_CODE=$?
+            set -e  # Re-enable exit on error
 
             if [ ${DEPLOY_EXIT_CODE} -ne 0 ]; then
               echo "❌ Docker compose failed with exit code ${DEPLOY_EXIT_CODE}"
+              echo ">>> Dumping docker compose logs..."
+              docker compose logs --tail 100 2>&1 || true
 
               if [ "${PREV_COMMIT}" != "none" ]; then
                 echo ">>> Attempting rollback to ${PREV_COMMIT}..."
                 git reset --hard "${PREV_COMMIT}"
-                docker compose -f compose.yml up -d --build
+                set +e
+                docker compose -f compose.yml up -d --build 2>&1
+                ROLLBACK_EXIT=$?
+                set -e
 
-                if [ $? -eq 0 ]; then
+                if [ ${ROLLBACK_EXIT} -eq 0 ]; then
                   echo "✅ Rollback successful"
+                  exit 0  # Exit successfully after rollback
                 else
-                  echo "❌ Rollback also failed! Manual intervention required."
+                  echo "❌ Rollback also failed with exit code ${ROLLBACK_EXIT}"
+                  echo ">>> Manual intervention required."
+                  docker compose logs --tail 100 2>&1 || true
                 fi
               fi
 
