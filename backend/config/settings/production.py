@@ -62,8 +62,10 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
-# Перенаправление на HTTPS (включать только если у тебя правильно настроен TLS)
-SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() == "true"
+# Перенаправление на HTTPS
+# Defense in depth: Django тоже делает редирект, даже если внешний Nginx уже настроен
+# Помогает при обходе Nginx (внутренний доступ, неправильный vhost, будущие прокси-сценарии)
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True").lower() == "true"
 
 
 # -----------------------------------------------------------------------------
