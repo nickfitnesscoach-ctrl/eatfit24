@@ -69,6 +69,17 @@ SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True").lower() == "
 
 
 # -----------------------------------------------------------------------------
+# CSRF: trusted origins для Django 4.0+ (требуется для HTTPS через Nginx)
+# -----------------------------------------------------------------------------
+_csrf_origins_env = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
+if _csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins_env.split(",") if o.strip()]
+else:
+    # Fallback: автоматически из ALLOWED_HOSTS
+    CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host not in ["localhost", "127.0.0.1"]]
+
+
+# -----------------------------------------------------------------------------
 # CORS: в проде задаётся через env (и обычно только https домены)
 # -----------------------------------------------------------------------------
 raw_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
