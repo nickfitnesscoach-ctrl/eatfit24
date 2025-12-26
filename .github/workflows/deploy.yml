@@ -245,9 +245,10 @@ jobs:
             if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
               echo "✅ Frontend healthy (port 3000)"
             else
-              echo "⚠️ Frontend not responding on port 3000"
+              echo "❌ Frontend not responding on port 3000"
               echo ">>> Frontend logs:"
-              docker logs --tail 30 eatfit24-frontend
+              docker logs --tail 50 eatfit24-frontend
+              exit 1
             fi
 
             echo ""
@@ -259,6 +260,9 @@ jobs:
             else
               echo "❌ Public website health check failed (code=${HTTP_CODE:-unknown})"
               echo ">>> This indicates SSL/Nginx routing or backend exposure issues"
+              echo ""
+              echo ">>> Diagnostics - Response headers (last 20 lines):"
+              curl -sSIL --max-time 10 https://eatfit24.ru/health/ 2>&1 | tail -n 20 || echo ">>> Failed to fetch headers"
               exit 1
             fi
 
