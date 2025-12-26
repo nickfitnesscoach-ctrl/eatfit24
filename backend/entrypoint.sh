@@ -86,6 +86,22 @@ fi
 # ============================================================
 
 if [ "$RUN_COLLECTSTATIC" = "1" ]; then
+    echo "[Entrypoint] Preparing static files directories..."
+
+    # Ensure directories exist
+    mkdir -p staticfiles media logs
+
+    # Clean staticfiles if we can't write to it (fixes Permission denied from old root-owned files)
+    if [ -d "staticfiles" ] && ! touch staticfiles/.writetest 2>/dev/null; then
+        echo "[Entrypoint] WARNING: Cannot write to staticfiles/ (likely owned by root)"
+        echo "[Entrypoint] Attempting to clean staticfiles/ before collection..."
+        # Try to remove files we can remove
+        find staticfiles -type f -writable -delete 2>/dev/null || true
+        find staticfiles -type d -empty -delete 2>/dev/null || true
+    else
+        rm -f staticfiles/.writetest 2>/dev/null || true
+    fi
+
     echo "[Entrypoint] Collecting static files..."
 
     if python manage.py collectstatic --noinput --settings="$DJANGO_SETTINGS_MODULE"; then
