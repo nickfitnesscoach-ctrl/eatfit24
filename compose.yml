@@ -101,7 +101,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eatfit24-celery-worker
-    command: celery -A config worker -l INFO --concurrency=2
+    command: celery -A config worker -l INFO --concurrency=2 -Q ai,billing,default
     depends_on:
       backend:
         condition: service_healthy
