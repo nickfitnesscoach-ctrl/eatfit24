@@ -318,6 +318,17 @@ BILLING_RECURRING_ENABLED = os.environ.get("BILLING_RECURRING_ENABLED", "False")
 
 
 # -----------------------------------------------------------------------------
+# Billing: YooKassa Payment Provider
+# -----------------------------------------------------------------------------
+YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
+YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
+YOOKASSA_MODE = os.environ.get("YOOKASSA_MODE", "test")
+YOOKASSA_RETURN_URL = os.environ.get("YOOKASSA_RETURN_URL", "")
+YOOKASSA_WEBHOOK_URL = os.environ.get("YOOKASSA_WEBHOOK_URL", "")
+YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = os.environ.get("YOOKASSA_WEBHOOK_VERIFY_SIGNATURE", "true").lower() == "true"
+
+
+# -----------------------------------------------------------------------------
 # JWT (если нужно)
 # -----------------------------------------------------------------------------
 SIMPLE_JWT = {
