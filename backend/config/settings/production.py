@@ -108,3 +108,22 @@ LOGGING = {
         "apps.ai_proxy": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+
+# -----------------------------------------------------------------------------
+# YooKassa Payment Provider (CRITICAL - production override)
+# -----------------------------------------------------------------------------
+# Явно задаём здесь для надёжности, т.к. это критичный контур денег
+YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
+YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
+YOOKASSA_MODE = os.environ.get("YOOKASSA_MODE", "test")
+YOOKASSA_RETURN_URL = os.environ.get("YOOKASSA_RETURN_URL", "")
+YOOKASSA_WEBHOOK_URL = os.environ.get("YOOKASSA_WEBHOOK_URL", "")
+YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = os.environ.get("YOOKASSA_WEBHOOK_VERIFY_SIGNATURE", "true").lower() == "true"
+
+# Fail-fast: не даём стартовать без credentials в проде
+if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
+    raise RuntimeError(
+        "YooKassa credentials missing in production. "
+        "Set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY environment variables."
+    )
