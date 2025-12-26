@@ -32,7 +32,21 @@ echo "  - RUN_MIGRATIONS=$RUN_MIGRATIONS"
 echo "  - RUN_COLLECTSTATIC=$RUN_COLLECTSTATIC"
 
 # ============================================================
-# Wait for PostgreSQL
+# Detect Service Type
+# ============================================================
+
+# If command is 'celery', skip DB-dependent initialization
+# Celery workers will wait for backend service (which runs migrations)
+if [ "$1" = "celery" ]; then
+    echo "[Entrypoint] Celery service detected, skipping migrations/collectstatic"
+    echo "[Entrypoint] Waiting briefly for backend to initialize DB..."
+    sleep 5
+    echo "[Entrypoint] Executing Celery command: $@"
+    exec "$@"
+fi
+
+# ============================================================
+# Wait for PostgreSQL (backend service only)
 # ============================================================
 
 DB_HOST="${POSTGRES_HOST:-db}"
@@ -120,7 +134,7 @@ else
 fi
 
 # ============================================================
-# Start Gunicorn
+# Start Gunicorn (backend service)
 # ============================================================
 
 echo "[Entrypoint] Starting Gunicorn with config gunicorn_config.py..."
