@@ -61,14 +61,6 @@ const FoodLogPage: React.FC = () => {
         getMealType: () => mealType,
     });
 
-    // Derive results from photoQueue for compatibility
-    const results = photoQueue
-        .filter(p => p.status === 'success' && p.result)
-        .map(p => ({
-            file: p.file,
-            status: 'success' as const,
-            data: p.result!,
-        }));
 
     // Cleanup on unmount
     useEffect(() => {
@@ -368,11 +360,26 @@ const FoodLogPage: React.FC = () => {
                 {/* Batch Results Modal */}
                 {showBatchResults && (
                     <BatchResultsModal
-                        results={results}
+                        photoQueue={photoQueue}
+                        onRetry={(id) => {
+                            setShowBatchResults(false);
+                            retryPhoto(id);
+                        }}
+                        onRetryAll={() => {
+                            setShowBatchResults(false);
+                            // Retry all retryable errors
+                            photoQueue.forEach(p => {
+                                if (p.status === 'error' && p.error !== 'Отменено') {
+                                    retryPhoto(p.id);
+                                }
+                            });
+                        }}
                         onClose={handleCloseResults}
                         onOpenDiary={() => {
                             setShowBatchResults(false);
-                            navigate('/');
+                            cleanup(); // Free hook-owned URLs
+                            const dateStr = selectedDate.toISOString().split('T')[0];
+                            navigate(`/?date=${dateStr}`);
                         }}
                     />
                 )}
