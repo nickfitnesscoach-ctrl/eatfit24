@@ -40,8 +40,8 @@ export function useTaskPolling(
 ): UseTaskPollingReturn {
     const {
         maxDuration = POLLING_CONFIG.CLIENT_TIMEOUT_MS,
-        initialDelay = POLLING_CONFIG.INITIAL_DELAY_MS,
-        maxDelay = POLLING_CONFIG.MAX_DELAY_MS,
+        initialDelay = POLLING_CONFIG.FAST_PHASE_DELAY_MS,
+        maxDelay = POLLING_CONFIG.SLOW_PHASE_MAX_DELAY_MS,
         backoffMultiplier = POLLING_CONFIG.BACKOFF_MULTIPLIER,
     } = options;
 

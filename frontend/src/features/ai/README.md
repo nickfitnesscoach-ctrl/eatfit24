@@ -10,6 +10,35 @@
 
 См. [API_CONTRACT_AI_AND_TELEGRAM.md](/docs/API_CONTRACT_AI_AND_TELEGRAM.md) для полной спецификации.
 
+## Image Preprocessing (Компрессия изображений)
+
+**Инварианты:**
+- Изображение перед отправкой: **JPEG, quality=0.85, max side=1024px**
+- Preprocess выполняется ровно один раз на каждое фото
+- Если preprocess не удался → ошибка, оригинал НЕ отправляется
+
+**Pipeline:**
+1. Валидация MIME type (`image/*`)
+2. Конвертация HEIC → JPEG (если нужно)
+3. Декодирование через `createImageBitmap()` (fallback: HTMLImageElement)
+4. Auto-ориентация EXIF
+5. Ресайз: longest side → 1024px
+6. Экспорт: JPEG quality=0.85
+
+**Конфигурация** (`lib/imagePreprocess.ts`):
+```typescript
+PREPROCESS_CONFIG = {
+  TARGET_QUALITY: 0.85,   // JPEG quality
+  MAX_SIDE_PX: 1024,      // Max dimension
+  TIMEOUT_MS: 2500,       // Abort threshold
+}
+```
+
+**Метрики в консоли:**
+```
+[Preprocess] { original_size, output_size, original_px, output_px, processing_ms }
+```
+
 ## Маппинг типов
 
 API использует другие названия полей, чем UI (для обратной совместимости):
@@ -69,6 +98,7 @@ features/ai/
 │   └── index.ts
 ├── lib/                    # Утилиты
 │   ├── image.ts            # HEIC-конвертация, валидация
+│   ├── imagePreprocess.ts  # Компрессия и ресайз (NEW)
 │   └── index.ts
 ├── model/                  # Типы и константы
 │   ├── constants.ts        # POLLING_CONFIG, MEAL_TYPES, ошибки
@@ -129,3 +159,4 @@ const { startBatch, results, isProcessing } = useFoodBatchAnalysis({
 - **Safe area insets**: Использовать `pb-[calc(6rem+env(safe-area-inset-bottom))]`
 - **Высота на мобильных**: Использовать класс `min-h-dvh`
 - **Зона загрузки**: `ui/Upload/UploadDropzone.tsx`
+

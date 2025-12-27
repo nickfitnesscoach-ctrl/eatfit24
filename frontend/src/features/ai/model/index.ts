@@ -3,11 +3,18 @@
  */
 
 // Types
-export type { FileWithComment, BatchProgress, BatchAnalysisOptions } from './types';
+export type {
+    FileWithComment,
+    BatchProgress,
+    BatchAnalysisOptions,
+    PhotoUploadStatus,
+    PhotoQueueItem,
+} from './types';
 
 // Constants
 export {
     POLLING_CONFIG,
+    PHOTO_STATUS_LABELS,
     MEAL_TYPES,
     MEAL_TYPE_OPTIONS,
     AI_ERROR_CODES,

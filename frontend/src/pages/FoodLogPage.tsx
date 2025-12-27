@@ -46,15 +46,24 @@ const FoodLogPage: React.FC = () => {
     // Batch analysis hook
     const {
         isProcessing,
-        progress,
-        results,
+        photoQueue,
         startBatch,
+        retryPhoto,
         cancelBatch,
     } = useFoodBatchAnalysis({
         onDailyLimitReached: () => setShowLimitModal(true),
         getDateString: () => selectedDate.toISOString().split('T')[0],
         getMealType: () => mealType,
     });
+
+    // Derive results from photoQueue for compatibility
+    const results = photoQueue
+        .filter(p => p.status === 'success' && p.result)
+        .map(p => ({
+            file: p.file,
+            status: 'success' as const,
+            data: p.result!,
+        }));
 
     // Cleanup preview URLs on unmount or when files change
     useEffect(() => {
@@ -65,33 +74,46 @@ const FoodLogPage: React.FC = () => {
         };
     }, [selectedFiles]);
 
+    // Cleanup hook-owned URLs on unmount (prevents leak if user navigates away)
+    useEffect(() => {
+        return () => {
+            cancelBatch(); // Stops processing + revokes ownedUrls
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only on unmount
+
     // Show results modal when batch completes
     useEffect(() => {
-        if (results.length > 0 && !isProcessing) {
+        const allDone = photoQueue.length > 0 &&
+            photoQueue.every(p => p.status === 'success' || p.status === 'error');
+        if (allDone && !isProcessing && photoQueue.length > 0) {
             setShowBatchResults(true);
             setSelectedFiles([]);
             billing.refresh();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [results, isProcessing]); // Removed billing to prevent infinite loop
+    }, [photoQueue, isProcessing]); // Removed billing to prevent infinite loop
 
     // Handle file selection from UploadDropzone
     const handleFilesSelected = async (files: File[]) => {
         // Convert to FileWithComment objects with empty comments
         const filesWithComments: FileWithComment[] = await Promise.all(
             files.map(async (file) => {
-                let previewUrl: string;
+                // For HEIC: convert and replace file with converted JPEG
                 if (isHeicFile(file)) {
                     try {
                         const converted = await convertHeicToJpeg(file);
-                        previewUrl = URL.createObjectURL(converted);
+                        return {
+                            file: converted,  // Use converted file!
+                            comment: '',
+                            previewUrl: URL.createObjectURL(converted)
+                        };
                     } catch {
-                        previewUrl = '';
+                        // Fallback: use original, preprocess will handle it
+                        return { file, comment: '', previewUrl: '' };
                     }
-                } else {
-                    previewUrl = URL.createObjectURL(file);
                 }
-                return { file, comment: '', previewUrl };
+                return { file, comment: '', previewUrl: URL.createObjectURL(file) };
             })
         );
         setSelectedFiles(filesWithComments);
@@ -101,18 +123,20 @@ const FoodLogPage: React.FC = () => {
     const handleAddFiles = async (newFiles: File[]) => {
         const filesWithComments: FileWithComment[] = await Promise.all(
             newFiles.map(async (file) => {
-                let previewUrl: string;
+                // For HEIC: convert and replace file with converted JPEG
                 if (isHeicFile(file)) {
                     try {
                         const converted = await convertHeicToJpeg(file);
-                        previewUrl = URL.createObjectURL(converted);
+                        return {
+                            file: converted,  // Use converted file!
+                            comment: '',
+                            previewUrl: URL.createObjectURL(converted)
+                        };
                     } catch {
-                        previewUrl = '';
+                        return { file, comment: '', previewUrl: '' };
                     }
-                } else {
-                    previewUrl = URL.createObjectURL(file);
                 }
-                return { file, comment: '', previewUrl };
+                return { file, comment: '', previewUrl: URL.createObjectURL(file) };
             })
         );
         setSelectedFiles([...selectedFiles, ...filesWithComments]);
@@ -210,10 +234,10 @@ const FoodLogPage: React.FC = () => {
                 </div>
 
                 {/* Main Content Area */}
-                {isProcessing ? (
+                {isProcessing || photoQueue.some(p => !['success', 'error'].includes(p.status)) ? (
                     <BatchProcessingScreen
-                        current={progress.current}
-                        total={progress.total}
+                        photoQueue={photoQueue}
+                        onRetry={retryPhoto}
                         onCancel={() => {
                             setSelectedFiles([]);
                             cancelBatch();

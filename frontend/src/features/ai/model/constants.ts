@@ -4,26 +4,46 @@
  * Aligned with API Contract polling recommendations
  */
 
+import type { PhotoUploadStatus } from './types';
+
 // ============================================================
-// Polling Configuration (per API Contract)
+// Polling Configuration (2-phase strategy)
 // ============================================================
 
 /**
  * Polling config for task status
- * Contract recommends: 1-2 seconds interval, 60s client timeout
+ * Phase 1 (fast): 1s interval for first 15 seconds
+ * Phase 2 (slow): 3s interval after 15 seconds
  */
 export const POLLING_CONFIG = {
-    /** Initial delay between polls (ms) */
-    INITIAL_DELAY_MS: 1500,
-    /** Maximum delay between polls (ms) */
-    MAX_DELAY_MS: 5000,
-    /** Backoff multiplier for exponential backoff */
-    BACKOFF_MULTIPLIER: 1.5,
+    /** Duration of fast polling phase (ms) */
+    FAST_PHASE_DURATION_MS: 15000,
+    /** Delay between polls in fast phase (ms) */
+    FAST_PHASE_DELAY_MS: 1000,
+    /** Delay between polls in slow phase (ms) */
+    SLOW_PHASE_DELAY_MS: 3000,
+    /** Maximum delay in slow phase with backoff (ms) */
+    SLOW_PHASE_MAX_DELAY_MS: 5000,
+    /** Backoff multiplier for slow phase */
+    BACKOFF_MULTIPLIER: 1.3,
     /** Maximum client-side polling duration (ms) */
     CLIENT_TIMEOUT_MS: 60000,
     /** Server-side Celery timeout (for reference) */
     SERVER_TIMEOUT_MS: 90000,
 } as const;
+
+// ============================================================
+// Photo Status Labels (Russian)
+// ============================================================
+
+export const PHOTO_STATUS_LABELS: Record<PhotoUploadStatus, string> = {
+    pending: 'Ожидает…',
+    compressing: 'Сжимаю фото…',
+    uploading: 'Загружаю…',
+    processing: 'В обработке…',
+    success: 'Готово ✅',
+    error: 'Ошибка',
+};
 
 // ============================================================
 // Meal Types (lowercase per API Contract)
