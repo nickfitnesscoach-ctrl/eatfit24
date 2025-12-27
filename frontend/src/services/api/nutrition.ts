@@ -84,12 +84,20 @@ export const deleteMeal = async (id: number): Promise<void> => {
  *   photo_url: string | null,
  *   meal_type_display: string
  * }
+ * @param signal - Optional AbortSignal for cancellation
  */
-export const getMealAnalysis = async (id: number | string): Promise<MealAnalysis> => {
+export const getMealAnalysis = async (
+    id: number | string,
+    signal?: AbortSignal
+): Promise<MealAnalysis> => {
     try {
-        const response = await fetchWithTimeout(`${URLS.meals}${id}/`, {
-            headers: getHeaders(),
-        });
+        const response = await fetchWithTimeout(
+            `${URLS.meals}${id}/`,
+            { headers: getHeaders() },
+            undefined, // default timeout
+            false,     // skipAuthCheck
+            signal     // external abort signal
+        );
         if (!response.ok) {
             throw new Error(`Failed to fetch meal analysis (${response.status})`);
         }

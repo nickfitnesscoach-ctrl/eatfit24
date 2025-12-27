@@ -65,13 +65,15 @@ const mapMealTypeToApi = (mealType?: string): string | undefined => {
  * @param userComment - Optional user comment about the food
  * @param mealType - Meal type (breakfast/lunch/dinner/snack)
  * @param date - Date string YYYY-MM-DD
+ * @param signal - Optional AbortSignal for cancellation
  * @returns RecognizeResponse with task_id for polling
  */
 export const recognizeFood = async (
     imageFile: File,
     userComment?: string,
     mealType?: MealType | string,
-    date?: string
+    date?: string,
+    signal?: AbortSignal
 ): Promise<RecognizeResponse> => {
     log(`AI recognize: ${imageFile.name}`);
 
@@ -93,11 +95,17 @@ export const recognizeFood = async (
         formData.append('date', date);
     }
 
-    const response = await fetchWithTimeout(URLS.recognize, {
-        method: 'POST',
-        headers: getHeadersWithoutContentType(),
-        body: formData,
-    });
+    const response = await fetchWithTimeout(
+        URLS.recognize,
+        {
+            method: 'POST',
+            headers: getHeadersWithoutContentType(),
+            body: formData,
+        },
+        undefined, // default timeout
+        false,     // skipAuthCheck
+        signal     // external abort signal
+    );
 
     // Log X-Request-ID for debugging
     const requestId = response.headers.get('X-Request-ID');
@@ -137,14 +145,24 @@ export const recognizeFood = async (
 /**
  * Get task status
  * GET /api/v1/ai/task/<task_id>/
+ * @param signal - Optional AbortSignal for cancellation
  */
-export const getTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
+export const getTaskStatus = async (
+    taskId: string,
+    signal?: AbortSignal
+): Promise<TaskStatusResponse> => {
     log(`Get task status: ${taskId}`);
 
-    const response = await fetchWithTimeout(URLS.taskStatus(taskId), {
-        method: 'GET',
-        headers: getHeaders(),
-    });
+    const response = await fetchWithTimeout(
+        URLS.taskStatus(taskId),
+        {
+            method: 'GET',
+            headers: getHeaders(),
+        },
+        undefined, // default timeout
+        false,     // skipAuthCheck
+        signal     // external abort signal
+    );
 
     if (!response.ok) {
         await throwApiError(response, 'Ошибка получения статуса задачи');

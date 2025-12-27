@@ -234,7 +234,7 @@ const handleAuthErrors = (response: Response): boolean => {
         });
         return true;
     }
-    
+
     if (response.status === 403) {
         dispatchAuthError({
             type: 'forbidden',
@@ -243,7 +243,7 @@ const handleAuthErrors = (response: Response): boolean => {
         });
         return true;
     }
-    
+
     return false;
 };
 
@@ -252,28 +252,65 @@ const handleAuthErrors = (response: Response): boolean => {
 // ============================================================
 
 export const fetchWithTimeout = async (
-    url: string, 
-    options: RequestInit = {}, 
+    url: string,
+    options: RequestInit = {},
     timeout = API_TIMEOUT,
-    skipAuthCheck = false
+    skipAuthCheck = false,
+    externalSignal?: AbortSignal
 ): Promise<Response> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
+
+    // Combine external signal with timeout signal
+    let combinedSignal: AbortSignal;
+
+    if (externalSignal) {
+        // Use AbortSignal.any if available (modern browsers)
+        if ('any' in AbortSignal) {
+            combinedSignal = (AbortSignal as any).any([externalSignal, timeoutController.signal]);
+        } else {
+            // Fallback: create a new controller that aborts on either signal
+            const combinedController = new AbortController();
+
+            const abortCombined = () => combinedController.abort();
+            externalSignal.addEventListener('abort', abortCombined);
+            timeoutController.signal.addEventListener('abort', abortCombined);
+
+            // Check if already aborted
+            if (externalSignal.aborted) {
+                combinedController.abort();
+            }
+
+            combinedSignal = combinedController.signal;
+        }
+    } else {
+        combinedSignal = timeoutController.signal;
+    }
 
     try {
         const response = await fetch(url, {
             ...options,
-            signal: controller.signal,
+            signal: combinedSignal,
         });
         clearTimeout(timeoutId);
-        
+
         if (!skipAuthCheck) {
             handleAuthErrors(response);
         }
-        
+
         return response;
     } catch (error) {
         clearTimeout(timeoutId);
+
+        // Check if aborted by external signal (user cancellation)
+        if (externalSignal?.aborted) {
+            // Re-throw as AbortError for caller to handle
+            const abortError = new Error('Request cancelled');
+            abortError.name = 'AbortError';
+            throw abortError;
+        }
+
+        // Timeout abort
         if (error instanceof Error && error.name === 'AbortError') {
             throw new ApiError({
                 code: 'TIMEOUT',

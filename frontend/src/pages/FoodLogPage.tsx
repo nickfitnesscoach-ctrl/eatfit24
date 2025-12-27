@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, Check, X, Send } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
@@ -43,6 +43,10 @@ const FoodLogPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
 
+    // Ref to access current selectedFiles in cleanup (avoids stale closure)
+    const selectedFilesRef = useRef<FileWithComment[]>([]);
+    selectedFilesRef.current = selectedFiles;
+
     // Batch analysis hook
     const {
         isProcessing,
@@ -50,6 +54,7 @@ const FoodLogPage: React.FC = () => {
         startBatch,
         retryPhoto,
         cancelBatch,
+        cleanup,  // For revoking ownedUrls on unmount
     } = useFoodBatchAnalysis({
         onDailyLimitReached: () => setShowLimitModal(true),
         getDateString: () => selectedDate.toISOString().split('T')[0],
@@ -65,19 +70,16 @@ const FoodLogPage: React.FC = () => {
             data: p.result!,
         }));
 
-    // Cleanup preview URLs on unmount or when files change
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            selectedFiles.forEach(f => {
+            // cleanup() is the master off switch: abort + revoke + reset
+            cleanup();
+
+            // Also cleanup parent-owned URLs (if any remain)
+            selectedFilesRef.current.forEach(f => {
                 if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
             });
-        };
-    }, [selectedFiles]);
-
-    // Cleanup hook-owned URLs on unmount (prevents leak if user navigates away)
-    useEffect(() => {
-        return () => {
-            cancelBatch(); // Stops processing + revokes ownedUrls
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Only on unmount
@@ -157,13 +159,30 @@ const FoodLogPage: React.FC = () => {
         setSelectedFiles(newFiles);
     };
 
+    /**
+     * Clear selectedFiles with explicit URL revoke
+     * Use for cancel/clear buttons (not after startBatch - hook owns those URLs)
+     */
+    const clearSelectedFiles = () => {
+        selectedFiles.forEach(f => {
+            if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+        });
+        setSelectedFiles([]);
+    };
+
     const handleAnalyze = () => {
         if (selectedFiles.length === 0) return;
+
+        // Start batch - hook takes ownership of URLs
         startBatch(selectedFiles);
+
+        // Clear parent's reference (no revoke - hook owns URLs now)
+        setSelectedFiles([]);
     };
 
     const handleCloseResults = () => {
         setShowBatchResults(false);
+        cleanup();  // Free hook-owned URLs
         const dateStr = selectedDate.toISOString().split('T')[0];
         navigate(`/?date=${dateStr}`);
     };
@@ -239,7 +258,7 @@ const FoodLogPage: React.FC = () => {
                         photoQueue={photoQueue}
                         onRetry={retryPhoto}
                         onCancel={() => {
-                            setSelectedFiles([]);
+                            // During processing, hook owns URLs - just cancel (hook will cleanup)
                             cancelBatch();
                         }}
                     />
@@ -250,7 +269,7 @@ const FoodLogPage: React.FC = () => {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-bold text-gray-900">Выбранные фото ({selectedFiles.length})</h2>
                                 <button
-                                    onClick={() => setSelectedFiles([])}
+                                    onClick={clearSelectedFiles}
                                     className="text-gray-400 hover:text-gray-600"
                                 >
                                     <X size={20} />
@@ -275,7 +294,7 @@ const FoodLogPage: React.FC = () => {
                             {/* Actions */}
                             <div className="mt-6 grid grid-cols-2 gap-3">
                                 <button
-                                    onClick={() => setSelectedFiles([])}
+                                    onClick={clearSelectedFiles}
                                     className="py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
                                 >
                                     Отмена
