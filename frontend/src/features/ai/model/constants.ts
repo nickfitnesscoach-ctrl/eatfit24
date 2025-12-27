@@ -54,6 +54,10 @@ export const AI_ERROR_CODES = {
     TASK_FAILURE: 'TASK_FAILURE',
     NETWORK_ERROR: 'NETWORK_ERROR',
     EMPTY_RESULT: 'EMPTY_RESULT',
+    // Preprocess errors
+    PREPROCESS_DECODE_FAILED: 'PREPROCESS_DECODE_FAILED',
+    PREPROCESS_TIMEOUT: 'PREPROCESS_TIMEOUT',
+    PREPROCESS_INVALID_IMAGE: 'PREPROCESS_INVALID_IMAGE',
 } as const;
 
 export type AiErrorCode = typeof AI_ERROR_CODES[keyof typeof AI_ERROR_CODES];
@@ -69,6 +73,10 @@ export const AI_ERROR_MESSAGES: Record<string, string> = {
     [AI_ERROR_CODES.TASK_FAILURE]: 'Ошибка обработки фото',
     [AI_ERROR_CODES.NETWORK_ERROR]: 'Ошибка сети. Проверьте интернет-соединение.',
     [AI_ERROR_CODES.EMPTY_RESULT]: 'Мы не смогли распознать еду на фото. Попробуйте сделать фото крупнее.',
+    // Preprocess errors
+    [AI_ERROR_CODES.PREPROCESS_DECODE_FAILED]: 'Не удалось обработать фото. Попробуйте другое или сделайте скриншот.',
+    [AI_ERROR_CODES.PREPROCESS_TIMEOUT]: 'Фото слишком тяжёлое. Попробуйте другое или сделайте скриншот.',
+    [AI_ERROR_CODES.PREPROCESS_INVALID_IMAGE]: 'Выбранный файл не является изображением.',
     // Backend throttling message pattern
     'Request was throttled': 'Дневной лимит исчерпан. Оформите PRO для безлимита.',
 };
@@ -104,8 +112,5 @@ export function getAiErrorMessage(errorCode: string | undefined, fallback?: stri
 export const AI_LIMITS = {
     /** Maximum photos per single upload batch */
     MAX_PHOTOS_PER_UPLOAD: 5,
-    /** Maximum file size in MB */
-    MAX_PHOTO_SIZE_MB: 10,
-    /** Maximum file size in bytes */
-    MAX_PHOTO_SIZE_BYTES: 10 * 1024 * 1024,
+    // Note: MAX_PHOTO_SIZE_* removed - preprocessing handles size reduction automatically
 } as const;

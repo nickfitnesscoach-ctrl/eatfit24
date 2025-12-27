@@ -13,7 +13,7 @@ import { recognizeFood, getTaskStatus, mapToAnalysisResult } from '../api';
 import type { AnalysisResult, BatchResult, TaskStatusResponse } from '../api';
 import type { FileWithComment, BatchAnalysisOptions } from '../model';
 import { POLLING_CONFIG, AI_ERROR_CODES, getAiErrorMessage } from '../model';
-import { convertHeicToJpeg } from '../lib';
+import { preprocessImage, PreprocessError } from '../lib';
 import { api } from '../../../services/api';
 
 interface UseFoodBatchAnalysisResult {
@@ -194,8 +194,17 @@ export const useFoodBatchAnalysis = (
                 setProgress({ current: i + 1, total: filesWithComments.length });
 
                 try {
-                    // Convert HEIC/HEIF to JPEG before upload
-                    const processedFile = await convertHeicToJpeg(file);
+                    // Preprocess image: resize + JPEG compression
+                    const { file: processedFile, metrics } = await preprocessImage(file);
+
+                    // Log preprocess metrics for debugging
+                    console.log('[Preprocess]', {
+                        original_size: metrics.originalSize,
+                        output_size: metrics.outputSize,
+                        original_px: `${metrics.originalPx.width}x${metrics.originalPx.height}`,
+                        output_px: `${metrics.outputPx.width}x${metrics.outputPx.height}`,
+                        processing_ms: metrics.processingMs,
+                    });
 
                     // Get date and meal type from options
                     const dateStr = options.getDateString();
@@ -249,6 +258,16 @@ export const useFoodBatchAnalysis = (
                             error: getAiErrorMessage(AI_ERROR_CODES.DAILY_LIMIT_REACHED),
                         });
                         break;
+                    }
+
+                    // Handle preprocess errors explicitly
+                    if (err instanceof PreprocessError) {
+                        batchResults.push({
+                            file,
+                            status: 'error',
+                            error: getAiErrorMessage(err.code),
+                        });
+                        continue; // Try next file
                     }
 
                     // Get localized error message

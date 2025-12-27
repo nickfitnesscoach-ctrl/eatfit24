@@ -42,20 +42,9 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             alert(`За один раз можно загрузить не более ${maxFiles} фото. Лишние будут проигнорированы.`);
         }
 
-        // Filter by size (10MB max)
-        const validFiles = imageFiles.slice(0, maxFiles).filter(file => {
-            if (file.size > 10 * 1024 * 1024) {
-                console.warn(`File ${file.name} is too large (skipped)`);
-                return false;
-            }
-            return true;
-        });
-
-        if (validFiles.length > 0) {
-            onFilesSelected(validFiles);
-        } else {
-            alert('Все выбранные файлы слишком большие (максимум 10MB).');
-        }
+        // All files pass through - preprocessing handles size reduction
+        const selectedFiles = imageFiles.slice(0, maxFiles);
+        onFilesSelected(selectedFiles);
     }, [maxFiles, onFilesSelected]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
