@@ -80,9 +80,20 @@ const FoodLogPage: React.FC = () => {
     useEffect(() => {
         const allDone = photoQueue.length > 0 &&
             photoQueue.every(p => p.status === 'success' || p.status === 'error');
+
         if (allDone && !isProcessing && photoQueue.length > 0) {
-            setShowBatchResults(true);
-            setSelectedFiles([]);
+            const hasErrors = photoQueue.some(p => p.status === 'error');
+
+            // Auto-open results ONLY if 100% success
+            if (!hasErrors) {
+                setShowBatchResults(true);
+            }
+
+            // Always clear selected files when batch is done
+            if (selectedFilesRef.current.length > 0) {
+                setSelectedFiles([]);
+            }
+
             billing.refresh();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,10 +256,18 @@ const FoodLogPage: React.FC = () => {
                 </div>
 
                 {/* Main Content Area */}
-                {isProcessing || photoQueue.some(p => !['success', 'error'].includes(p.status)) ? (
+                {(isProcessing || (photoQueue.length > 0 && !showBatchResults)) ? (
                     <BatchProcessingScreen
                         photoQueue={photoQueue}
                         onRetry={retryPhoto}
+                        onRetryAll={() => {
+                            photoQueue.forEach(p => {
+                                if (p.status === 'error' && p.error !== 'Отменено') {
+                                    retryPhoto(p.id);
+                                }
+                            });
+                        }}
+                        onShowResults={() => setShowBatchResults(true)}
                         onCancel={() => {
                             // During processing, hook owns URLs - just cancel (hook will cleanup)
                             cancelBatch();

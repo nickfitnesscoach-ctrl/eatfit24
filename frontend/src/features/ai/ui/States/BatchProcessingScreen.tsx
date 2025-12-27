@@ -7,6 +7,8 @@ interface BatchProcessingScreenProps {
     photoQueue: PhotoQueueItem[];
     onRetry: (id: string) => void;
     onCancel: () => void;
+    onShowResults: () => void;
+    onRetryAll?: () => void;
 }
 
 /**
@@ -15,14 +17,18 @@ interface BatchProcessingScreenProps {
 export const BatchProcessingScreen: React.FC<BatchProcessingScreenProps> = ({
     photoQueue,
     onRetry,
-    onCancel
+    onCancel,
+    onShowResults,
+    onRetryAll
 }) => {
     const completedCount = photoQueue.filter(p => p.status === 'success').length;
-    const errorCount = photoQueue.filter(p => p.status === 'error').length;
+    const errorCount = photoQueue.filter(p => p.status === 'error' && p.error !== 'Отменено').length;
+    const cancelledCount = photoQueue.filter(p => p.error === 'Отменено').length;
     const processingCount = photoQueue.filter(p =>
         !['success', 'error', 'pending'].includes(p.status)
     ).length;
-    const isAllDone = completedCount + errorCount === photoQueue.length;
+    const isAllDone = photoQueue.length > 0 && photoQueue.every(p => ['success', 'error'].includes(p.status));
+    const hasAnyError = errorCount > 0 || cancelledCount > 0;
 
     return (
         <div className="space-y-4">
@@ -30,7 +36,7 @@ export const BatchProcessingScreen: React.FC<BatchProcessingScreenProps> = ({
             <div className="bg-white rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-bold text-gray-900">
-                        Обработка фотографий
+                        {isAllDone ? 'Обработка завершена' : 'Обработка фотографий'}
                     </h3>
                     <span className="text-sm text-gray-500">
                         {completedCount}/{photoQueue.length}
@@ -49,6 +55,12 @@ export const BatchProcessingScreen: React.FC<BatchProcessingScreenProps> = ({
                             Ошибок: {errorCount}
                         </span>
                     )}
+                    {cancelledCount > 0 && (
+                        <span className="flex items-center gap-1 text-gray-400">
+                            <X className="w-3 h-3" />
+                            Отменено: {cancelledCount}
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -63,15 +75,55 @@ export const BatchProcessingScreen: React.FC<BatchProcessingScreenProps> = ({
                 ))}
             </div>
 
-            {/* Cancel Button */}
-            {!isAllDone && (
-                <button
-                    onClick={onCancel}
-                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-xl font-medium transition-colors"
-                >
-                    Прекратить анализ
-                </button>
-            )}
+            {/* Footer Actions */}
+            <div className="space-y-3 pt-2">
+                {isAllDone ? (
+                    <>
+                        {hasAnyError ? (
+                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+                                <div className="text-center">
+                                    <p className="text-gray-900 font-bold">Готово к просмотру</p>
+                                    <p className="text-sm text-gray-500">
+                                        Успешно: {completedCount}, Ошибок: {errorCount + cancelledCount}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={onShowResults}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold transition-all shadow-lg active:scale-[0.98]"
+                                    >
+                                        Посмотреть итоги
+                                    </button>
+                                    {errorCount > 1 && onRetryAll && (
+                                        <button
+                                            onClick={onRetryAll}
+                                            className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <RefreshCw size={16} />
+                                            Повторить ошибки ({errorCount})
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            /* Should usually auto-redirect, but fallback button just in case */
+                            <button
+                                onClick={onShowResults}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold transition-all shadow-lg"
+                            >
+                                Посмотреть результаты
+                            </button>
+                        )}
+                    </>
+                ) : (
+                    <button
+                        onClick={onCancel}
+                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl font-medium transition-colors"
+                    >
+                        Прекратить анализ
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
