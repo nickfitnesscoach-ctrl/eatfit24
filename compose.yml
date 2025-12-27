@@ -127,7 +127,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eatfit24-celery-beat
-    command: celery -A config beat -l INFO
+    command: celery -A config beat -l INFO --schedule=/app/celerybeat-data/celerybeat-schedule
     depends_on:
       backend:
         condition: service_healthy
@@ -136,6 +136,8 @@ services:
       - POSTGRES_HOST=db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - celerybeat_data:/app/celerybeat-data
     deploy:
       resources:
         limits:
@@ -207,6 +209,8 @@ volumes:
     name: eatfit24-backend-static
   backend_media:
     name: eatfit24-backend-media
+  celerybeat_data:
+    name: eatfit24-celerybeat-data
 
 # ============================================================
 # Networks

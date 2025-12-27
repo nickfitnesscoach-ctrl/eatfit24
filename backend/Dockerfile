@@ -56,7 +56,7 @@ RUN chown -R appuser:appuser /home/appuser/.local
 COPY --chown=appuser:appuser . .
 
 # Create necessary directories with proper ownership
-RUN mkdir -p logs staticfiles media && chown -R appuser:appuser logs staticfiles media
+RUN mkdir -p logs staticfiles media celerybeat-data && chown -R appuser:appuser logs staticfiles media celerybeat-data
 
 # Make entrypoint executable
 RUN chmod +x entrypoint.sh
