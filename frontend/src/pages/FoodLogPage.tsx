@@ -15,7 +15,10 @@ import {
     convertHeicToJpeg,
     MEAL_TYPE_OPTIONS,
     AI_LIMITS,
+<<<<<<< HEAD
     useAIProcessing,
+=======
+>>>>>>> 4ca8f99dce40d77fd273eebe71ff646a46b6029a
 } from '../features/ai';
 import type { FileWithComment } from '../features/ai';
 
@@ -234,7 +237,11 @@ const FoodLogPage: React.FC = () => {
                     <BatchProcessingScreen
                         photoQueue={photoQueue}
                         onRetry={retryPhoto}
+<<<<<<< HEAD
                         onShowResults={openResults}
+=======
+                        onShowResults={() => setShowBatchResults(true)}
+>>>>>>> 4ca8f99dce40d77fd273eebe71ff646a46b6029a
                         onCancel={cancelBatch}
                     />
                 ) : selectedFiles.length > 0 ? (
@@ -331,6 +338,7 @@ const FoodLogPage: React.FC = () => {
                             retryPhoto(id);
                         }}
                         onRetrySelected={(ids) => {
+<<<<<<< HEAD
                             // Close results to show processing screen? Or keep results open?
                             // If we retry, status becomes pending. 
                             // If we keep results open, we see update there.
@@ -340,6 +348,9 @@ const FoodLogPage: React.FC = () => {
                             // Currently BatchResults is static. 
                             // Let's close results to show main processing screen.
                             closeResults();
+=======
+                            setShowBatchResults(false);
+>>>>>>> 4ca8f99dce40d77fd273eebe71ff646a46b6029a
                             retrySelected(ids);
                         }}
                         onClose={handleCloseResults}
