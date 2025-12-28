@@ -2,10 +2,19 @@
 Business logic services for nutrition app.
 """
 
+import logging
 from datetime import date, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
-from .models import Meal, DailyGoal
+from django.db import models, transaction
+from django.utils import timezone
+
+from .models import Meal, MealPhoto, DailyGoal
+
+logger = logging.getLogger(__name__)
+
+# Time window for grouping photos into the same meal (in minutes)
+DRAFT_WINDOW_MINUTES = 10
 
 
 def get_daily_stats(user, target_date: date) -> Dict:
@@ -130,13 +139,13 @@ def get_weekly_stats(user, start_date: date) -> Dict:
 def create_auto_goal(user) -> DailyGoal:
     """
     Calculate and create a DailyGoal based on user profile.
-    
+
     Args:
         user: Django User instance
-        
+
     Returns:
         Created DailyGoal instance
-        
+
     Raises:
         ValueError: If profile data is incomplete
     """
@@ -153,3 +162,167 @@ def create_auto_goal(user) -> DailyGoal:
     )
 
     return daily_goal
+
+
+def get_or_create_draft_meal(
+    user,
+    meal_type: str,
+    meal_date: date,
+    meal_id: Optional[int] = None
+) -> Tuple[Meal, bool]:
+    """
+    Find an existing draft meal or create a new one for photo grouping.
+
+    Grouping rules:
+    1. If meal_id is provided and valid, use that meal
+    2. Otherwise, look for a draft/processing meal with:
+       - Same user, meal_type, date
+       - Created within last DRAFT_WINDOW_MINUTES (10 min)
+    3. If not found, create a new draft meal
+
+    Args:
+        user: Django User instance
+        meal_type: Type of meal (BREAKFAST, LUNCH, DINNER, SNACK)
+        meal_date: Date of the meal
+        meal_id: Optional existing meal ID to attach to
+
+    Returns:
+        Tuple of (Meal, created) where created is True if new meal was made
+    """
+    with transaction.atomic():
+        # Case 1: meal_id provided - verify ownership and use it
+        if meal_id:
+            meal = Meal.objects.select_for_update().filter(
+                id=meal_id,
+                user=user
+            ).first()
+            if meal:
+                logger.info(
+                    "[MealService] Using existing meal_id=%s for user_id=%s",
+                    meal_id, user.id
+                )
+                return meal, False
+            else:
+                logger.warning(
+                    "[MealService] meal_id=%s not found or not owned by user_id=%s, creating new",
+                    meal_id, user.id
+                )
+
+        # Case 2: Look for existing draft meal within time window
+        cutoff = timezone.now() - timedelta(minutes=DRAFT_WINDOW_MINUTES)
+
+        existing_meal = Meal.objects.select_for_update().filter(
+            user=user,
+            meal_type=meal_type,
+            date=meal_date,
+            status__in=['DRAFT', 'PROCESSING'],
+            created_at__gte=cutoff
+        ).order_by('-created_at').first()
+
+        if existing_meal:
+            logger.info(
+                "[MealService] Found existing draft meal_id=%s for user_id=%s (type=%s, date=%s)",
+                existing_meal.id, user.id, meal_type, meal_date
+            )
+            return existing_meal, False
+
+        # Case 3: Create new draft meal
+        new_meal = Meal.objects.create(
+            user=user,
+            meal_type=meal_type,
+            date=meal_date,
+            status='DRAFT'
+        )
+        logger.info(
+            "[MealService] Created new draft meal_id=%s for user_id=%s (type=%s, date=%s)",
+            new_meal.id, user.id, meal_type, meal_date
+        )
+        return new_meal, True
+
+
+def finalize_meal_if_complete(meal: Meal) -> None:
+    """
+    Check if all photos are processed and finalize meal status.
+
+    Called after each photo is processed to update meal status:
+    - If any photo is still PENDING/PROCESSING → do nothing
+    - If all photos are FAILED → delete orphan meal
+    - If at least one photo SUCCESS → set meal to COMPLETE
+
+    Args:
+        meal: Meal instance to check
+    """
+    with transaction.atomic():
+        # Reload meal with lock
+        meal = Meal.objects.select_for_update().get(id=meal.id)
+
+        photos = meal.photos.all()
+        if not photos.exists():
+            # No photos at all - shouldn't happen, but handle gracefully
+            logger.warning(
+                "[MealService] Meal %s has no photos, deleting orphan", meal.id
+            )
+            meal.delete()
+            return
+
+        # Check if any photos are still processing
+        pending_or_processing = photos.filter(status__in=['PENDING', 'PROCESSING']).exists()
+        if pending_or_processing:
+            # Still processing, don't finalize yet
+            return
+
+        # All photos are done (SUCCESS or FAILED)
+        successful_photos = photos.filter(status='SUCCESS').exists()
+
+        if successful_photos:
+            # At least one success - mark meal as complete
+            if meal.status != 'COMPLETE':
+                meal.status = 'COMPLETE'
+                meal.save(update_fields=['status'])
+                logger.info(
+                    "[MealService] Finalized meal_id=%s as COMPLETE", meal.id
+                )
+        else:
+            # All photos failed - delete orphan meal
+            logger.info(
+                "[MealService] All photos failed for meal_id=%s, deleting orphan", meal.id
+            )
+            meal.delete()
+
+
+def cleanup_orphan_meals(user, older_than_minutes: int = 30) -> int:
+    """
+    Clean up draft meals that have been stuck without photos.
+
+    This is a maintenance function to clean up meals that:
+    - Are in DRAFT status
+    - Have no photos
+    - Are older than specified minutes
+
+    Args:
+        user: Django User instance (or None for all users)
+        older_than_minutes: Only clean up meals older than this
+
+    Returns:
+        Number of meals deleted
+    """
+    cutoff = timezone.now() - timedelta(minutes=older_than_minutes)
+
+    queryset = Meal.objects.filter(
+        status='DRAFT',
+        created_at__lt=cutoff
+    ).annotate(
+        photo_count=models.Count('photos')
+    ).filter(
+        photo_count=0
+    )
+
+    if user:
+        queryset = queryset.filter(user=user)
+
+    count = queryset.count()
+    if count > 0:
+        queryset.delete()
+        logger.info("[MealService] Cleaned up %s orphan draft meals", count)
+
+    return count

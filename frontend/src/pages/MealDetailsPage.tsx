@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api, MealAnalysis } from '../services/api';
 import PageHeader from '../components/PageHeader';
-import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2 } from 'lucide-react';
+import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 // F-019: Skeleton loaders for better loading UX
 import { SkeletonMealDetails } from '../components/Skeleton';
 // F-029: Toast notifications
@@ -34,6 +34,9 @@ const MealDetailsPage: React.FC = () => {
     const [editing, setEditing] = useState(false);
     const [editName, setEditName] = useState('');
     const [editGrams, setEditGrams] = useState('');
+
+    // Photo gallery state (multi-photo meals)
+    const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
     // Helper: Navigate back to date from location state
     const navigateBackToDate = () => {
@@ -202,27 +205,88 @@ const MealDetailsPage: React.FC = () => {
         <div className="min-h-screen bg-gray-50 pb-8">
             <PageHeader title="Детали блюда" />
 
-            {/* Large Photo */}
-            <div className="w-full aspect-[4/3] bg-gray-200 relative">
-                {data.photo_url ? (
-                    <img
-                        src={data.photo_url}
-                        alt={data.label}
-                        className="w-full h-full object-cover"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        Нет фото
-                    </div>
-                )}
+            {/* Large Photo Gallery (supports multi-photo meals) */}
+            {(() => {
+                // Get successful photos from multi-photo data or fallback to single photo
+                const photos = data.photos?.filter((p: any) => p.status === 'SUCCESS' && p.image_url) || [];
+                const photoUrls = photos.length > 0
+                    ? photos.map((p: any) => p.image_url)
+                    : data.photo_url
+                    ? [data.photo_url]
+                    : [];
 
-                {/* Badge Overlay */}
-                <div className="absolute bottom-4 left-4">
-                    <span className="bg-white/90 backdrop-blur-sm text-gray-900 px-4 py-2 rounded-full font-bold shadow-lg">
-                        {data.label}
-                    </span>
-                </div>
-            </div>
+                const hasMultiplePhotos = photoUrls.length > 1;
+                const safeIndex = Math.min(currentPhotoIndex, photoUrls.length - 1);
+
+                return (
+                    <div className="w-full aspect-[4/3] bg-gray-200 relative">
+                        {photoUrls.length > 0 ? (
+                            <>
+                                <img
+                                    src={photoUrls[safeIndex]}
+                                    alt={`${data.label} - фото ${safeIndex + 1}`}
+                                    className="w-full h-full object-cover"
+                                />
+
+                                {/* Photo navigation for multi-photo meals */}
+                                {hasMultiplePhotos && (
+                                    <>
+                                        {/* Photo counter */}
+                                        <div className="absolute top-4 right-4 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                            {safeIndex + 1} / {photoUrls.length}
+                                        </div>
+
+                                        {/* Navigation arrows */}
+                                        <button
+                                            onClick={() => setCurrentPhotoIndex((prev) =>
+                                                prev === 0 ? photoUrls.length - 1 : prev - 1
+                                            )}
+                                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors"
+                                            aria-label="Предыдущее фото"
+                                        >
+                                            <ChevronLeft size={24} />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPhotoIndex((prev) =>
+                                                prev === photoUrls.length - 1 ? 0 : prev + 1
+                                            )}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors"
+                                            aria-label="Следующее фото"
+                                        >
+                                            <ChevronRight size={24} />
+                                        </button>
+
+                                        {/* Dot indicators */}
+                                        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                            {photoUrls.map((_: string, i: number) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => setCurrentPhotoIndex(i)}
+                                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                                        i === safeIndex ? 'bg-white' : 'bg-white/50'
+                                                    }`}
+                                                    aria-label={`Перейти к фото ${i + 1}`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                Нет фото
+                            </div>
+                        )}
+
+                        {/* Badge Overlay */}
+                        <div className="absolute bottom-4 left-4">
+                            <span className="bg-white/90 backdrop-blur-sm text-gray-900 px-4 py-2 rounded-full font-bold shadow-lg">
+                                {data.label}
+                            </span>
+                        </div>
+                    </div>
+                );
+            })()}
 
             <div className="p-4 space-y-6">
                 {/* Recognized Dishes Block */}

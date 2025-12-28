@@ -6,9 +6,14 @@ views.py — HTTP-эндпоинты AI распознавания.
 - Долгая работа (AI) — только в Celery.
 
 POST /api/v1/ai/recognize/
-- создаёт Meal (meal_type/date обязательны по модели)
-- если прислали multipart file — сохраняем фото в Meal.photo
-- запускает Celery задачу и возвращает 202 + task_id
+- Находит или создаёт Meal через get_or_create_draft_meal()
+- Создаёт MealPhoto с status=PENDING
+- Запускает Celery задачу и возвращает 202 + task_id + meal_id
+
+Multi-Photo Meal Grouping:
+- Если meal_id передан, фото прикрепляется к существующему meal
+- Если нет, ищется draft meal в пределах 10-минутного окна
+- Если не найден, создаётся новый draft meal
 
 GET /api/v1/ai/task/<task_id>/
 - polling статуса фоновой задачи
@@ -48,8 +53,12 @@ def _new_request_id() -> str:
 class AIRecognitionView(APIView):
     """
     POST /api/v1/ai/recognize/
-    Вход: {image, meal_type, date, user_comment}
-    Выход: 202 {task_id, status: 'processing'}
+    Вход: {image, meal_type, date, user_comment, meal_id?}
+    Выход: 202 {task_id, meal_id, status: 'processing'}
+
+    Multi-Photo Meal Support:
+    - meal_id передан → прикрепить фото к существующему meal
+    - meal_id не передан → найти draft meal в 10-мин окне или создать новый
     """
 
     permission_classes = [IsAuthenticated]
@@ -64,8 +73,9 @@ class AIRecognitionView(APIView):
 
         normalized = s.validated_data["normalized_image"]
         meal_type = s.validated_data["meal_type"]
-        date = s.validated_data["date"]
+        meal_date = s.validated_data["date"]
         user_comment = s.validated_data.get("user_comment", "")
+        client_meal_id = s.validated_data.get("meal_id")  # Optional: for multi-photo
 
         # P1-4: Проверяем лимит ДО создания Meal (избегаем orphan meals)
         from apps.billing.services import get_effective_plan_for_user
@@ -96,14 +106,57 @@ class AIRecognitionView(APIView):
                 resp["X-Request-ID"] = request_id
                 return resp
 
+        # Multi-Photo Grouping: Find or create draft meal
+        from apps.nutrition.services import get_or_create_draft_meal
+        from apps.nutrition.models import MealPhoto
+        from django.core.files.base import ContentFile
+        import mimetypes
+
+        meal, created = get_or_create_draft_meal(
+            user=request.user,
+            meal_type=meal_type,
+            meal_date=meal_date,
+            meal_id=client_meal_id,
+        )
+
+        # Create MealPhoto with PENDING status
+        # Determine file extension
+        mime_type = normalized.mime_type
+        if mime_type in ["image/heic", "image/heif"]:
+            ext = "heic"
+        else:
+            ext = mimetypes.guess_extension(mime_type) or ".jpg"
+            if ext.startswith("."):
+                ext = ext[1:]
+
+        filename = f"ai_{request_id}.{ext}"
+
+        meal_photo = MealPhoto.objects.create(
+            meal=meal,
+            status='PENDING',
+        )
+        # Save image file
+        meal_photo.image.save(filename, ContentFile(normalized.bytes_data), save=True)
+
+        logger.info(
+            "[AI] Created MealPhoto id=%s for meal_id=%s user_id=%s rid=%s",
+            meal_photo.id, meal.id, request.user.id, request_id
+        )
+
+        # Update meal status to PROCESSING
+        if meal.status == 'DRAFT':
+            meal.status = 'PROCESSING'
+            meal.save(update_fields=['status'])
+
         # 1) Async — основной режим (быстро и безопасно)
         if getattr(settings, "AI_ASYNC_ENABLED", True):
             task = recognize_food_async.delay(
-                meal_id=None,  # P1-1: Don't create Meal yet
+                meal_id=meal.id,
+                meal_photo_id=meal_photo.id,  # NEW: track which photo
                 meal_type=meal_type,
-                date=date,
+                date=meal_date,
                 image_bytes=normalized.bytes_data,
-                mime_type=normalized.mime_type,
+                mime_type=mime_type,
                 user_comment=user_comment,
                 request_id=request_id,
                 user_id=request.user.id,
@@ -112,7 +165,13 @@ class AIRecognitionView(APIView):
             # P0 Security Check: link task to user in cache (24h TTL)
             cache.set(f"ai_task_owner:{task.id}", request.user.id, timeout=86400)
 
-            data = {"task_id": str(task.id), "meal_id": None, "status": "processing"}
+            # Return meal_id so frontend can group subsequent photos
+            data = {
+                "task_id": str(task.id),
+                "meal_id": meal.id,
+                "meal_photo_id": meal_photo.id,
+                "status": "processing",
+            }
             resp = Response(data, status=status.HTTP_202_ACCEPTED)
             resp["X-Request-ID"] = request_id
             return resp
@@ -120,11 +179,12 @@ class AIRecognitionView(APIView):
         # 2) Sync — только для dev (не включать в проде)
         result = recognize_food_async.apply(
             kwargs=dict(
-                meal_id=None,
+                meal_id=meal.id,
+                meal_photo_id=meal_photo.id,
                 meal_type=meal_type,
-                date=date,
+                date=meal_date,
                 image_bytes=normalized.bytes_data,
-                mime_type=normalized.mime_type,
+                mime_type=mime_type,
                 user_comment=user_comment,
                 request_id=request_id,
                 user_id=request.user.id,

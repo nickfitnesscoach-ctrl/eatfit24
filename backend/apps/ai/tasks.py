@@ -1,19 +1,22 @@
 """
 tasks.py — Celery задачи AI распознавания.
 
-Простыми словами:
-- HTTP ручка отвечает быстро (202) и отдаёт task_id
-- эта задача в фоне:
-  1) вызывает AI Proxy
-  2) нормализует ответ
-  3) сохраняет в FoodItem (meal.items)
-  4) возвращает JSON-safe результат
+Multi-Photo Meal Architecture:
+- View создаёт MealPhoto с status=PENDING
+- Эта задача:
+  1) Обновляет MealPhoto.status=PROCESSING
+  2) Вызывает AI Proxy
+  3) Создаёт FoodItem записи (добавляет, не перезаписывает)
+  4) Сохраняет recognized_data в MealPhoto
+  5) Обновляет MealPhoto.status=SUCCESS/FAILED
+  6) Вызывает finalize_meal_if_complete()
 
 Главные правила:
-- ретраи только на timeout/5xx (временные проблемы)
-- граммовка всегда >= 1 (иначе упадёт валидатор FoodItem)
+- НЕ удаляем Meal при ошибке одного фото (другие могут успеть)
+- Ретраи только на timeout/5xx (временные проблемы)
+- Граммовка всегда >= 1 (иначе упадёт валидатор FoodItem)
 - DecimalField сохраняем через Decimal(str(x))
-- никаких секретов в логах
+- Никаких секретов в логах
 """
 
 from __future__ import annotations
@@ -48,7 +51,7 @@ def _to_decimal(value: Any, default: str = "0") -> Decimal:
 def _is_task_cancelled(task_id: str, user_id: int | None) -> bool:
     """
     Check if task was cancelled by user via CancelTaskView.
-    Returns True if task should abort without creating Meal.
+    Returns True if task should abort without processing.
     """
     from django.core.cache import cache
 
@@ -85,6 +88,27 @@ def _json_safe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return safe
 
 
+def _update_meal_photo_failed(meal_photo_id: int, error_code: str, error_message: str):
+    """Update MealPhoto to FAILED status and trigger finalization check."""
+    from apps.nutrition.models import MealPhoto
+    from apps.nutrition.services import finalize_meal_if_complete
+
+    try:
+        with transaction.atomic():
+            photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
+            photo.status = 'FAILED'
+            photo.error_message = error_message
+            photo.recognized_data = {"error": error_code, "error_message": error_message}
+            photo.save(update_fields=['status', 'error_message', 'recognized_data'])
+
+            # Check if meal should be finalized
+            finalize_meal_if_complete(photo.meal)
+    except MealPhoto.DoesNotExist:
+        logger.warning("[AI] MealPhoto %s not found for status update", meal_photo_id)
+    except Exception as e:
+        logger.error("[AI] Failed to update MealPhoto %s: %s", meal_photo_id, str(e))
+
+
 @shared_task(
     bind=True,
     max_retries=3,
@@ -95,7 +119,8 @@ def _json_safe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def recognize_food_async(
     self,
     *,
-    meal_id: int | None = None,
+    meal_id: int,  # Required: meal already created by view
+    meal_photo_id: int,  # Required: MealPhoto already created by view
     meal_type: str = "SNACK",
     date: str | None = None,
     image_bytes: bytes,
@@ -107,26 +132,50 @@ def recognize_food_async(
     """
     Основная задача: распознать еду по фото и сохранить items в БД.
 
+    Multi-Photo Architecture:
+    - Meal и MealPhoto уже созданы в view
+    - Обновляем MealPhoto.status по ходу работы
+    - Добавляем FoodItem к Meal (не перезаписываем)
+    - При ошибке одного фото — Meal сохраняется (другие могут успеть)
+
     Возвращаемое значение будет доступно через Celery result backend (polling ручка).
     """
     task_id = getattr(self.request, "id", None) or "unknown"
     rid = request_id or f"task-{str(task_id)[:8]}"
 
-    # Импортируем модель внутри задачи, чтобы не тянуть ORM при старте воркера
-    from apps.nutrition.models import Meal
+    # Импортируем модели внутри задачи
+    from apps.nutrition.models import Meal, MealPhoto
+    from apps.nutrition.services import finalize_meal_if_complete
 
     logger.info(
-        "[AI] start task=%s meal_id=%s type=%s date=%s rid=%s user_id=%s",
+        "[AI] start task=%s meal_id=%s photo_id=%s type=%s date=%s rid=%s user_id=%s",
         task_id,
         meal_id,
+        meal_photo_id,
         meal_type,
         date,
         rid,
         user_id,
     )
 
+    # Update MealPhoto to PROCESSING
+    try:
+        with transaction.atomic():
+            meal_photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
+            meal_photo.status = 'PROCESSING'
+            meal_photo.save(update_fields=['status'])
+    except MealPhoto.DoesNotExist:
+        logger.error("[AI] MealPhoto %s not found, aborting task", meal_photo_id)
+        return {
+            "error": "PHOTO_NOT_FOUND",
+            "error_message": "Фото не найдено.",
+            "items": [],
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
+            "owner_id": user_id,
+        }
+
     # 1) Validate mime_type (P0 Security/Integrity)
-    # Hardened Validation: Verify image by magic bytes/Pillow
     if not mime_type or mime_type not in [
         "image/jpeg",
         "image/png",
@@ -134,28 +183,39 @@ def recognize_food_async(
         "image/heic",
         "image/heif",
     ]:
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "UNSUPPORTED_IMAGE_TYPE",
+            "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP."
+        )
         return {
             "error": "UNSUPPORTED_IMAGE_TYPE",
             "error_message": "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP.",
             "items": [],
-            "meal_id": None,
-            "owner_id": user_id,  # P0-Ownership
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
+            "owner_id": user_id,
         }
 
-    # P0-D: Hardened validation using safe decode or magic bytes
-    # _detect_mime_from_bytes (already imported) works by signature
+    # P0-D: Hardened validation using magic bytes
     from apps.ai.serializers import _detect_mime_from_bytes
 
     detected = _detect_mime_from_bytes(image_bytes)
 
     # For HEIC we rely on client MIME as signatures are complex (ftyp)
     if not detected and mime_type not in ["image/heic", "image/heif"]:
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "INVALID_IMAGE",
+            "Файл поврежден или не является изображением."
+        )
         return {
             "error": "INVALID_IMAGE",
             "error_message": "Файл поврежден или не является изображением.",
             "items": [],
-            "meal_id": None,
-            "owner_id": user_id,  # P0-Ownership: Add explicit owner_id for robust fallback
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
+            "owner_id": user_id,
         }
 
     # 2) Safely parse date
@@ -167,26 +227,60 @@ def recognize_food_async(
             parsed_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         except ValueError:
             logger.warning("[AI] Invalid date format: %s rid=%s", date, rid)
+            _update_meal_photo_failed(
+                meal_photo_id,
+                "INVALID_DATE_FORMAT",
+                "Некорректный формат даты."
+            )
             return {
-                "meal_id": None,
+                "meal_id": meal_id,
+                "meal_photo_id": meal_photo_id,
                 "items": [],
                 "totals": {},
                 "error": "INVALID_DATE_FORMAT",
                 "error_message": "Некорректный формат даты.",
-                "owner_id": user_id,  # P0-Ownership
+                "owner_id": user_id,
             }
     else:
         parsed_date = date or datetime.date.today()
 
-    # P0 Security Check: restrict meal lookup to owner
-    # If meal_id belongs to another user, we ignore it (meal will be None)
-    meal = None
-    if meal_id and user_id:
-        meal = Meal.objects.filter(id=meal_id, user_id=user_id).first()
-        if meal_id and not meal:
-            logger.warning(
-                "[AI] Meal not found or ownership mismatch: meal_id=%s user_id=%s", meal_id, user_id
-            )
+    # P0 Security Check: Verify meal ownership
+    meal = Meal.objects.filter(id=meal_id, user_id=user_id).first()
+    if not meal:
+        logger.warning(
+            "[AI] Meal not found or ownership mismatch: meal_id=%s user_id=%s", meal_id, user_id
+        )
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "MEAL_NOT_FOUND",
+            "Приём пищи не найден."
+        )
+        return {
+            "error": "MEAL_NOT_FOUND",
+            "error_message": "Приём пищи не найден.",
+            "items": [],
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
+            "owner_id": user_id,
+        }
+
+    # P0-Cancel: Check if task was cancelled
+    if _is_task_cancelled(task_id, user_id):
+        logger.info(
+            "[AI] Task cancelled: task=%s user_id=%s rid=%s",
+            task_id,
+            user_id,
+            rid,
+        )
+        _update_meal_photo_failed(meal_photo_id, "CANCELLED", "Отменено")
+        return {
+            "error": "CANCELLED",
+            "error_message": "Отменено",
+            "items": [],
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
+            "owner_id": user_id,
+        }
 
     service = AIProxyService()
 
@@ -202,164 +296,121 @@ def recognize_food_async(
     except Exception as e:
         logger.error("[AI] Proxy error: %r rid=%s", e, rid)
 
-        # P1-3: Delete meal atomically if AI failed and meal exists
-        if meal_id:
-            try:
-                from apps.nutrition.models import Meal
-
-                meal = Meal.objects.filter(id=meal_id, user_id=user_id).first()
-                if meal:
-                    meal.delete()
-                    logger.info(
-                        "[AI] Deleted orphan meal_id=%s because AI proxy failed. rid=%s",
-                        meal_id,
-                        rid,
-                    )
-            except Exception:
-                pass
-
         if isinstance(e, (AIProxyTimeoutError, AIProxyServerError)):
             # Временные проблемы — ретраим
             logger.warning(
-                "[AI] retryable error task=%s meal_id=%s rid=%s err=%s",
+                "[AI] retryable error task=%s meal_id=%s photo_id=%s rid=%s err=%s",
                 task_id,
                 meal_id,
+                meal_photo_id,
                 rid,
                 str(e),
             )
-            # Re-delete meal on each retry just in case, but usually transaction helps
             raise self.retry(exc=e)
 
-        # Любая неожиданная ошибка или валидация — не ретраим или ретраим ограниченно
-        logger.exception("[AI] processing error task=%s meal_id=%s rid=%s", task_id, meal_id, rid)
+        # Постоянная ошибка — помечаем фото как FAILED
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "AI_ERROR",
+            "Произошла ошибка при обработке фото. Попробуйте позже."
+        )
         return {
-            "meal_id": (meal.id if meal else meal_id),
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
             "items": [],
             "totals": {},
             "error": "AI_ERROR",
             "error_message": "Произошла ошибка при обработке фото. Попробуйте позже.",
-            "owner_id": user_id,  # P0-Ownership
+            "owner_id": user_id,
         }
 
     items = result.items
     totals = result.totals
     meta = result.meta
 
-    # P0-2: Обрабатываем controlled error — НЕ сохраняем в БД, НЕ списываем usage
+    # P0-2: Обрабатываем controlled error
     if meta.get("is_error"):
         error_code = meta.get("error_code", "UNKNOWN")
         error_message = meta.get("error_message", "AI processing failed")
         logger.warning(
-            "[AI] controlled error task=%s meal_id=%s rid=%s code=%s",
+            "[AI] controlled error task=%s meal_id=%s photo_id=%s rid=%s code=%s",
             task_id,
             meal_id,
+            meal_photo_id,
             rid,
             error_code,
         )
-        # P0-4: Delete meal if AI failed to prevent empty record in diary
-        if meal:
-            with transaction.atomic():
-                meal.delete()
-
-        # Возвращаем ошибку для polling — frontend увидит явный error
+        _update_meal_photo_failed(meal_photo_id, error_code, error_message)
         return {
-            "meal_id": meal_id,  # return original even if not owned
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
             "items": [],
             "totals": {},
             "meta": meta,
             "error": error_code,
             "error_message": error_message,
-            "owner_id": user_id,  # P0-Ownership
+            "owner_id": user_id,
         }
 
     # 2) Гарантируем валидные данные
     safe_items = _json_safe_items(items)
 
-    # P0 Data Integrity: Delete meal if results are empty or error
+    # P0 Data Integrity: Handle empty results
     if not safe_items:
-        if meal_id:
-            try:
-                from apps.nutrition.models import Meal
-
-                meal = Meal.objects.filter(id=meal_id, user_id=user_id).first()
-                if meal:
-                    meal.delete()
-                    logger.info(
-                        "[AI] Deleted orphan meal_id=%s because result was empty/error. rid=%s",
-                        meal_id,
-                        rid,
-                    )
-            except Exception:
-                pass
-
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "EMPTY_RESULT",
+            "Не удалось распознать еду на фото."
+        )
         return {
             "error": "EMPTY_RESULT",
             "error_message": "Не удалось распознать еду на фото.",
             "items": [],
-            "meal_id": None,
-            "owner_id": user_id,  # P0-Ownership
-        }
-
-    # P0-Cancel: Check if task was cancelled before creating Meal
-    if _is_task_cancelled(task_id, user_id):
-        logger.info(
-            "[AI] Task cancelled before meal creation: task=%s user_id=%s rid=%s",
-            task_id,
-            user_id,
-            rid,
-        )
-        return {
-            "error": "CANCELLED",
-            "error_message": "Отменено",
-            "items": [],
-            "meal_id": None,
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
             "owner_id": user_id,
         }
 
     # 3) Сохраняем в БД атомарно
     with transaction.atomic():
-        if not meal:
-            # Create new meal if not exists
-            from django.contrib.auth import get_user_model
-            from django.core.files.base import ContentFile
+        # Reload meal and photo with lock
+        meal = Meal.objects.select_for_update().get(id=meal_id)
+        meal_photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
 
-            User = get_user_model()
-            user = User.objects.get(id=user_id)
-            meal = Meal.objects.create(
-                user=user,
-                meal_type=meal_type,
-                date=parsed_date,
-            )
-            # Attach photo
-            import mimetypes
-
-            if mime_type in ["image/heic", "image/heif"]:
-                ext = "heic"
-            else:
-                ext = mimetypes.guess_extension(mime_type) or ".jpg"
-                if ext.startswith("."):
-                    ext = ext[1:]
-
-            filename = f"ai_{rid}.{ext}" if rid else f"ai_{task_id}.{ext}"
-            meal.photo.save(filename, ContentFile(image_bytes), save=False)
-            meal.save()
-            logger.info("[AI] created new meal_id=%s rid=%s", meal.id, rid)
-
-        # Если AI пересчитали — перезаписываем
-        meal.items.all().delete()
-
+        # Add FoodItems (APPEND, not replace — multi-photo mode)
         for it in safe_items:
             meal.items.create(
                 name=it["name"],
-                grams=it["amount_grams"],  # P1-3: use amount_grams from _json_safe_items
+                grams=it["amount_grams"],
                 calories=_to_decimal(it["calories"], "0"),
                 protein=_to_decimal(it["protein"], "0"),
                 fat=_to_decimal(it["fat"], "0"),
                 carbohydrates=_to_decimal(it["carbohydrates"], "0"),
             )
 
+        # Update MealPhoto with success
+        meal_photo.status = 'SUCCESS'
+        meal_photo.recognized_data = {
+            "items": safe_items,
+            "totals": {
+                "calories": float(totals.get("calories") or 0.0),
+                "protein": float(totals.get("protein") or 0.0),
+                "fat": float(totals.get("fat") or 0.0),
+                "carbohydrates": float(totals.get("carbohydrates") or 0.0),
+            },
+            "meta": meta,
+        }
+        meal_photo.save(update_fields=['status', 'recognized_data'])
+
+        logger.info(
+            "[AI] MealPhoto %s updated to SUCCESS with %s items",
+            meal_photo_id, len(safe_items)
+        )
+
+    # Check if meal should be finalized
+    finalize_meal_if_complete(meal)
+
     # 4) P0-1: Инкрементируем usage ТОЛЬКО после успешного сохранения
-    # Это гарантирует, что лимит списывается только при реальном успехе AI
     if user_id:
         try:
             from django.contrib.auth import get_user_model
@@ -380,6 +431,7 @@ def recognize_food_async(
 
     response: Dict[str, Any] = {
         "meal_id": int(meal.id),
+        "meal_photo_id": int(meal_photo_id),
         "items": safe_items,
         "total_calories": float(totals.get("calories") or 0.0),
         "totals": {
@@ -389,13 +441,14 @@ def recognize_food_async(
             "carbohydrates": float(totals.get("carbohydrates") or 0.0),
         },
         "meta": meta,
-        "owner_id": user_id,  # P0-Ownership
+        "owner_id": user_id,
     }
 
     logger.info(
-        "[AI] done task=%s meal_id=%s rid=%s items=%s kcal=%.1f",
+        "[AI] done task=%s meal_id=%s photo_id=%s rid=%s items=%s kcal=%.1f",
         task_id,
         meal_id,
+        meal_photo_id,
         rid,
         len(safe_items),
         float(totals.get("calories") or 0.0),

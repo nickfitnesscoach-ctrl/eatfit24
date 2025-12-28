@@ -1,5 +1,11 @@
 /**
  * Sequential batch upload + polling with per-photo statuses.
+ *
+ * Multi-Photo Meal Support:
+ * - First photo creates a meal, subsequent photos attach to the same meal
+ * - meal_id is tracked across the batch and passed to recognizeFood()
+ * - Backend groups photos within 10-minute window automatically
+ *
  * Key rules:
  * - one-at-a-time processing
  * - AbortSignal passed everywhere
@@ -59,6 +65,9 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
 
     // Store context for processing (date, mealType)
     const contextRef = useRef<{ date: string; mealType: string }>({ date: '', mealType: '' });
+
+    // Multi-photo meal grouping: track meal_id for the batch
+    const batchMealIdRef = useRef<number | undefined>(undefined);
 
     const isMountedRef = useRef(true);
     const queueRef = useRef<PhotoQueueItem[]>([]);
@@ -176,15 +185,22 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
                 const dateStr = contextRef.current.date || new Date().toISOString().split('T')[0];
                 const mealType = contextRef.current.mealType || 'snack';
 
+                // Multi-photo grouping: pass meal_id from previous photos in batch
                 const rr: RecognizeResponse = await recognizeFood(
                     pre.file,
                     comment,
                     mealType,
                     dateStr,
-                    controller.signal
+                    controller.signal,
+                    batchMealIdRef.current // Pass meal_id for grouping
                 );
 
                 if (cancelledRef.current || controller.signal.aborted) return;
+
+                // Store meal_id for subsequent photos in the batch
+                if (rr.meal_id && !batchMealIdRef.current) {
+                    batchMealIdRef.current = rr.meal_id;
+                }
 
                 updatePhoto(id, { status: 'processing', taskId: rr.task_id, mealId: rr.meal_id ?? undefined });
 
@@ -243,6 +259,9 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
 
             // Save context for processing
             contextRef.current = context;
+
+            // Reset meal_id for new batch (multi-photo grouping)
+            batchMealIdRef.current = undefined;
 
             // new run
             cancelledRef.current = false;

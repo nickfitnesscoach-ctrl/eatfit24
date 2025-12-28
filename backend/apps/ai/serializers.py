@@ -156,6 +156,7 @@ class AIRecognizeRequestSerializer(serializers.Serializer):
     base64. В проде используется ТОЛЬКО multipart/form-data (binary upload).
 
     Дополнительно:
+    - meal_id: (опционально) ID существующего приёма пищи для добавления фото
     - meal_type: BREAKFAST/LUNCH/DINNER/SNACK (если нет → SNACK)
     - date: дата приёма пищи (если нет → сегодня)
     - user_comment: короткая подсказка для AI (опционально)
@@ -168,6 +169,13 @@ class AIRecognizeRequestSerializer(serializers.Serializer):
         allow_blank=False,
         trim_whitespace=True,
         help_text="Только для тестов/админа. В проде base64 запрещён.",
+    )
+
+    # Optional meal_id for multi-photo meal grouping
+    meal_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="ID существующего приёма пищи для добавления фото (multi-photo mode)",
     )
 
     meal_type = serializers.ChoiceField(choices=MEAL_TYPE_CHOICES, required=False)

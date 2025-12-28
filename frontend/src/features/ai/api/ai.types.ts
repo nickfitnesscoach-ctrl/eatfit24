@@ -1,8 +1,13 @@
 /**
  * AI Recognition API Types
  * Aligned with backend:
- * - POST /api/v1/ai/recognize/ -> 202 { task_id, meal_id: null, status: "processing" }
+ * - POST /api/v1/ai/recognize/ -> 202 { task_id, meal_id, meal_photo_id, status: "processing" }
  * - GET  /api/v1/ai/task/<id>/ -> 200 { task_id, status, state, result? , error? }
+ *
+ * Multi-Photo Meal Support:
+ * - meal_id is always returned (created upfront in view)
+ * - meal_photo_id tracks individual photo within a meal
+ * - Subsequent photos can pass meal_id to group into same meal
  */
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -12,6 +17,7 @@ export interface RecognizeRequest {
     meal_type: MealType;
     date?: string; // YYYY-MM-DD
     user_comment?: string;
+    meal_id?: number; // Optional: for multi-photo meals
 }
 
 export interface ApiRecognizedItem {
@@ -33,7 +39,8 @@ export interface RecognitionTotals {
 
 export interface RecognizeResponse {
     task_id: string;
-    meal_id: number | null;
+    meal_id: number; // Always returned now (created upfront)
+    meal_photo_id: number; // Individual photo ID within the meal
     status: 'processing';
 }
 
@@ -42,6 +49,7 @@ export type TaskStatus = 'processing' | 'success' | 'failed';
 
 export interface TaskResult {
     meal_id: number | null;
+    meal_photo_id?: number; // Photo ID for multi-photo tracking
     items: ApiRecognizedItem[];
     totals: Partial<RecognitionTotals> | {}; // backend гарантирует объект, но может быть пустой
     error?: string;

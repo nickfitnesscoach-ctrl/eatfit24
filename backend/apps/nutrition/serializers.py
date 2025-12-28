@@ -5,7 +5,7 @@ Serializers for nutrition app - meals, food items, daily goals.
 
 from datetime import date
 from rest_framework import serializers
-from .models import Meal, FoodItem, DailyGoal
+from .models import Meal, FoodItem, MealPhoto, DailyGoal
 
 
 class FoodItemSerializer(serializers.ModelSerializer):
@@ -56,21 +56,53 @@ class NutritionTotalsSerializer(serializers.Serializer):
     carbohydrates = serializers.DecimalField(max_digits=6, decimal_places=2)
 
 
+class MealPhotoSerializer(serializers.ModelSerializer):
+    """
+    Serializer for MealPhoto model.
+
+    Used for multi-photo meal display in diary.
+    """
+
+    image_url = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = MealPhoto
+        fields = [
+            'id', 'image_url', 'status', 'status_display',
+            'error_message', 'created_at'
+        ]
+        read_only_fields = ['id', 'image_url', 'status', 'status_display', 'error_message', 'created_at']
+
+    def get_image_url(self, obj):
+        """Return URL for photo image."""
+        request = self.context.get("request")
+        if obj.image and hasattr(obj.image, "url"):
+            url = obj.image.url
+            if request is not None:
+                return request.build_absolute_uri(url)
+            return url
+        return None
+
+
 class MealSerializer(serializers.ModelSerializer):
-    """Serializer for Meal model with nested food items."""
+    """Serializer for Meal model with nested food items and photos."""
 
     items = FoodItemSerializer(many=True, read_only=True)
+    photos = MealPhotoSerializer(many=True, read_only=True)
     meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     total = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
+    photo_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Meal
         fields = [
-            'id', 'meal_type', 'meal_type_display', 'date',
-            'created_at', 'items', 'total', 'photo_url'
+            'id', 'meal_type', 'meal_type_display', 'date', 'status', 'status_display',
+            'created_at', 'items', 'photos', 'total', 'photo_url', 'photo_count'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'status', 'status_display']
 
     def get_total(self, obj):
         """Calculate total nutrition for all items in meal."""
@@ -82,13 +114,33 @@ class MealSerializer(serializers.ModelSerializer):
         }
 
     def get_photo_url(self, obj):
+        """
+        Return URL for the first photo (backward compatibility).
+
+        For multi-photo meals, use the 'photos' field instead.
+        """
         request = self.context.get("request")
+
+        # Try new MealPhoto model first
+        first_photo = obj.photos.filter(status='SUCCESS').first()
+        if first_photo and first_photo.image:
+            url = first_photo.image.url
+            if request is not None:
+                return request.build_absolute_uri(url)
+            return url
+
+        # Fallback to deprecated Meal.photo field
         if obj.photo and hasattr(obj.photo, "url"):
             url = obj.photo.url
             if request is not None:
                 return request.build_absolute_uri(url)
             return url
+
         return None
+
+    def get_photo_count(self, obj):
+        """Return count of successful photos for this meal."""
+        return obj.photos.filter(status='SUCCESS').count()
 
     def validate_date(self, value):
         """Validate that date is not in the future."""

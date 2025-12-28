@@ -14,6 +14,7 @@ class Meal(models.Model):
     Represents a meal (breakfast, lunch, dinner, snack).
 
     Each meal belongs to a user and contains multiple food items.
+    Supports multiple photos via MealPhoto model (one Meal → many photos).
     """
 
     MEAL_TYPE_CHOICES = [
@@ -21,6 +22,12 @@ class Meal(models.Model):
         ('LUNCH', 'Обед'),
         ('DINNER', 'Ужин'),
         ('SNACK', 'Перекус'),
+    ]
+
+    STATUS_CHOICES = [
+        ('DRAFT', 'Черновик'),          # Accepting new photos
+        ('PROCESSING', 'Обработка'),    # AI processing in progress
+        ('COMPLETE', 'Готово'),         # All photos processed
     ]
 
     user = models.ForeignKey(
@@ -37,15 +44,22 @@ class Meal(models.Model):
     date = models.DateField(
         verbose_name='Дата'
     )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='COMPLETE',
+        verbose_name='Статус'
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Создано'
     )
+    # DEPRECATED: Use MealPhoto model instead. Kept for backward compatibility.
     photo = models.ImageField(
         upload_to=upload_to_meal_photos,
         blank=True,
         null=True,
-        verbose_name='Фотография приёма пищи',
+        verbose_name='Фотография приёма пищи (устаревшее)',
         validators=[
             FileSizeValidator(max_mb=10),
             ImageDimensionValidator(max_width=4096, max_height=4096)
@@ -60,6 +74,8 @@ class Meal(models.Model):
         indexes = [
             models.Index(fields=['user', 'date']),
             models.Index(fields=['date']),
+            # Index for draft meal lookup (grouping photos within time window)
+            models.Index(fields=['user', 'meal_type', 'date', 'status', 'created_at']),
         ]
 
     def __str__(self):
@@ -158,6 +174,75 @@ class FoodItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.grams}г)"
+
+    @property
+    def user(self):
+        """Get user from parent meal."""
+        return self.meal.user
+
+
+class MealPhoto(models.Model):
+    """
+    Photo attached to a meal with its individual AI recognition results.
+
+    Multiple photos can belong to one meal, enabling multi-photo meal logging.
+    Each photo stores its own AI recognition data separately.
+    """
+
+    STATUS_CHOICES = [
+        ('PENDING', 'Ожидание'),
+        ('PROCESSING', 'Обработка'),
+        ('SUCCESS', 'Успешно'),
+        ('FAILED', 'Ошибка'),
+    ]
+
+    meal = models.ForeignKey(
+        Meal,
+        on_delete=models.CASCADE,
+        related_name='photos',
+        verbose_name='Приём пищи'
+    )
+    image = models.ImageField(
+        upload_to=upload_to_meal_photos,
+        verbose_name='Фотография',
+        validators=[
+            FileSizeValidator(max_mb=10),
+            ImageDimensionValidator(max_width=4096, max_height=4096)
+        ]
+    )
+    recognized_data = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Результат распознавания',
+        help_text='Per-photo AI recognition result (items, totals, meta)'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING',
+        verbose_name='Статус обработки'
+    )
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Сообщение об ошибке'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Создано'
+    )
+
+    class Meta:
+        db_table = 'nutrition_meal_photos'
+        verbose_name = 'Фото приёма пищи'
+        verbose_name_plural = 'Фото приёмов пищи'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['meal', 'status']),
+        ]
+
+    def __str__(self):
+        return f"Photo for {self.meal} ({self.get_status_display()})"
 
     @property
     def user(self):

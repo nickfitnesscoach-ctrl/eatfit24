@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronRight, Trash2 } from 'lucide-react';
 import { Meal } from '../../types/meal';
 import { MEAL_TYPE_LABELS } from '../../constants/meals';
+import { MealPhotoStrip } from '../meal/MealPhotoGallery';
 
 interface MealsListProps {
     meals: Meal[];
@@ -43,13 +44,20 @@ export const MealsList: React.FC<MealsListProps> = ({
                                     onClick={() => onOpenMeal(meal.id)}
                                     className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors active:scale-[0.98]"
                                 >
-                                    <div>
-                                        <p className="font-medium text-gray-900">
-                                            {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
-                                        </p>
+                                    <div className="flex items-center gap-3">
+                                        {/* Photo gallery for multi-photo meals */}
+                                        <MealPhotoStrip
+                                            photos={meal.photos || []}
+                                            fallbackPhotoUrl={meal.photo_url}
+                                        />
+                                        <div>
+                                            <p className="font-medium text-gray-900">
+                                                {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
+                                            </p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="font-bold text-orange-600">

@@ -56,14 +56,23 @@ const safeJson = async (res: Response) => {
 // API calls
 // ============================================================
 
+/**
+ * Start food recognition for an image.
+ *
+ * Multi-Photo Meal Support:
+ * - Pass meal_id to add photo to existing meal
+ * - If not provided, backend will find/create draft meal within 10-min window
+ * - Returns meal_id for subsequent photos in the same batch
+ */
 export const recognizeFood = async (
     imageFile: File,
     userComment?: string,
     mealType?: MealType | string,
     date?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    mealId?: number // Optional: for multi-photo meals
 ): Promise<RecognizeResponse> => {
-    log(`AI recognize: ${imageFile.name}`);
+    log(`AI recognize: ${imageFile.name}${mealId ? ` (meal_id=${mealId})` : ''}`);
 
     const formData = new FormData();
     formData.append('image', imageFile);
@@ -74,6 +83,9 @@ export const recognizeFood = async (
     if (apiMealType) formData.append('meal_type', apiMealType);
 
     if (date) formData.append('date', date);
+
+    // Multi-photo grouping: pass meal_id to attach to existing meal
+    if (mealId) formData.append('meal_id', String(mealId));
 
     const response = await fetchWithTimeout(
         URLS.recognize,
