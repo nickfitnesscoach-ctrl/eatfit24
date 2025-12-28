@@ -1,26 +1,19 @@
-import {
-    fetchWithTimeout,
-    getHeadersWithoutContentType,
-    log,
-} from '../../../services/api/client';
+import { fetchWithTimeout, getHeadersWithoutContentType, log } from '../../../services/api/client';
 import { URLS } from '../../../services/api/urls';
 import type {
     RecognizeResponse,
     TaskStatusResponse,
     AnalysisResult,
     RecognizedItem,
+    ApiRecognizedItem,
+    RecognitionTotals,
     MealType,
 } from './ai.types';
 
 // ============================================================
-// AI Recognition
+// Helpers
 // ============================================================
 
-/**
- * Map UI meal type to API meal type
- * UI uses lowercase (завтрак → breakfast)
- * API uses UPPERCASE (BREAKFAST, LUNCH, DINNER, SNACK)
- */
 const MEAL_TYPE_MAP: Record<string, string> = {
     'завтрак': 'BREAKFAST',
     'breakfast': 'BREAKFAST',
@@ -30,34 +23,39 @@ const MEAL_TYPE_MAP: Record<string, string> = {
     'dinner': 'DINNER',
     'перекус': 'SNACK',
     'snack': 'SNACK',
+    'BREAKFAST': 'BREAKFAST',
+    'LUNCH': 'LUNCH',
+    'DINNER': 'DINNER',
+    'SNACK': 'SNACK',
 };
 
-/**
- * Convert UI meal type to API format
- * @param mealType - Meal type from UI (e.g., "Завтрак", "breakfast", "BREAKFAST")
- * @returns API-compatible meal type (BREAKFAST/LUNCH/DINNER/SNACK) or undefined
- */
-const mapMealTypeToApi = (mealType?: string): string | undefined => {
+const mapMealTypeToApi = (mealType?: MealType | string): string | undefined => {
     if (!mealType) return undefined;
-
-    // Normalize to lowercase for lookup
-    const normalized = mealType.toLowerCase().trim();
-
-    // Return mapped value or fallback to SNACK if unknown
-    return MEAL_TYPE_MAP[normalized] || 'SNACK';
+    const normalized = String(mealType).trim();
+    const lower = normalized.toLowerCase();
+    return MEAL_TYPE_MAP[lower] || MEAL_TYPE_MAP[normalized] || 'SNACK';
 };
 
-/**
- * Recognize food from image (async mode)
- * POST /api/v1/ai/recognize/
- *
- * @param imageFile - Image file (JPEG/PNG)
- * @param userComment - Optional user comment about the food
- * @param mealType - Meal type (breakfast/lunch/dinner/snack)
- * @param date - Date string YYYY-MM-DD
- * @param signal - Optional AbortSignal for cancellation
- * @returns RecognizeResponse with task_id for polling
- */
+const getAuthHeaders = () => {
+    const initData = (window as any).Telegram?.WebApp?.initData || '';
+    return {
+        Authorization: `Bearer ${initData}`,
+        'X-Telegram-Init-Data': initData,
+    };
+};
+
+const safeJson = async (res: Response) => {
+    try {
+        return await res.json();
+    } catch {
+        return {};
+    }
+};
+
+// ============================================================
+// API calls
+// ============================================================
+
 export const recognizeFood = async (
     imageFile: File,
     userComment?: string,
@@ -70,20 +68,12 @@ export const recognizeFood = async (
     const formData = new FormData();
     formData.append('image', imageFile);
 
-    // API uses user_comment (not description)
-    if (userComment) {
-        formData.append('user_comment', userComment);
-    }
+    if (userComment) formData.append('user_comment', userComment);
 
-    // Map UI meal type to API format (UPPERCASE)
     const apiMealType = mapMealTypeToApi(mealType);
-    if (apiMealType) {
-        formData.append('meal_type', apiMealType);
-    }
+    if (apiMealType) formData.append('meal_type', apiMealType);
 
-    if (date) {
-        formData.append('date', date);
-    }
+    if (date) formData.append('date', date);
 
     const response = await fetchWithTimeout(
         URLS.recognize,
@@ -91,61 +81,37 @@ export const recognizeFood = async (
             method: 'POST',
             headers: getHeadersWithoutContentType(),
             body: formData,
+            signal,
         },
-        undefined, // default timeout
-        false,     // skipAuthCheck
-        signal     // external abort signal
+        undefined,
+        false,
+        signal
     );
 
-    // Log X-Request-ID for debugging
     const requestId = response.headers.get('X-Request-ID');
-    if (requestId) {
-        log(`X-Request-ID: ${requestId}`);
-    }
+    if (requestId) log(`X-Request-ID: ${requestId}`);
 
-    // Handle 429 (daily limit) - per contract: {error: "...", message: "...", used: ..., limit: ...}
+    // 429 daily limit
     if (response.status === 429) {
-        const data = await safeJsonParse(response);
-
-        // P0-1: Throw specific Error for daily limit
-        if (data.error === 'DAILY_PHOTO_LIMIT_EXCEEDED') {
-            const error = new Error(data.message || 'Дневной лимит фото исчерпан');
-            (error as any).code = 'DAILY_LIMIT_REACHED';
-            (error as any).error = 'DAILY_LIMIT_REACHED';
-            (error as any).data = data;
-            throw error;
-        }
-
-        // Fallback for other throttles
-        const error = new Error(data.detail || data.message || 'Слишком много запросов. Попробуйте позже.');
-        (error as any).code = 'THROTTLED';
-        throw error;
+        const data = await safeJson(response);
+        const err = new Error(data.message || data.detail || 'Слишком много запросов');
+        (err as any).code = data.error === 'DAILY_PHOTO_LIMIT_EXCEEDED' ? 'DAILY_LIMIT_REACHED' : 'THROTTLED';
+        (err as any).data = data;
+        throw err;
     }
 
     if (response.status !== 202) {
-        const data = await safeJsonParse(response);
-        throw new Error(data.message || 'Ошибка запуска распознавания');
+        const data = await safeJson(response);
+        throw new Error(data.message || data.detail || 'Ошибка запуска распознавания');
     }
 
-    return await safeJsonParse(response);
+    return (await safeJson(response)) as RecognizeResponse;
 };
 
-// ============================================================
-// Task Status (for async recognition)
-// ============================================================
-
-/**
- * Get task status
- * GET /api/v1/ai/task/<task_id>/
- * @param signal - Optional AbortSignal for cancellation
- */
-export const getTaskStatus = async (
-    taskId: string,
-    signal?: AbortSignal
-): Promise<TaskStatusResponse> => {
+export const getTaskStatus = async (taskId: string, signal?: AbortSignal): Promise<TaskStatusResponse> => {
     log(`Get task status: ${taskId}`);
 
-    const response = await fetch(`${URLS.taskStatus(taskId)}`, { // Changed URLS.taskStatus(taskId) to template literal
+    const res = await fetch(`${URLS.taskStatus(taskId)}`, {
         method: 'GET',
         headers: {
             ...getAuthHeaders(),
@@ -154,72 +120,63 @@ export const getTaskStatus = async (
         signal,
     });
 
-    if (response.status === 404) {
+    if (res.status === 404) {
         throw new Error('Задача не найдена или доступ запрещен');
     }
 
-    if (!response.ok) {
-        const data = await safeJsonParse(response);
+    if (!res.ok) {
+        const data = await safeJson(res);
         throw new Error(data.message || 'Ошибка при получении статуса');
     }
 
-    return await safeJsonParse(response);
+    return (await safeJson(res)) as TaskStatusResponse;
 };
 
-const getAuthHeaders = () => {
-    const initData = (window as any).Telegram?.WebApp?.initData || '';
+// ============================================================
+// Mapping
+// ============================================================
+
+const normalizeTotals = (totals: any): RecognitionTotals => {
+    const t = totals || {};
     return {
-        'Authorization': `Bearer ${initData}`,
-        'X-Telegram-Init-Data': initData,
+        calories: Number(t.calories ?? 0) || 0,
+        protein: Number(t.protein ?? 0) || 0,
+        fat: Number(t.fat ?? 0) || 0,
+        carbohydrates: Number(t.carbohydrates ?? 0) || 0,
     };
 };
 
-/**
- * P0-Contract: Robust JSON parsing
- */
-const safeJsonParse = async (response: Response) => {
-    try {
-        return await response.json();
-    } catch (e) {
-        console.error('[AI API] JSON parse error:', e);
-        return {};
-    }
-};
+const mapItem = (apiItem: ApiRecognizedItem): RecognizedItem => ({
+    id: crypto.randomUUID(),
+    name: String(apiItem.name || 'Unknown'),
+    grams: Number(apiItem.amount_grams ?? 0) || 0,
+    calories: Number(apiItem.calories ?? 0) || 0,
+    protein: Number(apiItem.protein ?? 0) || 0,
+    fat: Number(apiItem.fat ?? 0) || 0,
+    carbohydrates: Number(apiItem.carbohydrates ?? 0) || 0,
+    confidence: apiItem.confidence ?? null,
+});
 
-// ============================================================
-// Mapping Helpers
-// ============================================================
-
-/**
- * P0 Data Integrity & API Contract:
- * - return null if !result OR result.error OR !items OR items.length==0
- * - generate stable item ids
- */
 export const mapToAnalysisResult = (taskStatus: TaskStatusResponse): AnalysisResult | null => {
+    if (taskStatus.status !== 'success' || taskStatus.state !== 'SUCCESS') return null;
+
     const result = taskStatus.result;
+    if (!result) return null;
 
-    // P0-Contract Check: Fail if there's a result-level error or no items
-    if (!result || result.error || !result.items || result.items.length === 0) {
-        return null;
-    }
+    // Логическая ошибка с бэка
+    if (result.error) return null;
 
-    // Success - map items to UI format (amount_grams -> grams)
-    const items: RecognizedItem[] = result.items.map((apiItem) => ({
-        id: crypto.randomUUID(), // P0: Stable unique ID
-        name: apiItem.name,
-        grams: apiItem.amount_grams,
-        calories: apiItem.calories,
-        protein: apiItem.protein,
-        fat: apiItem.fat,
-        carbohydrates: apiItem.carbohydrates,
-    }));
+    const items = Array.isArray(result.items) ? result.items : [];
+    if (items.length === 0) return null;
+
+    const totals = normalizeTotals(result.totals);
 
     return {
         meal_id: result.meal_id,
-        recognized_items: items,
-        total_calories: result.totals.calories,
-        total_protein: result.totals.protein,
-        total_fat: result.totals.fat,
-        total_carbohydrates: result.totals.carbohydrates,
+        recognized_items: items.map(mapItem),
+        total_calories: totals.calories,
+        total_protein: totals.protein,
+        total_fat: totals.fat,
+        total_carbohydrates: totals.carbohydrates,
     };
 };

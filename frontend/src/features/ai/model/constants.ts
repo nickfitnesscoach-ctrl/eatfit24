@@ -74,6 +74,7 @@ export const AI_ERROR_CODES = {
     TASK_FAILURE: 'TASK_FAILURE',
     NETWORK_ERROR: 'NETWORK_ERROR',
     EMPTY_RESULT: 'EMPTY_RESULT',
+    CANCELLED: 'CANCELLED',
     // Preprocess errors
     PREPROCESS_DECODE_FAILED: 'PREPROCESS_DECODE_FAILED',
     PREPROCESS_TIMEOUT: 'PREPROCESS_TIMEOUT',
@@ -97,6 +98,7 @@ export const AI_ERROR_MESSAGES: Record<string, string> = {
     [AI_ERROR_CODES.PREPROCESS_DECODE_FAILED]: 'Не удалось обработать фото. Попробуйте другое или сделайте скриншот.',
     [AI_ERROR_CODES.PREPROCESS_TIMEOUT]: 'Фото слишком тяжёлое. Попробуйте другое или сделайте скриншот.',
     [AI_ERROR_CODES.PREPROCESS_INVALID_IMAGE]: 'Выбранный файл не является изображением.',
+    [AI_ERROR_CODES.CANCELLED]: 'Отменено',
     // Backend throttling message pattern
     'Request was throttled': 'Дневной лимит исчерпан. Оформите PRO для безлимита.',
 };

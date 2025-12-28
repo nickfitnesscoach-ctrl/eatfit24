@@ -106,7 +106,8 @@
       "Bash(git fetch:*)",
       "Bash(ssh -i ~/.ssh/id_ed25519 deploy@eatfit24.ru \"echo ''Connected successfully'' && whoami && pwd\")",
       "Bash(ls -la compose.yml* docker-compose.yml*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(ai\\): implement P0/P1 security and lifecycle fixes for async AI flow\n\nThis commit addresses critical security and data integrity issues in the AI food recognition system:\n\n**P0 Security Fixes:**\n- Add task ownership validation via cache to prevent unauthorized access to AI results\n- Implement strict meal ownership checks in task processing\n- Add hardened image validation using magic bytes detection\n- Add owner_id field to all task responses for audit trail\n\n**P1 Data Integrity Fixes:**\n- Defer meal creation until AI successfully returns items \\(no more orphan meals\\)\n- Delete meal atomically if AI fails, returns empty results, or controlled errors\n- Fix batch upload lifecycle: proper cancellation and cleanup on unmount\n- Add comprehensive test coverage for ownership isolation and edge cases\n\n**Backend Changes:**\n- tasks.py: Meal now created only on success, ownership checks, delete on failure\n- views.py: Return 202 with meal_id=null, link task to user in cache\n- New tests: test_extra_async.py, test_extra_tasks.py for edge cases\n\n**Frontend Changes:**\n- Batch results modal: show items count, proper error states\n- Task polling: handle null meal_id, improved cancellation\n- API types: add owner_id, make meal_id nullable during processing\n\nAll tests passing. Ready for production deployment.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

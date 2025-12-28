@@ -1,46 +1,29 @@
 /**
  * AI Recognition API Types
- * 
- * Aligned with API Contract: /docs/API_CONTRACT_AI_AND_TELEGRAM.md
- * 
- * Endpoints:
- * - POST /api/v1/ai/recognize/ - Start recognition (returns 202)
- * - GET /api/v1/ai/task/<id>/ - Poll task status
+ * Aligned with backend:
+ * - POST /api/v1/ai/recognize/ -> 202 { task_id, meal_id: null, status: "processing" }
+ * - GET  /api/v1/ai/task/<id>/ -> 200 { task_id, status, state, result? , error? }
  */
 
-// ============================================================
-// Request Types
-// ============================================================
-
-/** Meal type values (lowercase per API contract) */
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-/** Fields for POST /api/v1/ai/recognize/ */
 export interface RecognizeRequest {
     image: File;
     meal_type: MealType;
-    date: string; // YYYY-MM-DD
-    user_comment?: string; // API uses user_comment (not description)
+    date?: string; // YYYY-MM-DD
+    user_comment?: string;
 }
 
-// ============================================================
-// Response Types (aligned with API Contract)
-// ============================================================
-
-/** 
- * Item from task result
- * API uses amount_grams, we map to grams for UI
- */
 export interface ApiRecognizedItem {
     name: string;
-    amount_grams: number;  // API field name
+    amount_grams: number;
     calories: number;
     protein: number;
     fat: number;
     carbohydrates: number;
+    confidence?: number | null;
 }
 
-/** Totals from task result */
 export interface RecognitionTotals {
     calories: number;
     protein: number;
@@ -48,60 +31,51 @@ export interface RecognitionTotals {
     carbohydrates: number;
 }
 
-/** Response from POST /api/v1/ai/recognize/ (202 Accepted) */
 export interface RecognizeResponse {
     task_id: string;
-    meal_id: number;
+    meal_id: number | null;
     status: 'processing';
 }
 
-/** Task states from Celery */
 export type TaskState = 'PENDING' | 'STARTED' | 'RETRY' | 'SUCCESS' | 'FAILURE';
-
-/** Task status values */
 export type TaskStatus = 'processing' | 'success' | 'failed';
 
-/** Task result when success */
-export interface TaskSuccessResult {
+export interface TaskResult {
     meal_id: number | null;
-    items: ApiRecognizedItem[];  // API uses "items", NOT "recognized_items"
-    totals: RecognitionTotals;
+    items: ApiRecognizedItem[];
+    totals: Partial<RecognitionTotals> | {}; // backend гарантирует объект, но может быть пустой
     error?: string;
     error_message?: string;
+    meta?: Record<string, any>;
+    total_calories?: number; // иногда приходит
 }
 
-/** GET /api/v1/ai/task/<id>/ response */
 export interface TaskStatusResponse {
     task_id: string;
     status: TaskStatus;
     state: TaskState;
-    result?: TaskSuccessResult;
+    result?: TaskResult;
     error?: string;
 }
 
-// ============================================================
-// UI Types (for display, mapped from API)
-// ============================================================
+// =====================
+// UI types
+// =====================
 
-/** 
- * Display item for UI components
- * Uses "grams" for backward compatibility with existing UI
- */
 export interface RecognizedItem {
-    id?: string;
+    id: string;
     name: string;
-    grams: number;      // Mapped from API's amount_grams
+    grams: number;
     calories: number;
     protein: number;
     fat: number;
     carbohydrates: number;
-    confidence?: number;
+    confidence?: number | null;
 }
 
-/** Analysis result for UI components */
 export interface AnalysisResult {
     meal_id: number | string | null;
-    recognized_items: RecognizedItem[];  // UI uses recognized_items for compat
+    recognized_items: RecognizedItem[];
     total_calories: number;
     total_protein: number;
     total_fat: number;
@@ -109,7 +83,6 @@ export interface AnalysisResult {
     photo_url?: string;
 }
 
-/** Batch result for multiple photo processing */
 export interface BatchResult {
     file: File;
     status: 'success' | 'error';

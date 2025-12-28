@@ -27,4 +27,13 @@ export default defineConfig([
       'react-hooks/exhaustive-deps': 'error',
     },
   },
+  // Node.js config files (vite.config.js, etc.)
+  {
+    files: ['vite.config.js', 'eslint.config.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
 ])

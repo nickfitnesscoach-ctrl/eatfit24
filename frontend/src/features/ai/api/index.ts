@@ -16,7 +16,7 @@ export type {
     RecognizeResponse,
     TaskState,
     TaskStatus,
-    TaskSuccessResult,
+    TaskResult,
     TaskStatusResponse,
     // UI format (mapped)
     RecognizedItem,

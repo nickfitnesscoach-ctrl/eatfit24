@@ -46,7 +46,9 @@ export interface PhotoQueueItem {
     previewUrl?: string;
     /** Current processing status */
     status: PhotoUploadStatus;
-    /** Error message if status === 'error' */
+    /** Error code for programmatic checks (e.g., AI_ERROR_CODES.CANCELLED) */
+    errorCode?: string;
+    /** Error message for display if status === 'error' */
     error?: string;
     /** Analysis result if status === 'success' */
     result?: import('../api').AnalysisResult;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, Check, X, Loader2 } from 'lucide-react';
 import type { PhotoQueueItem } from '../../model';
-import { PHOTO_STATUS_LABELS } from '../../model';
+import { PHOTO_STATUS_LABELS, AI_ERROR_CODES } from '../../model';
 
 interface BatchProcessingScreenProps {
     photoQueue: PhotoQueueItem[];
@@ -22,8 +22,8 @@ export const BatchProcessingScreen: React.FC<BatchProcessingScreenProps> = ({
     onRetryAll
 }) => {
     const completedCount = photoQueue.filter(p => p.status === 'success').length;
-    const errorCount = photoQueue.filter(p => p.status === 'error' && p.error !== 'Отменено').length;
-    const cancelledCount = photoQueue.filter(p => p.error === 'Отменено').length;
+    const errorCount = photoQueue.filter(p => p.status === 'error' && p.errorCode !== AI_ERROR_CODES.CANCELLED).length;
+    const cancelledCount = photoQueue.filter(p => p.errorCode === AI_ERROR_CODES.CANCELLED).length;
     const processingCount = photoQueue.filter(p =>
         !['success', 'error', 'pending'].includes(p.status)
     ).length;

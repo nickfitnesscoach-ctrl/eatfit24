@@ -5,7 +5,6 @@ import { useBilling } from '../contexts/BillingContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 
-// Import from AI feature module
 import {
     useFoodBatchAnalysis,
     BatchResultsModal,
@@ -17,6 +16,7 @@ import {
     convertHeicToJpeg,
     MEAL_TYPE_OPTIONS,
     AI_LIMITS,
+    AI_ERROR_CODES,
 } from '../features/ai';
 import type { FileWithComment } from '../features/ai';
 
@@ -27,27 +27,21 @@ const FoodLogPage: React.FC = () => {
     const { isBrowserDebug } = useAuth();
     const { isReady, isTelegramWebApp: webAppDetected, isBrowserDebug: webAppBrowserDebug, isDesktop } = useTelegramWebApp();
 
-    // Get initial date from location state or use today
     const getInitialDate = () => {
         const dateFromState = (location.state as any)?.selectedDate;
-        if (dateFromState) {
-            return new Date(dateFromState);
-        }
-        return new Date();
+        return dateFromState ? new Date(dateFromState) : new Date();
     };
 
     const [selectedDate, setSelectedDate] = useState<Date>(getInitialDate());
-    const [mealType, setMealType] = useState<string>('breakfast'); // UI lowercase, mapped to UPPERCASE for API
+    const [mealType, setMealType] = useState<string>('breakfast');
     const [selectedFiles, setSelectedFiles] = useState<FileWithComment[]>([]);
     const [showBatchResults, setShowBatchResults] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
 
-    // Ref to access current selectedFiles in cleanup (avoids stale closure)
     const selectedFilesRef = useRef<FileWithComment[]>([]);
     selectedFilesRef.current = selectedFiles;
 
-    // Batch analysis hook
     const {
         isProcessing,
         photoQueue,
@@ -55,120 +49,83 @@ const FoodLogPage: React.FC = () => {
         retryPhoto,
         removePhoto,
         cancelBatch,
-        cleanup,  // For revoking ownedUrls on unmount
+        cleanup,
     } = useFoodBatchAnalysis({
         onDailyLimitReached: () => setShowLimitModal(true),
         getDateString: () => selectedDate.toISOString().split('T')[0],
         getMealType: () => mealType,
     });
 
-
-    // Cleanup on unmount
+    // unmount cleanup
     useEffect(() => {
         return () => {
-            // cleanup() is the master off switch: abort + revoke + reset
             cleanup();
-
-            // Also cleanup parent-owned URLs (if any remain)
-            selectedFilesRef.current.forEach(f => {
+            // revoke parent-owned urls (если остались до startBatch)
+            selectedFilesRef.current.forEach((f) => {
                 if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
             });
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only on unmount
+    }, []);
 
-    // Show results modal when batch completes
+    // auto-open results when finished (ALWAYS, even with errors)
     useEffect(() => {
-        const allDone = photoQueue.length > 0 &&
-            photoQueue.every(p => p.status === 'success' || p.status === 'error');
+        const allDone =
+            photoQueue.length > 0 &&
+            photoQueue.every((p) => p.status === 'success' || p.status === 'error');
 
-        if (allDone && !isProcessing && photoQueue.length > 0) {
-            const hasErrors = photoQueue.some(p => p.status === 'error');
-
-            // Auto-open results ONLY if 100% success
-            if (!hasErrors) {
-                setShowBatchResults(true);
-            }
-
-            // Always clear selected files when batch is done
-            if (selectedFilesRef.current.length > 0) {
-                setSelectedFiles([]);
-            }
-
+        if (allDone && !isProcessing) {
+            setShowBatchResults(true);
+            if (selectedFilesRef.current.length > 0) setSelectedFiles([]);
             billing.refresh();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [photoQueue, isProcessing]); // Removed billing to prevent infinite loop
+    }, [photoQueue, isProcessing]);
 
-    // Handle file selection from UploadDropzone
-    const handleFilesSelected = async (files: File[]) => {
-        // Convert to FileWithComment objects with empty comments
-        const filesWithComments: FileWithComment[] = await Promise.all(
-            files.map(async (file) => {
-                // For HEIC: convert and replace file with converted JPEG
-                if (isHeicFile(file)) {
-                    try {
-                        const converted = await convertHeicToJpeg(file);
-                        return {
-                            file: converted,  // Use converted file!
-                            comment: '',
-                            previewUrl: URL.createObjectURL(converted)
-                        };
-                    } catch {
-                        // Fallback: use original, preprocess will handle it
-                        return { file, comment: '', previewUrl: '' };
-                    }
-                }
+    const buildFileWithComment = async (file: File): Promise<FileWithComment> => {
+        if (isHeicFile(file)) {
+            try {
+                const converted = await convertHeicToJpeg(file);
+                return { file: converted, comment: '', previewUrl: URL.createObjectURL(converted) };
+            } catch {
+                // even in fallback, create preview for original
                 return { file, comment: '', previewUrl: URL.createObjectURL(file) };
-            })
-        );
+            }
+        }
+        return { file, comment: '', previewUrl: URL.createObjectURL(file) };
+    };
+
+    const handleFilesSelected = async (files: File[]) => {
+        const filesWithComments = await Promise.all(files.map(buildFileWithComment));
         setSelectedFiles(filesWithComments);
         setError(null);
     };
 
     const handleAddFiles = async (newFiles: File[]) => {
-        const filesWithComments: FileWithComment[] = await Promise.all(
-            newFiles.map(async (file) => {
-                // For HEIC: convert and replace file with converted JPEG
-                if (isHeicFile(file)) {
-                    try {
-                        const converted = await convertHeicToJpeg(file);
-                        return {
-                            file: converted,  // Use converted file!
-                            comment: '',
-                            previewUrl: URL.createObjectURL(converted)
-                        };
-                    } catch {
-                        return { file, comment: '', previewUrl: '' };
-                    }
-                }
-                return { file, comment: '', previewUrl: URL.createObjectURL(file) };
-            })
-        );
-        setSelectedFiles([...selectedFiles, ...filesWithComments]);
+        const more = await Promise.all(newFiles.map(buildFileWithComment));
+        setSelectedFiles((prev) => [...prev, ...more]);
     };
 
     const handleRemoveFile = (index: number) => {
-        const newFiles = [...selectedFiles];
-        if (newFiles[index].previewUrl) {
-            URL.revokeObjectURL(newFiles[index].previewUrl!);
-        }
-        newFiles.splice(index, 1);
-        setSelectedFiles(newFiles);
+        setSelectedFiles((prev) => {
+            const next = [...prev];
+            const item = next[index];
+            if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+            next.splice(index, 1);
+            return next;
+        });
     };
 
     const handleCommentChange = (index: number, comment: string) => {
-        const newFiles = [...selectedFiles];
-        newFiles[index] = { ...newFiles[index], comment };
-        setSelectedFiles(newFiles);
+        setSelectedFiles((prev) => {
+            const next = [...prev];
+            next[index] = { ...next[index], comment };
+            return next;
+        });
     };
 
-    /**
-     * Clear selectedFiles with explicit URL revoke
-     * Use for cancel/clear buttons (not after startBatch - hook owns those URLs)
-     */
     const clearSelectedFiles = () => {
-        selectedFiles.forEach(f => {
+        selectedFiles.forEach((f) => {
             if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
         });
         setSelectedFiles([]);
@@ -177,21 +134,20 @@ const FoodLogPage: React.FC = () => {
     const handleAnalyze = () => {
         if (selectedFiles.length === 0) return;
 
-        // Start batch - hook takes ownership of URLs
+        // startBatch: hook takes ownership of previewUrl
         startBatch(selectedFiles);
 
-        // Clear parent's reference (no revoke - hook owns URLs now)
+        // parent drops references WITHOUT revoke
         setSelectedFiles([]);
     };
 
     const handleCloseResults = () => {
         setShowBatchResults(false);
-        cleanup();  // Free hook-owned URLs
+        cleanup(); // revoke hook-owned URLs
         const dateStr = selectedDate.toISOString().split('T')[0];
         navigate(`/?date=${dateStr}`);
     };
 
-    // While WebApp is initializing
     if (!isReady) {
         return (
             <div className="min-h-screen min-h-dvh flex items-center justify-center">
@@ -200,27 +156,24 @@ const FoodLogPage: React.FC = () => {
         );
     }
 
-    // WebApp is ready but we're not in Telegram
     if (!webAppDetected && !isBrowserDebug && !webAppBrowserDebug) {
         return (
             <div className="min-h-screen min-h-dvh flex items-center justify-center p-4">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">
-                    <h2 className="text-xl font-bold text-orange-900 mb-2">
-                        Откройте через Telegram
-                    </h2>
+                    <h2 className="text-xl font-bold text-orange-900 mb-2">Откройте через Telegram</h2>
                     <p className="text-orange-700">
-                        Это приложение работает только внутри Telegram.
-                        Пожалуйста, откройте бота и нажмите кнопку "Открыть приложение".
+                        Это приложение работает только внутри Telegram. Откройте бота и нажмите “Открыть приложение”.
                     </p>
                 </div>
             </div>
         );
     }
 
+    const showProcessing = isProcessing || (photoQueue.length > 0 && !showBatchResults);
+
     return (
         <div className="min-h-screen min-h-dvh bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
             <div className="max-w-lg mx-auto">
-                {/* Date and Meal Type Selector */}
                 <div className="bg-white rounded-3xl shadow-sm p-4 mb-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -256,34 +209,24 @@ const FoodLogPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Main Content Area */}
-                {(isProcessing || (photoQueue.length > 0 && !showBatchResults)) ? (
+                {showProcessing ? (
                     <BatchProcessingScreen
                         photoQueue={photoQueue}
                         onRetry={retryPhoto}
                         onRetryAll={() => {
-                            photoQueue.forEach(p => {
-                                if (p.status === 'error' && p.error !== 'Отменено') {
-                                    retryPhoto(p.id);
-                                }
+                            photoQueue.forEach((p) => {
+                                if (p.status === 'error' && p.errorCode !== AI_ERROR_CODES.CANCELLED) retryPhoto(p.id);
                             });
                         }}
                         onShowResults={() => setShowBatchResults(true)}
-                        onCancel={() => {
-                            // During processing, hook owns URLs - just cancel (hook will cleanup)
-                            cancelBatch();
-                        }}
+                        onCancel={cancelBatch}
                     />
                 ) : selectedFiles.length > 0 ? (
-                    /* Preview State with Individual Comments */
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="bg-white rounded-3xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-bold text-gray-900">Выбранные фото ({selectedFiles.length})</h2>
-                                <button
-                                    onClick={clearSelectedFiles}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
+                                <button onClick={clearSelectedFiles} className="text-gray-400 hover:text-gray-600">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -296,14 +239,12 @@ const FoodLogPage: React.FC = () => {
                                 maxFiles={AI_LIMITS.MAX_PHOTOS_PER_UPLOAD}
                             />
 
-                            {/* Hint */}
                             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
                                 <p className="text-blue-800 text-sm">
-                                    💡 <strong>Совет:</strong> Укажите комментарий для каждого фото отдельно — так ИИ точнее распознает блюда и калории
+                                    💡 <strong>Совет:</strong> Комментарий к каждому фото повышает точность распознавания
                                 </p>
                             </div>
 
-                            {/* Actions */}
                             <div className="mt-6 grid grid-cols-2 gap-3">
                                 <button
                                     onClick={clearSelectedFiles}
@@ -322,38 +263,28 @@ const FoodLogPage: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    /* Initial Upload State */
                     <div className="space-y-6">
-                        {/* Desktop Warning */}
                         {isDesktop && (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
                                 <div className="flex items-start gap-3">
                                     <AlertCircle className="text-yellow-600 shrink-0 mt-0.5" size={20} />
                                     <div>
-                                        <p className="text-yellow-800 font-medium text-sm">
-                                            Вы используете десктоп-версию
-                                        </p>
+                                        <p className="text-yellow-800 font-medium text-sm">Вы используете десктоп-версию</p>
                                         <p className="text-yellow-700 text-sm mt-1">
-                                            Для съёмки еды рекомендуем открыть приложение на телефоне.
-                                            На десктопе можно загрузить готовые фото.
+                                            Для съёмки еды лучше открыть приложение на телефоне. На десктопе можно загрузить готовые фото.
                                         </p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        <UploadDropzone
-                            onFilesSelected={handleFilesSelected}
-                            maxFiles={AI_LIMITS.MAX_PHOTOS_PER_UPLOAD}
-                            isDesktop={isDesktop}
-                        />
+                        <UploadDropzone onFilesSelected={handleFilesSelected} maxFiles={AI_LIMITS.MAX_PHOTOS_PER_UPLOAD} isDesktop={isDesktop} />
 
                         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                             <p className="text-blue-800 text-sm text-center">
                                 {isDesktop
                                     ? '💡 Загрузите фото еды с хорошим освещением для точного распознавания'
-                                    : '💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении'
-                                }
+                                    : '💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении'}
                             </p>
                         </div>
 
@@ -365,7 +296,6 @@ const FoodLogPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* Limit Reached Modal */}
                 {showLimitModal && (
                     <LimitReachedModal
                         dailyLimit={billing.data?.daily_photo_limit || 3}
@@ -377,7 +307,6 @@ const FoodLogPage: React.FC = () => {
                     />
                 )}
 
-                {/* Batch Results Modal */}
                 {showBatchResults && (
                     <BatchResultsModal
                         photoQueue={photoQueue}
@@ -387,11 +316,8 @@ const FoodLogPage: React.FC = () => {
                         }}
                         onRetryAll={() => {
                             setShowBatchResults(false);
-                            // Retry all retryable errors
-                            photoQueue.forEach(p => {
-                                if (p.status === 'error' && p.error !== 'Отменено') {
-                                    retryPhoto(p.id);
-                                }
+                            photoQueue.forEach((p) => {
+                                if (p.status === 'error' && p.errorCode !== AI_ERROR_CODES.CANCELLED) retryPhoto(p.id);
                             });
                         }}
                         onClose={handleCloseResults}
@@ -399,21 +325,16 @@ const FoodLogPage: React.FC = () => {
                     />
                 )}
 
-                {/* Compact Billing Info Footer */}
                 {billing.data && !billing.loading && (
-                    <div className={`mt-8 rounded-xl p-3 text-sm ${billing.isPro
-                        ? 'bg-purple-50 border border-purple-100'
-                        : billing.isLimitReached
-                            ? 'bg-red-50 border border-red-100'
-                            : 'bg-blue-50 border border-blue-100'
-                        }`}>
+                    <div
+                        className={`mt-8 rounded-xl p-3 text-sm ${billing.isPro ? 'bg-purple-50 border border-purple-100' : billing.isLimitReached ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
+                            }`}
+                    >
                         {billing.isPro ? (
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Check className="text-purple-600" size={16} />
-                                    <span className="font-medium text-purple-900">
-                                        PRO активен
-                                    </span>
+                                    <span className="font-medium text-purple-900">PRO активен</span>
                                 </div>
                                 {billing.data.expires_at && (
                                     <span className="text-purple-600 text-xs">
@@ -425,14 +346,9 @@ const FoodLogPage: React.FC = () => {
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
                                     <AlertCircle className="text-red-600" size={16} />
-                                    <span className="font-medium text-red-900">
-                                        Лимит исчерпан
-                                    </span>
+                                    <span className="font-medium text-red-900">Лимит исчерпан</span>
                                 </div>
-                                <button
-                                    onClick={() => navigate('/subscription')}
-                                    className="text-red-600 font-medium text-xs hover:underline whitespace-nowrap"
-                                >
+                                <button onClick={() => navigate('/subscription')} className="text-red-600 font-medium text-xs hover:underline whitespace-nowrap">
                                     Купить PRO
                                 </button>
                             </div>
@@ -441,10 +357,7 @@ const FoodLogPage: React.FC = () => {
                                 <span className="text-blue-900">
                                     {billing.data.used_today} / {billing.data.daily_photo_limit} фото
                                 </span>
-                                <button
-                                    onClick={() => navigate('/subscription')}
-                                    className="text-blue-600 font-medium text-xs hover:underline"
-                                >
+                                <button onClick={() => navigate('/subscription')} className="text-blue-600 font-medium text-xs hover:underline">
                                     Увеличить лимит
                                 </button>
                             </div>

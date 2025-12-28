@@ -27,7 +27,7 @@ export type {
     RecognizeResponse,
     TaskState,
     TaskStatus,
-    TaskSuccessResult,
+    TaskResult,
     TaskStatusResponse,
     // UI types (mapped from API)
     RecognizedItem,
