@@ -96,17 +96,37 @@ def _update_meal_photo_failed(meal_photo_id: int, error_code: str, error_message
     try:
         with transaction.atomic():
             photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
-            photo.status = 'FAILED'
-            photo.error_message = error_message
-            photo.recognized_data = {"error": error_code, "error_message": error_message}
-            photo.save(update_fields=['status', 'error_message', 'recognized_data'])
+            # Only update if not already in terminal state
+            if photo.status not in ('SUCCESS', 'FAILED'):
+                photo.status = 'FAILED'
+                photo.error_message = error_message
+                photo.recognized_data = {"error": error_code, "error_message": error_message}
+                photo.save(update_fields=['status', 'error_message', 'recognized_data'])
 
-            # Check if meal should be finalized
+            # Always check if meal should be finalized
             finalize_meal_if_complete(photo.meal)
     except MealPhoto.DoesNotExist:
         logger.warning("[AI] MealPhoto %s not found for status update", meal_photo_id)
     except Exception as e:
         logger.error("[AI] Failed to update MealPhoto %s: %s", meal_photo_id, str(e))
+
+
+def _on_task_failure(self, exc, task_id, args, kwargs, einfo):
+    """
+    Celery on_failure callback.
+    Ensures MealPhoto is marked FAILED if task fails after all retries.
+    """
+    meal_photo_id = kwargs.get('meal_photo_id')
+    if meal_photo_id:
+        logger.error(
+            "[AI] Task %s failed permanently, marking MealPhoto %s as FAILED: %s",
+            task_id, meal_photo_id, str(exc)
+        )
+        _update_meal_photo_failed(
+            meal_photo_id,
+            "TASK_FAILED",
+            "Произошла ошибка при обработке. Попробуйте позже."
+        )
 
 
 @shared_task(
@@ -115,6 +135,7 @@ def _update_meal_photo_failed(meal_photo_id: int, error_code: str, error_message
     retry_backoff=True,
     retry_backoff_max=60,
     retry_jitter=True,
+    on_failure=_on_task_failure,
 )
 def recognize_food_async(
     self,

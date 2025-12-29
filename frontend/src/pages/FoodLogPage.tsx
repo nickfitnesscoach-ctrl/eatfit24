@@ -166,10 +166,10 @@ const FoodLogPage: React.FC = () => {
         cleanup();
         // Then close modal
         closeResults();
-        // Navigate to diary with selected date after a small delay to ensure cleanup completes
+        // Navigate to diary with selected date and force refresh to update meal statuses
         const dateStr = selectedDate.toISOString().split('T')[0];
         setTimeout(() => {
-            navigate(`/?date=${dateStr}`);
+            navigate(`/?date=${dateStr}&refresh=1`);
         }, 0);
     };
 
@@ -177,8 +177,9 @@ const FoodLogPage: React.FC = () => {
         // Explicit "I am done" action
         closeResults();
         cleanup();
+        // Navigate to diary with force refresh to update meal statuses
         const dateStr = selectedDate.toISOString().split('T')[0];
-        navigate(`/?date=${dateStr}`);
+        navigate(`/?date=${dateStr}&refresh=1`);
     };
 
     if (!isReady) {

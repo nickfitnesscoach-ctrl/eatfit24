@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Drumstick, Droplets, Wheat, Plus } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,7 +12,6 @@ import { SkeletonMealsList } from '../components/Skeleton';
 import { DailyCaloriesCard } from '../components/dashboard/DailyCaloriesCard';
 import { MacrosGrid, MacroInfo } from '../components/dashboard/MacrosGrid';
 import { MealsList } from '../components/dashboard/MealsList';
-import { DeleteMealModal } from '../components/dashboard/DeleteMealModal';
 
 import { getProgress, getProgressColor } from '../utils/progress';
 
@@ -39,10 +38,6 @@ const ClientDashboard: React.FC = () => {
         enabled: isWebAppEnabled
     });
 
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [mealToDelete, setMealToDelete] = useState<number | null>(null);
-    const [deleting, setDeleting] = useState(false);
-
     // Update URL when date changes
     useEffect(() => {
         const dateStr = dailyMeals.selectedDate.toISOString().split('T')[0];
@@ -51,32 +46,21 @@ const ClientDashboard: React.FC = () => {
         setSearchParams(newParams, { replace: true });
     }, [dailyMeals.selectedDate, searchParams, setSearchParams]);
 
+    // Handle refresh=1 param (from FoodLogPage after "Готово")
+    useEffect(() => {
+        const shouldRefresh = searchParams.get('refresh') === '1';
+        if (shouldRefresh && isWebAppEnabled) {
+            // Clear refresh param and trigger refresh
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('refresh');
+            setSearchParams(newParams, { replace: true });
+            dailyMeals.refresh();
+        }
+    }, [searchParams, isWebAppEnabled, setSearchParams, dailyMeals]);
+
     // Pull-to-refresh handler
     const handleRefresh = async () => {
         await dailyMeals.refresh();
-    };
-
-    const handleDeleteMealClick = (e: React.MouseEvent, mealId: number) => {
-        e.stopPropagation();
-        setMealToDelete(mealId);
-        setShowDeleteConfirm(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!mealToDelete) return;
-
-        try {
-            setDeleting(true);
-            await dailyMeals.deleteMeal(mealToDelete);
-            setShowDeleteConfirm(false);
-            setMealToDelete(null);
-        } catch (err) {
-            // Error is already set by the hook
-            setShowDeleteConfirm(false);
-            setMealToDelete(null);
-        } finally {
-            setDeleting(false);
-        }
     };
 
     const getRemainingCalories = () => {
@@ -185,7 +169,6 @@ const ClientDashboard: React.FC = () => {
                             onOpenMeal={(mealId) => navigate(`/meal/${mealId}`, {
                                 state: { returnDate: dailyMeals.selectedDate.toISOString().split('T')[0] }
                             })}
-                            onDeleteMealClick={handleDeleteMealClick}
                         />
                     )}
 
@@ -204,16 +187,6 @@ const ClientDashboard: React.FC = () => {
                         </div>
                     )}
                 </div>
-
-                <DeleteMealModal
-                    open={showDeleteConfirm}
-                    deleting={deleting}
-                    onConfirm={handleConfirmDelete}
-                    onCancel={() => {
-                        setShowDeleteConfirm(false);
-                        setMealToDelete(null);
-                    }}
-                />
             </div>
         </PullToRefresh>
     );

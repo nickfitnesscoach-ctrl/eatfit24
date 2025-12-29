@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Image as ImageIcon, AlertCircle, XCircle, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Image as ImageIcon, AlertCircle, XCircle } from 'lucide-react';
 import type { MealPhoto } from '../../services/api/types';
 
 interface MealPhotoGalleryProps {
@@ -58,6 +58,7 @@ export const MealPhotoGallery: React.FC<MealPhotoGalleryProps> = ({
     const currentPhoto = photoList[currentIndex] || photoList[0];
 
     // Helper to render mini status badge
+    // NOTE: PROCESSING/PENDING badges NOT shown here - meal-level spinner is used instead
     const renderMiniBadge = (status: string) => {
         if (status === 'FAILED') {
             return (
@@ -73,13 +74,7 @@ export const MealPhotoGallery: React.FC<MealPhotoGalleryProps> = ({
                 </div>
             );
         }
-        if (status === 'PROCESSING' || status === 'PENDING') {
-            return (
-                <div className="absolute top-0.5 left-0.5 bg-blue-500 text-white p-0.5 rounded">
-                    <Loader2 size={10} className="animate-spin" />
-                </div>
-            );
-        }
+        // No spinner for PROCESSING/PENDING - meal-level status is used
         return null;
     };
 
@@ -185,6 +180,7 @@ export const MealPhotoStrip: React.FC<MealPhotoStripProps> = ({
     const remainingCount = photoList.length - displayPhotos.length;
 
     // Helper to render mini status badge for strip
+    // NOTE: PROCESSING/PENDING badges NOT shown here - meal-level spinner is used instead
     const renderStripBadge = (status: string) => {
         if (status === 'FAILED') {
             return (
@@ -200,13 +196,7 @@ export const MealPhotoStrip: React.FC<MealPhotoStripProps> = ({
                 </div>
             );
         }
-        if (status === 'PROCESSING' || status === 'PENDING') {
-            return (
-                <div className="absolute top-0 left-0 bg-blue-500 text-white p-0.5 rounded-tl-md rounded-br">
-                    <Loader2 size={8} className="animate-spin" />
-                </div>
-            );
-        }
+        // No spinner for PROCESSING/PENDING - meal-level status is used
         return null;
     };
 

@@ -443,6 +443,19 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         abortRef.current?.abort();
         abortRef.current = null;
 
+        // Collect taskIds to cancel on backend (in-flight only)
+        const taskIdsToCancel: string[] = [];
+        queueRef.current.forEach((p) => {
+            if (p.taskId && !['success', 'error'].includes(p.status)) {
+                taskIdsToCancel.push(p.taskId);
+            }
+        });
+
+        // Cancel tasks on backend (fire-and-forget)
+        taskIdsToCancel.forEach((taskId) => {
+            void cancelAiTask(taskId);
+        });
+
         processingRef.current = false;
         if (isMountedRef.current) setIsProcessing(false);
 

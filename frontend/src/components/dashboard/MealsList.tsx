@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import { Meal } from '../../types/meal';
 import { MEAL_TYPE_LABELS } from '../../constants/meals';
 import { MealPhotoStrip } from '../meal/MealPhotoGallery';
@@ -7,13 +7,11 @@ import { MealPhotoStrip } from '../meal/MealPhotoGallery';
 interface MealsListProps {
     meals: Meal[];
     onOpenMeal: (mealId: number) => void;
-    onDeleteMealClick: (e: React.MouseEvent, mealId: number) => void;
 }
 
 export const MealsList: React.FC<MealsListProps> = ({
     meals,
     onOpenMeal,
-    onDeleteMealClick
 }) => {
     return (
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -35,6 +33,9 @@ export const MealsList: React.FC<MealsListProps> = ({
                         const mealCalories = items.reduce((sum, item) =>
                             sum + (parseFloat(String(item.calories)) || 0), 0) || 0;
 
+                        // Show spinner based on meal.status only (not individual photo statuses)
+                        const isProcessing = meal.status === 'PROCESSING';
+
                         return (
                             <div
                                 key={meal.id}
@@ -51,11 +52,14 @@ export const MealsList: React.FC<MealsListProps> = ({
                                             fallbackPhotoUrl={meal.photo_url}
                                         />
                                         <div>
-                                            <p className="font-medium text-gray-900">
+                                            <p className="font-medium text-gray-900 flex items-center gap-2">
                                                 {MEAL_TYPE_LABELS[meal.meal_type] || meal.meal_type}
+                                                {isProcessing && (
+                                                    <Loader2 size={14} className="animate-spin text-blue-500" />
+                                                )}
                                             </p>
                                             <p className="text-sm text-gray-500">
-                                                {items.length} {items.length === 1 ? 'блюдо' : 'блюд'}
+                                                {isProcessing ? 'Обработка...' : `${items.length} ${items.length === 1 ? 'блюдо' : 'блюд'}`}
                                             </p>
                                         </div>
                                     </div>
@@ -63,13 +67,6 @@ export const MealsList: React.FC<MealsListProps> = ({
                                         <span className="font-bold text-orange-600">
                                             {Math.round(mealCalories)} ккал
                                         </span>
-                                        <button
-                                            onClick={(e) => onDeleteMealClick(e, meal.id)}
-                                            className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                            aria-label="Удалить приём пищи"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
                                         <ChevronRight size={18} className="text-gray-400" />
                                     </div>
                                 </div>
