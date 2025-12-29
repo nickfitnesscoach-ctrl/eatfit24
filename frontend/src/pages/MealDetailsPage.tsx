@@ -227,8 +227,9 @@ const MealDetailsPage: React.FC = () => {
                 const safeIndex = Math.min(currentPhotoIndex, Math.max(0, displayPhotos.length - 1));
                 const currentPhoto = displayPhotos[safeIndex];
 
-                // Helper to render status badge
-                const renderStatusBadge = (status?: string) => {
+                // Helper to render status badge for individual photo
+                // NOTE: PROCESSING/PENDING badges NOT shown for photos - meal-level status is used instead
+                const renderPhotoBadge = (status?: string) => {
                     if (status === 'FAILED') {
                         return (
                             <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-lg">
@@ -245,16 +246,12 @@ const MealDetailsPage: React.FC = () => {
                             </div>
                         );
                     }
-                    if (status === 'PROCESSING' || status === 'PENDING') {
-                        return (
-                            <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-lg">
-                                <Loader2 size={16} className="animate-spin" />
-                                Обработка...
-                            </div>
-                        );
-                    }
+                    // No spinner for PROCESSING/PENDING - meal-level status is used
                     return null;
                 };
+
+                // Meal-level processing badge (shown once, not per-photo)
+                const isMealProcessing = data.status === 'PROCESSING';
 
                 return (
                     <div className="w-full aspect-[4/3] bg-gray-200 relative">
@@ -270,8 +267,16 @@ const MealDetailsPage: React.FC = () => {
                                     }`}
                                 />
 
-                                {/* Status badge for non-success photos */}
-                                {renderStatusBadge(currentPhoto.status)}
+                                {/* Status badge for photo errors (FAILED/CANCELLED) */}
+                                {renderPhotoBadge(currentPhoto.status)}
+
+                                {/* Meal-level processing badge */}
+                                {isMealProcessing && (
+                                    <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-lg">
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Обработка...
+                                    </div>
+                                )}
 
                                 {/* Photo navigation for multi-photo meals */}
                                 {hasMultiplePhotos && (
@@ -304,11 +309,11 @@ const MealDetailsPage: React.FC = () => {
                                         {/* Dot indicators with status colors */}
                                         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5">
                                             {displayPhotos.map((photo, i) => {
-                                                // Color dot based on photo status
+                                                // Color dot based on photo status (no blue for PROCESSING - use meal-level)
                                                 let dotColor = 'bg-white';
                                                 if (photo.status === 'FAILED') dotColor = 'bg-red-400';
                                                 else if (photo.status === 'CANCELLED') dotColor = 'bg-gray-400';
-                                                else if (photo.status === 'PROCESSING' || photo.status === 'PENDING') dotColor = 'bg-blue-400';
+                                                // PROCESSING/PENDING show as white (meal-level spinner handles this)
 
                                                 return (
                                                     <button
