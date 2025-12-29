@@ -21,7 +21,7 @@ export const PageContainer: React.FC<PageContainerProps> = ({
         <div
             className={`px-page w-full max-w-2xl mx-auto ${className}`}
             style={{
-                paddingTop: withSafeTop ? 'var(--safe-top)' : undefined,
+                paddingTop: withSafeTop ? 'calc(var(--safe-top) + 16px)' : undefined,
             }}
         >
             {children}

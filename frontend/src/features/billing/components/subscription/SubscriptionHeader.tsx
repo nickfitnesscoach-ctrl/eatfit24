@@ -12,7 +12,7 @@ export const SubscriptionHeader: React.FC<SubscriptionHeaderProps> = ({
     headerSubtitle
 }) => {
     return (
-        <div className="flex flex-col items-center text-center space-y-2 mb-4">
+        <div className="flex flex-col items-center text-center space-y-2">
             <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-100 text-slate-600 border border-slate-200">
                 {topStatusText}
             </div>

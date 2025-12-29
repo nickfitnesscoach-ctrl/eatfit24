@@ -54,7 +54,7 @@ const SubscriptionPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <PageContainer withSafeTop={true} className="pt-2 pb-10 space-y-6">
+            <PageContainer withSafeTop={true} className="pt-2 pb-6 flex flex-col gap-5">
                 <SubscriptionHeader
                     topStatusText={subscriptionStatus.topStatusText}
                     headerTitle={subscriptionStatus.headerTitle}
