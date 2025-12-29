@@ -67,6 +67,11 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                         <p className="text-sm text-gray-500">
                             Распознано {successCount} из {totalCount} фото
                         </p>
+                        {selectedForRetry.size > 0 && (
+                            <p className="text-sm text-blue-600 font-medium mt-0.5">
+                                Выбрано: {selectedForRetry.size} из {retryableCount}
+                            </p>
+                        )}
                     </div>
                     <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
                         <X size={20} className="text-gray-600" />
@@ -120,33 +125,62 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                                                 {isCancelled ? 'Отменено' : 'Ошибка загрузки'}
                                             </h3>
                                             <p className="text-sm text-gray-500 mt-1 truncate">{item.error || 'Ошибка распознавания'}</p>
-                                            <div className="flex gap-4 mt-2">
-                                                {/* Toggle selection for multi-select retry */}
+                                            <div className="flex gap-3 mt-2">
                                                 {!NON_RETRYABLE_ERROR_CODES.has(item.errorCode || '') && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedForRetry(prev => {
-                                                                const next = new Set(prev);
-                                                                if (next.has(item.id)) {
-                                                                    next.delete(item.id);
-                                                                } else {
-                                                                    next.add(item.id);
-                                                                }
-                                                                return next;
-                                                            });
-                                                        }}
-                                                        className={`text-sm font-bold px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${selectedForRetry.has(item.id)
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'text-blue-600 hover:bg-blue-50'
-                                                            }`}
-                                                    >
-                                                        {selectedForRetry.has(item.id) ? (
-                                                            <CheckCircle2 size={14} />
+                                                    <>
+                                                        {/* Режим A (selectedCount === 0): локальная кнопка "Повторить" + "Выбрать" */}
+                                                        {selectedForRetry.size === 0 ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => onRetry(item.id)}
+                                                                    className="text-sm font-bold px-2 py-1 rounded-lg transition-colors flex items-center gap-1 text-blue-600 hover:bg-blue-50"
+                                                                >
+                                                                    <RefreshCcw size={14} />
+                                                                    Повторить
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedForRetry(new Set([item.id]));
+                                                                    }}
+                                                                    className="text-sm font-bold px-2 py-1 rounded-lg transition-colors flex items-center gap-1 text-blue-600 hover:bg-blue-50"
+                                                                >
+                                                                    <CheckCircle2 size={14} />
+                                                                    Выбрать
+                                                                </button>
+                                                            </>
                                                         ) : (
-                                                            <RefreshCcw size={14} />
+                                                            /* Режим B (selectedCount > 0): кнопка "Выбрать"/"Снять" */
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedForRetry(prev => {
+                                                                        const next = new Set(prev);
+                                                                        if (next.has(item.id)) {
+                                                                            next.delete(item.id);
+                                                                        } else {
+                                                                            next.add(item.id);
+                                                                        }
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                                className={`text-sm font-bold px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${selectedForRetry.has(item.id)
+                                                                    ? 'bg-blue-600 text-white'
+                                                                    : 'text-blue-600 hover:bg-blue-50'
+                                                                    }`}
+                                                            >
+                                                                {selectedForRetry.has(item.id) ? (
+                                                                    <>
+                                                                        <X size={14} />
+                                                                        Снять
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CheckCircle2 size={14} />
+                                                                        Выбрать
+                                                                    </>
+                                                                )}
+                                                            </button>
                                                         )}
-                                                        {selectedForRetry.has(item.id) ? 'Выбрано' : 'Повторить'}
-                                                    </button>
+                                                    </>
                                                 )}
                                                 {/* CANCELLED = cancelled process, not entity. Can't delete, only retry or ignore */}
                                                 {!isCancelled && (
@@ -168,57 +202,57 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                 </div>
 
                 <div className="p-4 border-t border-gray-100 shrink-0 bg-white sm:rounded-b-3xl pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-4 space-y-3">
-                    {/* Show 'Повторить выбранные' when items are selected */}
+                    {/* Режим B: показываем глобальную кнопку "Повторить выбранные" */}
                     {selectedForRetry.size > 0 && (
                         <button
                             onClick={() => {
                                 onRetrySelected(Array.from(selectedForRetry));
                                 setSelectedForRetry(new Set());
                             }}
-                            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg"
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center gap-2 shadow-lg"
                         >
                             <RefreshCcw size={18} />
                             Повторить выбранные ({selectedForRetry.size})
                         </button>
                     )}
 
-                    {/* 'Выбрать все' helper when there are retryable items but none selected */}
-                    {selectedForRetry.size === 0 && retryableCount >= 2 && (
-                        <button
-                            onClick={() => {
-                                const retryableIds = photoQueue
-                                    .filter(p => p.status === 'error' && !NON_RETRYABLE_ERROR_CODES.has(p.errorCode || ''))
-                                    .map(p => p.id);
-                                setSelectedForRetry(new Set(retryableIds));
-                            }}
-                            className="w-full bg-blue-50 text-blue-600 py-4 rounded-2xl font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <RefreshCcw size={18} />
-                            Выбрать все для повтора ({retryableCount})
-                        </button>
+                    {/* Primary CTA: "Готово" если есть успешные фото, иначе "Вернуться в камеру" */}
+                    {selectedForRetry.size === 0 && (
+                        <>
+                            {successCount > 0 ? (
+                                <button
+                                    onClick={onClose}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center shadow-lg"
+                                >
+                                    Готово
+                                </button>
+                            ) : onBackToCamera ? (
+                                <button
+                                    onClick={onBackToCamera}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    <Camera size={20} />
+                                    Вернуться в камеру
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={onClose}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center shadow-lg"
+                                >
+                                    Закрыть
+                                </button>
+                            )}
+                        </>
                     )}
 
-                    {successCount > 0 ? (
-                        <button
-                            onClick={onClose}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center shadow-lg"
-                        >
-                            Готово
-                        </button>
-                    ) : onBackToCamera ? (
+                    {/* Secondary CTA: "Вернуться в камеру" всегда доступна в режиме B */}
+                    {selectedForRetry.size > 0 && onBackToCamera && (
                         <button
                             onClick={onBackToCamera}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center gap-2 shadow-lg"
+                            className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                         >
-                            <Camera size={20} />
+                            <Camera size={18} />
                             Вернуться в камеру
-                        </button>
-                    ) : (
-                        <button
-                            onClick={onClose}
-                            className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-colors"
-                        >
-                            Закрыть
                         </button>
                     )}
                 </div>
