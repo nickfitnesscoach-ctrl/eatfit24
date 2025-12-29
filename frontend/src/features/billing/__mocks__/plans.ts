@@ -17,10 +17,10 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
         advanced_stats: false,
         priority_support: false,
         features: [
-            '3 анализа по фото в день',
-            'Базовый расчет КБЖУ',
-            'История за 7 дней',
-            'Ручной ввод безлимитно'
+            '3 AI-анализа в день',
+            'Расчет КБЖУ и нутриентов',
+            'История приемов за 7 дней',
+            'Ручной ввод без ограничений'
         ],
         is_popular: false,
     },
@@ -35,11 +35,11 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
         advanced_stats: true,
         priority_support: true,
         features: [
-            'Безлимит анализов по фото',
-            'Приоритетная обработка AI',
-            'Расширенная аналитика и тренды',
-            'Полная история приемов пищи',
-            'Персональные рекомендации'
+            'Безлимитный AI-анализ фото',
+            'Мгновенная обработка (Priority)',
+            'Глубокая аналитика и тренды',
+            'Вся история ваших успехов',
+            'Персональный план питания'
         ],
         is_popular: true,
         old_price: 499,
@@ -55,11 +55,11 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
         advanced_stats: true,
         priority_support: true,
         features: [
-            'Все преимущества PRO',
-            'Выгода более 15%',
-            'Безлимитный AI анализ',
-            'Приоритетная поддержка',
-            'Экспорт отчетов (скоро)'
+            'Все возможности PRO-доступа',
+            'Выгода 17% (2 месяца в подарок)',
+            'Экспорт отчетов в PDF/Excel',
+            'Приоритет в чате поддержки',
+            'Ранний доступ к новым фичам'
         ],
         is_popular: false,
         old_price: 4990,
