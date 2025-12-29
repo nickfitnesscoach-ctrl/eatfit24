@@ -186,13 +186,15 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
                 const mealType = contextRef.current.mealType || 'snack';
 
                 // Multi-photo grouping: pass meal_id from previous photos in batch
+                // Retry: pass meal_photo_id if retrying existing failed photo
                 const rr: RecognizeResponse = await recognizeFood(
                     pre.file,
                     comment,
                     mealType,
                     dateStr,
                     controller.signal,
-                    batchMealIdRef.current // Pass meal_id for grouping
+                    item.mealId ?? batchMealIdRef.current, // Use item's mealId for retry, or batch ref for new
+                    item.mealPhotoId // Pass existing photo ID for retry (prevents duplicate)
                 );
 
                 if (cancelledRef.current || controller.signal.aborted) return;
@@ -202,7 +204,12 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
                     batchMealIdRef.current = rr.meal_id;
                 }
 
-                updatePhoto(id, { status: 'processing', taskId: rr.task_id, mealId: rr.meal_id ?? undefined });
+                updatePhoto(id, {
+                    status: 'processing',
+                    taskId: rr.task_id,
+                    mealId: rr.meal_id ?? undefined,
+                    mealPhotoId: rr.meal_photo_id ?? undefined
+                });
 
                 const analysis = await pollTask(rr.task_id, controller);
 
@@ -310,10 +317,11 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             if (photo.errorCode && NON_RETRYABLE_ERROR_CODES.has(photo.errorCode)) return;
 
             // Just mark as pending, don't auto-start (multi-select mode)
+            // IMPORTANT: Keep mealId and mealPhotoId for retry (prevents duplicate MealPhoto)
             setQueueSync((prev) =>
                 prev.map((p) =>
                     p.id === id
-                        ? { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined, mealId: undefined }
+                        ? { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined }
                         : p
                 )
             );
@@ -328,13 +336,14 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             if (processingRef.current) return;
 
             // Mark all selected as pending
+            // IMPORTANT: Keep mealId and mealPhotoId for retry (prevents duplicate MealPhoto)
             const validIds = new Set(ids);
             setQueueSync((prev) =>
                 prev.map((p) => {
                     if (!validIds.has(p.id)) return p;
                     if (p.status !== 'error') return p;
                     if (p.errorCode && NON_RETRYABLE_ERROR_CODES.has(p.errorCode)) return p;
-                    return { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined, mealId: undefined };
+                    return { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined };
                 })
             );
 

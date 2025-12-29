@@ -76,37 +76,39 @@ class AIRecognitionView(APIView):
         meal_date = s.validated_data["date"]
         user_comment = s.validated_data.get("user_comment", "")
         client_meal_id = s.validated_data.get("meal_id")  # Optional: for multi-photo
+        client_meal_photo_id = s.validated_data.get("meal_photo_id")  # Optional: for retry
 
         # P1-4: Проверяем лимит ДО создания Meal (избегаем orphan meals)
+        # НО: при retry (meal_photo_id передан) не проверяем лимит — это повтор, не новый запрос
         from apps.billing.services import get_effective_plan_for_user
         from apps.billing.usage import DailyUsage
 
-        plan = get_effective_plan_for_user(request.user)
-        limit = plan.daily_photo_limit  # None = безлимит
+        if not client_meal_photo_id:  # Only check limit for NEW photos
+            plan = get_effective_plan_for_user(request.user)
+            limit = plan.daily_photo_limit  # None = безлимит
 
-        if limit is not None:
-            usage = DailyUsage.objects.get_today(request.user)
-            if usage.photo_ai_requests >= limit:
-                logger.info(
-                    "[AI] limit exceeded: user_id=%s used=%s limit=%s rid=%s",
-                    request.user.id,
-                    usage.photo_ai_requests,
-                    limit,
-                    request_id,
-                )
-                resp = Response(
-                    {
-                        "error": "DAILY_PHOTO_LIMIT_EXCEEDED",
-                        "message": "Вы исчерпали дневной лимит фото",
-                        "used": usage.photo_ai_requests,
-                        "limit": limit,
-                    },
-                    status=status.HTTP_429_TOO_MANY_REQUESTS,
-                )
-                resp["X-Request-ID"] = request_id
-                return resp
+            if limit is not None:
+                usage = DailyUsage.objects.get_today(request.user)
+                if usage.photo_ai_requests >= limit:
+                    logger.info(
+                        "[AI] limit exceeded: user_id=%s used=%s limit=%s rid=%s",
+                        request.user.id,
+                        usage.photo_ai_requests,
+                        limit,
+                        request_id,
+                    )
+                    resp = Response(
+                        {
+                            "error": "DAILY_PHOTO_LIMIT_EXCEEDED",
+                            "message": "Вы исчерпали дневной лимит фото",
+                            "used": usage.photo_ai_requests,
+                            "limit": limit,
+                        },
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                    resp["X-Request-ID"] = request_id
+                    return resp
 
-        # Multi-Photo Grouping: Find or create draft meal
         import mimetypes
 
         from django.core.files.base import ContentFile
@@ -114,39 +116,80 @@ class AIRecognitionView(APIView):
         from apps.nutrition.models import MealPhoto
         from apps.nutrition.services import get_or_create_draft_meal
 
-        meal, created = get_or_create_draft_meal(
-            user=request.user,
-            meal_type=meal_type,
-            meal_date=meal_date,
-            meal_id=client_meal_id,
-        )
-
-        # Create MealPhoto with PENDING status
-        # Determine file extension
         mime_type = normalized.mime_type
-        if mime_type in ["image/heic", "image/heif"]:
-            ext = "heic"
+
+        # RETRY MODE: Re-use existing MealPhoto instead of creating new
+        if client_meal_photo_id:
+            try:
+                meal_photo = MealPhoto.objects.select_related("meal").get(
+                    id=client_meal_photo_id,
+                    meal__user=request.user,  # Security: verify ownership
+                )
+            except MealPhoto.DoesNotExist:
+                resp = Response(
+                    {"error": "PHOTO_NOT_FOUND", "message": "Фото не найдено"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+                resp["X-Request-ID"] = request_id
+                return resp
+
+            # Only allow retry on FAILED/CANCELLED photos
+            if meal_photo.status not in ("FAILED", "CANCELLED"):
+                resp = Response(
+                    {"error": "INVALID_STATUS", "message": "Можно повторить только неудавшиеся фото"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                resp["X-Request-ID"] = request_id
+                return resp
+
+            meal = meal_photo.meal
+
+            # Reset photo status for retry
+            meal_photo.status = "PENDING"
+            meal_photo.error_message = None
+            meal_photo.recognized_data = None
+            meal_photo.save(update_fields=["status", "error_message", "recognized_data"])
+
+            logger.info(
+                "[AI] Retry MealPhoto id=%s for meal_id=%s user_id=%s rid=%s",
+                meal_photo.id,
+                meal.id,
+                request.user.id,
+                request_id,
+            )
         else:
-            ext = mimetypes.guess_extension(mime_type) or ".jpg"
-            if ext.startswith("."):
-                ext = ext[1:]
+            # NEW PHOTO MODE: Find or create draft meal and new MealPhoto
+            meal, created = get_or_create_draft_meal(
+                user=request.user,
+                meal_type=meal_type,
+                meal_date=meal_date,
+                meal_id=client_meal_id,
+            )
 
-        filename = f"ai_{request_id}.{ext}"
+            # Determine file extension
+            if mime_type in ["image/heic", "image/heif"]:
+                ext = "heic"
+            else:
+                ext = mimetypes.guess_extension(mime_type) or ".jpg"
+                if ext.startswith("."):
+                    ext = ext[1:]
 
-        meal_photo = MealPhoto.objects.create(
-            meal=meal,
-            status="PENDING",
-        )
-        # Save image file
-        meal_photo.image.save(filename, ContentFile(normalized.bytes_data), save=True)
+            filename = f"ai_{request_id}.{ext}"
 
-        logger.info(
-            "[AI] Created MealPhoto id=%s for meal_id=%s user_id=%s rid=%s",
-            meal_photo.id,
-            meal.id,
-            request.user.id,
-            request_id,
-        )
+            meal_photo = MealPhoto.objects.create(
+                meal=meal,
+                status="PENDING",
+            )
+            # Save image file
+            meal_photo.image.save(filename, ContentFile(normalized.bytes_data), save=True)
+
+            logger.info(
+                "[AI] Created MealPhoto id=%s for meal_id=%s user_id=%s rid=%s",
+                meal_photo.id,
+                meal.id,
+                request.user.id,
+                request_id,
+            )
 
         # Update meal status to PROCESSING
         if meal.status == "DRAFT":

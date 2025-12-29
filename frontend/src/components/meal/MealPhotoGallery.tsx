@@ -175,8 +175,8 @@ export const MealPhotoStrip: React.FC<MealPhotoStripProps> = ({
         return null;
     }
 
-    // Show up to 3 photos in a strip
-    const displayPhotos = photoList.slice(0, 3);
+    // Show up to 2 photos in a strip (3 causes layout issues)
+    const displayPhotos = photoList.slice(0, 2);
     const remainingCount = photoList.length - displayPhotos.length;
 
     // Helper to render mini status badge for strip

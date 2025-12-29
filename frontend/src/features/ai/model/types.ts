@@ -56,6 +56,8 @@ export interface PhotoQueueItem {
     taskId?: string;
     /** Meal ID from backend */
     mealId?: number;
+    /** MealPhoto ID from backend (for retry without creating duplicate) */
+    mealPhotoId?: number;
 }
 
 /** Progress state for batch processing */

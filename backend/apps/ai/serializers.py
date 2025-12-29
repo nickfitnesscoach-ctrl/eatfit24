@@ -178,6 +178,13 @@ class AIRecognizeRequestSerializer(serializers.Serializer):
         help_text="ID существующего приёма пищи для добавления фото (multi-photo mode)",
     )
 
+    # Optional meal_photo_id for retry (re-use existing MealPhoto instead of creating new)
+    meal_photo_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="ID существующего фото для retry (вместо создания нового)",
+    )
+
     meal_type = serializers.ChoiceField(choices=MEAL_TYPE_CHOICES, required=False)
     date = serializers.DateField(required=False)
 

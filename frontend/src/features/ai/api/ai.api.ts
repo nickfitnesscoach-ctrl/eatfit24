@@ -63,6 +63,9 @@ const safeJson = async (res: Response) => {
  * - Pass meal_id to add photo to existing meal
  * - If not provided, backend will find/create draft meal within 10-min window
  * - Returns meal_id for subsequent photos in the same batch
+ *
+ * Retry Support:
+ * - Pass meal_photo_id to retry existing failed photo (no duplicate created)
  */
 export const recognizeFood = async (
     imageFile: File,
@@ -70,9 +73,10 @@ export const recognizeFood = async (
     mealType?: MealType | string,
     date?: string,
     signal?: AbortSignal,
-    mealId?: number // Optional: for multi-photo meals
+    mealId?: number, // Optional: for multi-photo meals
+    mealPhotoId?: number // Optional: for retry (re-use existing MealPhoto)
 ): Promise<RecognizeResponse> => {
-    log(`AI recognize: ${imageFile.name}${mealId ? ` (meal_id=${mealId})` : ''}`);
+    log(`AI recognize: ${imageFile.name}${mealId ? ` (meal_id=${mealId})` : ''}${mealPhotoId ? ` (retry photo_id=${mealPhotoId})` : ''}`);
 
     const formData = new FormData();
     formData.append('image', imageFile);
@@ -86,6 +90,9 @@ export const recognizeFood = async (
 
     // Multi-photo grouping: pass meal_id to attach to existing meal
     if (mealId) formData.append('meal_id', String(mealId));
+
+    // Retry: pass meal_photo_id to re-use existing photo record
+    if (mealPhotoId) formData.append('meal_photo_id', String(mealPhotoId));
 
     const response = await fetchWithTimeout(
         URLS.recognize,
