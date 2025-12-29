@@ -54,10 +54,10 @@ class TestAIAsyncFlow:
         body = resp.json()
         assert body["task_id"] == "task-123"
         assert body["status"] == "processing"
-        assert body["meal_id"] is None  # P1-1: No meal created yet
+        assert body["meal_id"] is not None  # Updated: Meal is created to allow grouping
 
-        # Verify no meal created in DB
-        assert Meal.objects.filter(user=user).count() == 0
+        # Verify meal created in DB
+        assert Meal.objects.filter(user=user).count() == 1
 
         # Verify ownership saved in cache
         assert cache.get(f"ai_task_owner:{fake_task.id}") == user.id

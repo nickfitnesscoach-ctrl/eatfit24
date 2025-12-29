@@ -107,10 +107,12 @@ class AIRecognitionView(APIView):
                 return resp
 
         # Multi-Photo Grouping: Find or create draft meal
-        from apps.nutrition.services import get_or_create_draft_meal
-        from apps.nutrition.models import MealPhoto
-        from django.core.files.base import ContentFile
         import mimetypes
+
+        from django.core.files.base import ContentFile
+
+        from apps.nutrition.models import MealPhoto
+        from apps.nutrition.services import get_or_create_draft_meal
 
         meal, created = get_or_create_draft_meal(
             user=request.user,
@@ -133,20 +135,23 @@ class AIRecognitionView(APIView):
 
         meal_photo = MealPhoto.objects.create(
             meal=meal,
-            status='PENDING',
+            status="PENDING",
         )
         # Save image file
         meal_photo.image.save(filename, ContentFile(normalized.bytes_data), save=True)
 
         logger.info(
             "[AI] Created MealPhoto id=%s for meal_id=%s user_id=%s rid=%s",
-            meal_photo.id, meal.id, request.user.id, request_id
+            meal_photo.id,
+            meal.id,
+            request.user.id,
+            request_id,
         )
 
         # Update meal status to PROCESSING
-        if meal.status == 'DRAFT':
-            meal.status = 'PROCESSING'
-            meal.save(update_fields=['status'])
+        if meal.status == "DRAFT":
+            meal.status = "PROCESSING"
+            meal.save(update_fields=["status"])
 
         # 1) Async — основной режим (быстро и безопасно)
         if getattr(settings, "AI_ASYNC_ENABLED", True):
@@ -164,6 +169,8 @@ class AIRecognitionView(APIView):
 
             # P0 Security Check: link task to user in cache (24h TTL)
             cache.set(f"ai_task_owner:{task.id}", request.user.id, timeout=86400)
+            # Store photo ID for immediate cancellation feedback
+            cache.set(f"ai_task_photo:{task.id}", meal_photo.id, timeout=86400)
 
             # Return meal_id so frontend can group subsequent photos
             data = {
@@ -314,10 +321,10 @@ class TaskStatusView(APIView):
 class CancelTaskView(APIView):
     """
     POST /api/v1/ai/task/<task_id>/cancel/
-    
+
     Marks a task as cancelled. The Celery task will check this flag
     before creating a Meal, preventing orphan diary entries.
-    
+
     Fire-and-forget from frontend perspective - always returns 200.
     """
 
@@ -328,7 +335,7 @@ class CancelTaskView(APIView):
 
         # Security: Verify task belongs to this user
         owner_id = cache.get(f"ai_task_owner:{task_id}")
-        
+
         if owner_id is None:
             # Task doesn't exist or already expired - that's fine, just log
             logger.info(
@@ -353,6 +360,27 @@ class CancelTaskView(APIView):
         # Set cancellation flag (24h TTL same as task ownership)
         cache.set(f"ai_task_cancelled:{task_id}", request.user.id, timeout=86400)
 
+        # P0 Immediate Feedback: Update MealPhoto status and finalize
+        meal_photo_id = cache.get(f"ai_task_photo:{task_id}")
+        if meal_photo_id:
+            from apps.nutrition.models import MealPhoto
+            from apps.nutrition.services import finalize_meal_if_complete
+
+            try:
+                photo = MealPhoto.objects.get(id=meal_photo_id)
+                if photo.status not in ("SUCCESS", "FAILED", "CANCELLED"):
+                    photo.status = "CANCELLED"
+                    photo.error_message = "Отменено пользователем"
+                    photo.save(update_fields=["status", "error_message"])
+
+                    # Finalize meal status
+                    finalize_meal_if_complete(photo.meal)
+                    logger.info("[AI] Mark MealPhoto %s as CANCELLED immediately", meal_photo_id)
+            except Exception as e:
+                logger.error(
+                    "[AI] Failed to update MealPhoto %s on cancel: %s", meal_photo_id, str(e)
+                )
+
         logger.info(
             "[AI] Task cancelled: task_id=%s user_id=%s rid=%s",
             task_id,
@@ -361,4 +389,3 @@ class CancelTaskView(APIView):
         )
 
         return Response({"ok": True}, status=status.HTTP_200_OK)
-

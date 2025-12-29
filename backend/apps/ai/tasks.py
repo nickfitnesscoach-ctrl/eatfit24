@@ -88,8 +88,12 @@ def _json_safe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return safe
 
 
-def _update_meal_photo_failed(meal_photo_id: int, error_code: str, error_message: str):
+def _update_meal_photo_failed(meal_photo_id: int | None, error_code: str, error_message: str):
     """Update MealPhoto to FAILED status and trigger finalization check."""
+    if not meal_photo_id:
+        # Legacy/bot call without pre-created photo - nothing to update
+        return
+
     from apps.nutrition.models import MealPhoto
     from apps.nutrition.services import finalize_meal_if_complete
 
@@ -97,11 +101,11 @@ def _update_meal_photo_failed(meal_photo_id: int, error_code: str, error_message
         with transaction.atomic():
             photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
             # Only update if not already in terminal state
-            if photo.status not in ('SUCCESS', 'FAILED'):
-                photo.status = 'FAILED'
+            if photo.status not in ("SUCCESS", "FAILED", "CANCELLED"):
+                photo.status = "CANCELLED" if error_code == "CANCELLED" else "FAILED"
                 photo.error_message = error_message
                 photo.recognized_data = {"error": error_code, "error_message": error_message}
-                photo.save(update_fields=['status', 'error_message', 'recognized_data'])
+                photo.save(update_fields=["status", "error_message", "recognized_data"])
 
             # Always check if meal should be finalized
             finalize_meal_if_complete(photo.meal)
@@ -116,16 +120,16 @@ def _on_task_failure(self, exc, task_id, args, kwargs, einfo):
     Celery on_failure callback.
     Ensures MealPhoto is marked FAILED if task fails after all retries.
     """
-    meal_photo_id = kwargs.get('meal_photo_id')
+    meal_photo_id = kwargs.get("meal_photo_id")
     if meal_photo_id:
         logger.error(
             "[AI] Task %s failed permanently, marking MealPhoto %s as FAILED: %s",
-            task_id, meal_photo_id, str(exc)
+            task_id,
+            meal_photo_id,
+            str(exc),
         )
         _update_meal_photo_failed(
-            meal_photo_id,
-            "TASK_FAILED",
-            "Произошла ошибка при обработке. Попробуйте позже."
+            meal_photo_id, "TASK_FAILED", "Произошла ошибка при обработке. Попробуйте позже."
         )
 
 
@@ -179,22 +183,40 @@ def recognize_food_async(
         user_id,
     )
 
-    # Update MealPhoto to PROCESSING
-    try:
+    # 1. Prepare photo (multi-photo architecture: already created by view)
+    meal_photo = None
+    if meal_photo_id:
+        try:
+            meal_photo = MealPhoto.objects.select_related("meal").get(id=meal_photo_id)
+        except MealPhoto.DoesNotExist:
+            logger.error("[AI] MealPhoto %s not found, aborting task", meal_photo_id)
+            return {
+                "error": "PHOTO_NOT_FOUND",
+                "error_message": "Фото не найдено.",
+                "items": [],
+                "meal_id": meal_id,
+                "meal_photo_id": meal_photo_id,
+                "owner_id": user_id,
+            }
+
+        # Sync check: ensure photo belongs to meal
+        if meal_id and meal_photo.meal_id != meal_id:
+            logger.error("[AI] Photo %s doesn't belong to meal %s", meal_photo_id, meal_id)
+            return {
+                "error": "OWNERSHIP_MISMATCH",
+                "error_message": "Фото не принадлежит указанному приёму пищи.",
+                "items": [],
+                "meal_id": meal_id,
+                "meal_photo_id": meal_photo_id,
+                "owner_id": user_id,
+            }
+
+        # Update MealPhoto to PROCESSING
         with transaction.atomic():
-            meal_photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
-            meal_photo.status = 'PROCESSING'
-            meal_photo.save(update_fields=['status'])
-    except MealPhoto.DoesNotExist:
-        logger.error("[AI] MealPhoto %s not found, aborting task", meal_photo_id)
-        return {
-            "error": "PHOTO_NOT_FOUND",
-            "error_message": "Фото не найдено.",
-            "items": [],
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "owner_id": user_id,
-        }
+            meal_photo.status = "PROCESSING"
+            meal_photo.save(update_fields=["status"])
+    else:
+        logger.info("[AI] No meal_photo_id provided, continuing (bot/legacy call)")
 
     # 1) Validate mime_type (P0 Security/Integrity)
     if not mime_type or mime_type not in [
@@ -207,7 +229,7 @@ def recognize_food_async(
         _update_meal_photo_failed(
             meal_photo_id,
             "UNSUPPORTED_IMAGE_TYPE",
-            "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP."
+            "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP.",
         )
         return {
             "error": "UNSUPPORTED_IMAGE_TYPE",
@@ -226,9 +248,7 @@ def recognize_food_async(
     # For HEIC we rely on client MIME as signatures are complex (ftyp)
     if not detected and mime_type not in ["image/heic", "image/heif"]:
         _update_meal_photo_failed(
-            meal_photo_id,
-            "INVALID_IMAGE",
-            "Файл поврежден или не является изображением."
+            meal_photo_id, "INVALID_IMAGE", "Файл поврежден или не является изображением."
         )
         return {
             "error": "INVALID_IMAGE",
@@ -249,9 +269,7 @@ def recognize_food_async(
         except ValueError:
             logger.warning("[AI] Invalid date format: %s rid=%s", date, rid)
             _update_meal_photo_failed(
-                meal_photo_id,
-                "INVALID_DATE_FORMAT",
-                "Некорректный формат даты."
+                meal_photo_id, "INVALID_DATE_FORMAT", "Некорректный формат даты."
             )
             return {
                 "meal_id": meal_id,
@@ -271,11 +289,7 @@ def recognize_food_async(
         logger.warning(
             "[AI] Meal not found or ownership mismatch: meal_id=%s user_id=%s", meal_id, user_id
         )
-        _update_meal_photo_failed(
-            meal_photo_id,
-            "MEAL_NOT_FOUND",
-            "Приём пищи не найден."
-        )
+        _update_meal_photo_failed(meal_photo_id, "MEAL_NOT_FOUND", "Приём пищи не найден.")
         return {
             "error": "MEAL_NOT_FOUND",
             "error_message": "Приём пищи не найден.",
@@ -331,9 +345,7 @@ def recognize_food_async(
 
         # Постоянная ошибка — помечаем фото как FAILED
         _update_meal_photo_failed(
-            meal_photo_id,
-            "AI_ERROR",
-            "Произошла ошибка при обработке фото. Попробуйте позже."
+            meal_photo_id, "AI_ERROR", "Произошла ошибка при обработке фото. Попробуйте позже."
         )
         return {
             "meal_id": meal_id,
@@ -379,9 +391,7 @@ def recognize_food_async(
     # P0 Data Integrity: Handle empty results
     if not safe_items:
         _update_meal_photo_failed(
-            meal_photo_id,
-            "EMPTY_RESULT",
-            "Не удалось распознать еду на фото."
+            meal_photo_id, "EMPTY_RESULT", "Не удалось распознать еду на фото."
         )
         return {
             "error": "EMPTY_RESULT",
@@ -409,24 +419,26 @@ def recognize_food_async(
                 carbohydrates=_to_decimal(it["carbohydrates"], "0"),
             )
 
-        # Update MealPhoto with success
-        meal_photo.status = 'SUCCESS'
-        meal_photo.recognized_data = {
-            "items": safe_items,
-            "totals": {
-                "calories": float(totals.get("calories") or 0.0),
-                "protein": float(totals.get("protein") or 0.0),
-                "fat": float(totals.get("fat") or 0.0),
-                "carbohydrates": float(totals.get("carbohydrates") or 0.0),
-            },
-            "meta": meta,
-        }
-        meal_photo.save(update_fields=['status', 'recognized_data'])
-
-        logger.info(
-            "[AI] MealPhoto %s updated to SUCCESS with %s items",
-            meal_photo_id, len(safe_items)
-        )
+        # Update MealPhoto with success (if exists)
+        if meal_photo_id:
+            meal_photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
+            meal_photo.status = "SUCCESS"
+            meal_photo.recognized_data = {
+                "items": safe_items,
+                "totals": {
+                    "calories": float(totals.get("calories") or 0.0),
+                    "protein": float(totals.get("protein") or 0.0),
+                    "fat": float(totals.get("fat") or 0.0),
+                    "carbohydrates": float(totals.get("carbohydrates") or 0.0),
+                },
+                "meta": meta,
+            }
+            meal_photo.save(update_fields=["status", "recognized_data"])
+            logger.info(
+                "[AI] MealPhoto %s updated to SUCCESS with %s items", meal_photo_id, len(safe_items)
+            )
+        else:
+            logger.info("[AI] Success for meal_id=%s (no photo to update)", meal.id)
 
     # Check if meal should be finalized
     finalize_meal_if_complete(meal)
@@ -452,7 +464,7 @@ def recognize_food_async(
 
     response: Dict[str, Any] = {
         "meal_id": int(meal.id),
-        "meal_photo_id": int(meal_photo_id),
+        "meal_photo_id": int(meal_photo_id) if meal_photo_id else None,
         "items": safe_items,
         "total_calories": float(totals.get("calories") or 0.0),
         "totals": {
