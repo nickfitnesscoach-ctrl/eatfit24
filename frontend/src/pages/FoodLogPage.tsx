@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Check, X, Send } from 'lucide-react';
+import { AlertCircle, Check, X, Send, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBilling } from '../contexts/BillingContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
 import { PageContainer } from '../components/shared/PageContainer';
+import PageHeader from '../components/PageHeader';
 
 import {
     SelectedPhotosList,
@@ -184,25 +185,39 @@ const FoodLogPage: React.FC = () => {
 
     return (
         <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <PageHeader title="Добавить еду" fallbackRoute="/" />
             <PageContainer className="py-6 space-y-[var(--section-gap)]">
+                {/* Date & Meal Type Selection Card */}
                 <div className="bg-white rounded-[var(--radius-card)] shadow-sm p-[var(--card-p)] border border-gray-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Дата</h3>
-                            <input
-                                type="date"
-                                value={selectedDate.toISOString().split('T')[0]}
-                                onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                                className="w-full p-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white"
-                            />
+                    <div className="grid grid-cols-1 gap-4">
+                        {/* Date Selection */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                                Дата
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={selectedDate.toISOString().split('T')[0]}
+                                    onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                                    className="w-full h-[var(--tap-h)] px-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 text-[16px] font-semibold text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none"
+                                />
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                    <CalendarIcon size={18} className="text-gray-400" />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Приём пищи</h3>
+
+                        {/* Meal Type Selection */}
+                        <div className="space-y-1.5">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                                Приём пищи
+                            </label>
                             <div className="relative">
                                 <select
                                     value={mealType}
                                     onChange={(e) => setMealType(e.target.value)}
-                                    className="w-full p-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white appearance-none"
+                                    className="w-full h-[var(--tap-h)] px-4 pr-10 rounded-xl border border-gray-200 bg-gray-50 text-[16px] font-semibold text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none"
                                 >
                                     {MEAL_TYPE_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -210,10 +225,8 @@ const FoodLogPage: React.FC = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400">
+                                    <ChevronDown size={20} />
                                 </div>
                             </div>
                         </div>
