@@ -1,6 +1,6 @@
 import React from 'react';
 import type { PaymentHistoryItem } from '../../../../types/billing';
-import { PAYMENT_STATUS_BADGES } from '../../../../constants/billing';
+import { PAYMENT_STATUS_BADGES, PAYMENT_STATUS_LABELS } from '../../../../constants/billing';
 import { formatBillingDate } from '../../utils/date';
 
 interface PaymentHistoryListProps {
@@ -41,7 +41,7 @@ const PaymentHistoryList: React.FC<PaymentHistoryListProps> = ({ payments }) => 
                             <span
                                 className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(payment.status)}`}
                             >
-                                {payment.status}
+                                {PAYMENT_STATUS_LABELS[payment.status] || payment.status}
                             </span>
                         </div>
                     </div>
