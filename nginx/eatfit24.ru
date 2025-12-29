@@ -43,14 +43,12 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 
-    # Media files (served by Django)
+    # Media files (served directly by Nginx from bind mount)
     location /media/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
+        alias /opt/eatfit24/media/;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public";
     }
 
     # Health checks (proxy to backend)
