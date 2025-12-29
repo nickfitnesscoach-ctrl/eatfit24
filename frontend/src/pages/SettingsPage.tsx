@@ -11,7 +11,7 @@ const SettingsPage: React.FC = () => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="flex-1 bg-gray-50">
             <PageHeader title="Настройки" fallbackRoute="/profile" />
 
             <PageContainer className="py-6 space-y-[var(--section-gap)]">

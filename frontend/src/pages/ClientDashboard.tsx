@@ -144,7 +144,7 @@ const ClientDashboard: React.FC = () => {
 
     return (
         <PullToRefresh onRefresh={handleRefresh} disabled={dailyMeals.loading}>
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
                 <PageContainer className="py-6 space-y-[var(--section-gap)]">
                     <Calendar selectedDate={dailyMeals.selectedDate} onDateSelect={dailyMeals.setSelectedDate} />
 

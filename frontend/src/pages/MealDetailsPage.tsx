@@ -170,7 +170,7 @@ const MealDetailsPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50">
+            <div className="flex-1 bg-gray-50">
                 <PageHeader title="Детали блюда" />
                 <SkeletonMealDetails />
             </div>
@@ -179,7 +179,7 @@ const MealDetailsPage: React.FC = () => {
 
     if (error || !data) {
         return (
-            <div className="min-h-screen bg-white">
+            <div className="flex-1 bg-white">
                 <PageHeader title="Детали блюда" />
                 <div className="flex flex-col items-center justify-center h-[80vh] text-center p-4">
                     <p className="text-red-500 font-medium mb-4">{error || 'Блюдо не найдено'}</p>
@@ -200,7 +200,7 @@ const MealDetailsPage: React.FC = () => {
     const isMealProcessing = data.status === 'PROCESSING';
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="flex-1 bg-gray-50">
             <PageHeader title="Детали блюда" />
 
             {/* Large Photo Gallery */}

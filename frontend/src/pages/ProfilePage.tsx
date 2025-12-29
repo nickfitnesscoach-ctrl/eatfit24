@@ -161,7 +161,7 @@ const ProfilePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
             <PageContainer className="py-6 space-y-[var(--section-gap)]">
                 {/* Profile Card */}
                 <div className="bg-white rounded-[var(--radius-card)] shadow-sm border border-gray-100 overflow-hidden">

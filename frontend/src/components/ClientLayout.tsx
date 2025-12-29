@@ -14,8 +14,8 @@ import { Home, Camera, CreditCard, User } from 'lucide-react';
  */
 const ClientLayout: React.FC = () => {
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            <main className="flex-1" style={{ paddingBottom: 'calc(var(--tap-h) + var(--safe-bottom) + 12px)' }}>
+        <div className="min-h-dvh bg-gray-50 flex flex-col">
+            <main className="flex-1 flex flex-col" style={{ paddingBottom: 'calc(var(--tap-h) + var(--safe-bottom) + 12px)' }}>
                 <Outlet />
             </main>
 

@@ -183,7 +183,7 @@ const FoodLogPage: React.FC = () => {
     const showProcessing = hasInFlight && !showResults;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
             <PageContainer className="py-6 space-y-[var(--section-gap)]">
                 <div className="bg-white rounded-[var(--radius-card)] shadow-sm p-[var(--card-p)] border border-gray-100">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
