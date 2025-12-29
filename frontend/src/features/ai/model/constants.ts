@@ -69,6 +69,7 @@ export const MEAL_TYPE_OPTIONS = [
 
 export const AI_ERROR_CODES = {
     DAILY_LIMIT_REACHED: 'DAILY_LIMIT_REACHED',
+    THROTTLED: 'THROTTLED',
     RECOGNITION_FAILED: 'RECOGNITION_FAILED',
     TASK_TIMEOUT: 'TASK_TIMEOUT',
     TASK_FAILURE: 'TASK_FAILURE',
@@ -89,6 +90,7 @@ export type AiErrorCode = typeof AI_ERROR_CODES[keyof typeof AI_ERROR_CODES];
  */
 export const NON_RETRYABLE_ERROR_CODES = new Set<string>([
     AI_ERROR_CODES.DAILY_LIMIT_REACHED,
+    AI_ERROR_CODES.THROTTLED,
 ]);
 
 // ============================================================
@@ -97,6 +99,7 @@ export const NON_RETRYABLE_ERROR_CODES = new Set<string>([
 
 export const AI_ERROR_MESSAGES: Record<string, string> = {
     [AI_ERROR_CODES.DAILY_LIMIT_REACHED]: 'Дневной лимит исчерпан. Оформите PRO для безлимита.',
+    [AI_ERROR_CODES.THROTTLED]: 'Превышен дневной лимит запросов. Попробуйте позже или оформите PRO.',
     [AI_ERROR_CODES.RECOGNITION_FAILED]: 'Не удалось распознать еду на фото',
     [AI_ERROR_CODES.TASK_TIMEOUT]: 'Превышено время ожидания. Попробуйте ещё раз.',
     [AI_ERROR_CODES.TASK_FAILURE]: 'Ошибка обработки фото',
