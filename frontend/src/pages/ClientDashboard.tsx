@@ -54,9 +54,28 @@ const ClientDashboard: React.FC = () => {
             const newParams = new URLSearchParams(searchParams);
             newParams.delete('refresh');
             setSearchParams(newParams, { replace: true });
-            dailyMeals.refresh();
+
+            // Initial refresh with small delay to let backend finalize
+            setTimeout(() => {
+                dailyMeals.refresh();
+            }, 300);
         }
     }, [searchParams, isWebAppEnabled, setSearchParams, dailyMeals]);
+
+    // Poll for meals with PROCESSING status
+    useEffect(() => {
+        if (!isWebAppEnabled) return;
+
+        const hasProcessing = dailyMeals.meals.some(meal => meal.status === 'PROCESSING');
+        if (!hasProcessing) return;
+
+        // Poll every 2 seconds while there are processing meals
+        const pollInterval = setInterval(() => {
+            dailyMeals.refresh();
+        }, 2000);
+
+        return () => clearInterval(pollInterval);
+    }, [dailyMeals.meals, isWebAppEnabled, dailyMeals]);
 
     // Pull-to-refresh handler
     const handleRefresh = async () => {
