@@ -12,6 +12,7 @@ import { useWeeklyKbjuStats } from '../hooks/useWeeklyKbjuStats';
 import GoalsSection from '../components/profile/GoalsSection';
 import WeeklyStatsCard from '../components/profile/WeeklyStatsCard';
 import { PageContainer } from '../components/shared/PageContainer';
+import { processAvatar } from '../shared/utils/image/avatarProcess';
 
 interface UserGoals {
     calories: number;
@@ -35,6 +36,7 @@ const ProfilePage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [processingAvatar, setProcessingAvatar] = useState(false);
     const [profile, setProfile] = useState<Profile | null>(null);
 
     const { avgCalories, avgProtein, avgFat, avgCarbs } = useWeeklyKbjuStats();
@@ -117,19 +119,33 @@ const ProfilePage: React.FC = () => {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-        if (file.size > 5 * 1024 * 1024) {
-            setError(`Файл слишком большой (> 5 МБ)`);
-            return;
-        }
+
+        setProcessingAvatar(true);
+        setError(null);
+
+        let processedFile: File;
         try {
-            const objectUrl = URL.createObjectURL(file);
+            processedFile = await processAvatar(file);
+
+            // Show preview of processed image
+            const objectUrl = URL.createObjectURL(processedFile);
             setAvatarPreview(objectUrl);
-        } catch (err) { }
+
+            // Clear input so same file can be selected again
+            if (event.target) event.target.value = '';
+        } catch (err: any) {
+            console.error('[Profile] Processing failed:', err);
+            setError(err.message || 'Не удалось обработать фото');
+            setProcessingAvatar(false);
+            if (event.target) event.target.value = '';
+            return;
+        } finally {
+            setProcessingAvatar(false);
+        }
 
         setUploadingAvatar(true);
-        setError(null);
         try {
-            const updatedProfile = await api.uploadAvatar(file);
+            const updatedProfile = await api.uploadAvatar(processedFile);
             setProfile(updatedProfile);
             setAvatarPreview(updatedProfile.avatar_url || null);
         } catch (err: any) {
@@ -137,7 +153,6 @@ const ProfilePage: React.FC = () => {
             setAvatarPreview(profile?.avatar_url || null);
         } finally {
             setUploadingAvatar(false);
-            if (event.target) event.target.value = '';
         }
     };
 
@@ -177,18 +192,21 @@ const ProfilePage: React.FC = () => {
                                             <User size={36} className="text-white" />
                                         </div>
                                     )}
-                                    {uploadingAvatar && (
-                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                            <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
+                                    {(uploadingAvatar || processingAvatar) && (
+                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-2 text-center">
+                                            <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full mb-1"></div>
+                                            <span className="text-[8px] font-bold text-white uppercase tracking-tighter">
+                                                {processingAvatar ? 'Обрабатываем...' : 'Загружаем...'}
+                                            </span>
                                         </div>
                                     )}
-                                    {!uploadingAvatar && (
+                                    {!uploadingAvatar && !processingAvatar && (
                                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <Camera size={24} className="text-white" />
                                         </div>
                                     )}
                                 </div>
-                                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" disabled={uploadingAvatar} />
+                                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" disabled={uploadingAvatar || processingAvatar} />
                             </div>
                         </div>
                         <div className="flex justify-end pt-2">
