@@ -52,14 +52,61 @@ def _get_plan_by_code_or_legacy(plan_code: str) -> Optional[SubscriptionPlan]:
 # Public Plans
 # ---------------------------------------------------------------------
 
+# ---------------------------------------------------------------------
+# Public Plans
+# ---------------------------------------------------------------------
+
+# [TODO: TEMP] Hardcoded features schema until DB migration
+# SSOT for features, old_price, and display_name override
+PLAN_CONFIG = {
+    "FREE": {
+        "features": [
+            "3 AI-распознавания в день",
+            "Базовый расчет КБЖУ",
+            "История питания (7 дней)",
+        ],
+        "old_price": None,
+        "is_popular": False,
+    },
+    "PRO_MONTHLY": {
+        "features": [
+            "Полная свобода питания",
+            "Мгновенный подсчет калорий",
+            "Анализ прогресса и привычек",
+            "Адаптивный план под твою цель",
+        ],
+        "old_price": None,
+        "is_popular": False,
+        "display_name": "PRO Месяц",  # [TODO: TEMP] override DB name
+    },
+    "PRO_YEARLY": {
+        "features": [
+            "Все функции PRO-доступа",
+            "Бонус: Стратегия с тренером",
+            "Аудит твоего питания",
+            "План выхода на цель",
+        ],
+        "old_price": 4990,
+        "is_popular": True,
+        "display_name": "PRO Год",  # [TODO: TEMP] override DB name
+    },
+}
+
+
 class SubscriptionPlanPublicSerializer(serializers.ModelSerializer):
     """
     Публичный сериализатор тарифов для /billing/plans/
 
     Отдаём:
-    - code, display_name, price, duration_days
-    - лимиты/фичи для UI
+    - code, display_name, price, old_price, duration_days
+    - features (list of strings)
+    - is_popular
     """
+
+    features = serializers.SerializerMethodField()
+    old_price = serializers.SerializerMethodField()
+    is_popular = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SubscriptionPlan
@@ -67,13 +114,39 @@ class SubscriptionPlanPublicSerializer(serializers.ModelSerializer):
             "code",
             "display_name",
             "price",
+            "old_price",
+            "is_popular",
             "duration_days",
+            "features",
+            # Legacy fields (kept for backward compat if needed, but UI uses features[])
             "daily_photo_limit",
             "history_days",
             "ai_recognition",
             "advanced_stats",
             "priority_support",
         ]
+
+    def get_features(self, obj: SubscriptionPlan) -> list[str]:
+        # [TODO: TEMP] Fallback to empty list if code unknown
+        config = PLAN_CONFIG.get(obj.code)
+        return config["features"] if config else []
+
+    def get_old_price(self, obj: SubscriptionPlan) -> Optional[int]:
+        # [TODO: TEMP] Fallback to None
+        config = PLAN_CONFIG.get(obj.code)
+        return config["old_price"] if config else None
+
+    def get_is_popular(self, obj: SubscriptionPlan) -> bool:
+        # [TODO: TEMP] Fallback to False
+        config = PLAN_CONFIG.get(obj.code)
+        return config["is_popular"] if config else False
+
+    def get_display_name(self, obj: SubscriptionPlan) -> str:
+        # [TODO: TEMP] Override DB display_name to match new design strictly
+        config = PLAN_CONFIG.get(obj.code)
+        if config and "display_name" in config:
+            return config["display_name"]
+        return obj.display_name
 
 
 # ---------------------------------------------------------------------
