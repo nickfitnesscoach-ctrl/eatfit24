@@ -1,5 +1,5 @@
-import React from 'react';
-import { Check } from 'lucide-react';
+import { PlanPriceStack } from './PlanPriceStack';
+import { cleanFeatureText, getPlanFeatureIcon } from '../utils/text';
 
 interface PremiumMonthCardProps {
     displayName: string;
@@ -24,21 +24,21 @@ export function PremiumMonthCard({
     onSelect,
     bottomContent,
 }: PremiumMonthCardProps) {
-    const isButtonDisabled = disabled || isCurrent || isLoading;
+    const isButtonDisabled = Boolean(disabled || isCurrent || isLoading);
 
     return (
-        <div className="relative w-full">
+        <div className="relative w-full h-full">
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20 blur-3xl -z-10" />
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-cyan-500/10 blur-3xl -z-10" />
 
-            <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-700/50 backdrop-blur-xl">
+            <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-700/50 backdrop-blur-xl flex flex-col h-full">
                 {/* Header with title and price */}
-                <div className="flex items-start justify-between mb-8">
-                    <div>
+                <div className="flex items-start justify-between gap-6 mb-8">
+                    <div className="min-w-0">
                         <p className="text-slate-400 text-xs font-medium tracking-wider uppercase mb-2">
                             Премиум функции
                         </p>
-                        <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                        <h2 className="text-4xl font-bold text-white mb-3 tracking-tight">
                             {displayName}
                         </h2>
                         <div className="inline-flex items-center bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
@@ -48,26 +48,29 @@ export function PremiumMonthCard({
                         </div>
                     </div>
 
-                    <div className="text-right">
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-5xl font-bold text-white bg-gradient-to-br from-white to-slate-300 bg-clip-text text-transparent">
-                                {price}
-                            </span>
-                            <span className="text-xl font-bold text-slate-300">₽/мес</span>
-                        </div>
-                    </div>
+                    <PlanPriceStack
+                        priceMain={price}
+                        priceUnit="₽/мес"
+                        alignRight={true}
+                        isDark={true}
+                    />
                 </div>
 
                 {/* Features list */}
                 <div className="bg-slate-800/50 rounded-2xl p-6 backdrop-blur-sm border border-slate-700/30 mb-6 space-y-4">
-                    {features.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-3 group">
-                            <div className="text-emerald-400 flex-shrink-0 transition-transform group-hover:scale-110">
-                                <Check className="w-5 h-5" />
+                    {features.map((feature, index) => {
+                        const cleanText = cleanFeatureText(feature);
+                        return (
+                            <div key={index} className="flex items-center gap-3 group">
+                                <div className="text-emerald-400 flex-shrink-0 transition-transform group-hover:scale-110">
+                                    {getPlanFeatureIcon(cleanText)}
+                                </div>
+                                <span className="text-slate-100 text-base font-medium">
+                                    {cleanText}
+                                </span>
                             </div>
-                            <span className="text-slate-100 text-base font-medium">{feature}</span>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* CTA section */}

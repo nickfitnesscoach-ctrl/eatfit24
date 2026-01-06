@@ -53,15 +53,18 @@ const SubscriptionPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <PageContainer withSafeTop={true} className="pt-2 pb-6 flex flex-col gap-5">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+            <PageContainer
+                withSafeTop={true}
+                className="pt-2 pb-10 flex-1 flex flex-col gap-6"
+            >
                 <SubscriptionHeader
                     topStatusText={subscriptionStatus.topStatusText}
                     headerTitle={subscriptionStatus.headerTitle}
                     headerSubtitle={subscriptionStatus.headerSubtitle}
                 />
 
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {loadingPlans ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-4">
                             <Loader2 className="animate-spin text-slate-400" size={32} />
@@ -105,7 +108,7 @@ const SubscriptionPage: React.FC = () => {
                     })}
                 </div>
 
-                <div className="px-4">
+                <div className="px-4 mt-auto pt-6 pb-[env(safe-area-inset-bottom,16px)]">
                     <p className="text-center text-[10px] text-slate-400 leading-relaxed uppercase tracking-wider opacity-60">
                         Нажимая кнопку, вы соглашаетесь с условиями использования и политикой конфиденциальности.
                         Подписка продлевается автоматически, отмена в любое время.
