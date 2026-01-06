@@ -1,6 +1,6 @@
 import React from 'react';
 import { TestTube } from 'lucide-react';
-import { MODE } from '../../../../config/env';
+import { MODE } from '../../../config/env';
 
 interface AdminTestPaymentCardProps {
     creatingTestPayment: boolean;

@@ -1,7 +1,7 @@
 import React from 'react';
-import type { PaymentHistoryItem } from '../../../../types/billing';
-import { PAYMENT_STATUS_BADGES, PAYMENT_STATUS_LABELS } from '../../../../constants/billing';
-import { formatBillingDate } from '../../utils/date';
+import type { PaymentHistoryItem } from '../../../types/billing';
+import { PAYMENT_STATUS_BADGES, PAYMENT_STATUS_LABELS } from '../../../constants/billing';
+import { formatBillingDate } from '../utils/date';
 
 interface PaymentHistoryListProps {
     payments: PaymentHistoryItem[];

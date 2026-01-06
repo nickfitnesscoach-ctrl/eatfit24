@@ -8,7 +8,7 @@ import { useTelegramWebApp } from '../../../hooks/useTelegramWebApp';
 import { useSubscriptionPlans } from '../hooks/useSubscriptionPlans';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { useSubscriptionActions } from '../hooks/useSubscriptionActions';
-import { SubscriptionHeader } from '../components/subscription/SubscriptionHeader';
+import { SubscriptionHeader } from '../components/SubscriptionHeader';
 import { buildPlanCardState } from '../utils/planCardState';
 import { PageContainer } from '../../../components/shared/PageContainer';
 

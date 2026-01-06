@@ -1,6 +1,6 @@
 import React from 'react';
 import PageHeader from '../../../components/PageHeader';
-import PaymentHistoryList from '../components/billing/PaymentHistoryList';
+import PaymentHistoryList from '../components/PaymentHistoryList';
 import { usePaymentHistory } from '../hooks/usePaymentHistory';
 import { PageContainer } from '../../../components/shared/PageContainer';
 

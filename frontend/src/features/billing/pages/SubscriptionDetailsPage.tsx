@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronRight, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
-import AdminTestPaymentCard from '../components/billing/AdminTestPaymentCard';
+import AdminTestPaymentCard from '../components/AdminTestPaymentCard';
 import { useSubscriptionDetails } from '../hooks/useSubscriptionDetails';
 import { PageContainer } from '../../../components/shared/PageContainer';
 
