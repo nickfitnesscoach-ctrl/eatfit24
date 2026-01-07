@@ -7,7 +7,7 @@
 ## 📁 Project Structure
 
 ```
-fitness-app/
+eatfit24/
 ├── backend/              # Django REST API
 │   ├── apps/            # Django applications
 │   │   ├── users/       # User management
@@ -111,7 +111,7 @@ All backend services operate in **UTC**:
 
 ```bash
 git clone <repo-url>
-cd fitness-app
+cd eatfit24
 ```
 
 ### 2. Setup environment variables

@@ -307,7 +307,7 @@ OK
 
 ## Ссылки
 
-- Commit: https://github.com/nickfitnesscoach-ctrl/fitness-app/commit/0e8a981
+- Commit: https://github.com/nickfitnesscoach-ctrl/eatfit24/commit/0e8a981
 - Тесты: `backend/apps/billing/test_webhook_json_parsing.py`
 - Документация: `backend/apps/billing/docs/WEBHOOK_PROXY.md`
 
