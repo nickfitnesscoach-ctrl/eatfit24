@@ -3,7 +3,7 @@
 **Audit Date**: 2025-12-17
 **Auditor**: Claude Code DevOps Audit
 **Server**: eatfit24.ru
-**Project Path**: /opt/EatFit24
+**Project Path**: /opt/eatfit24
 
 This document lists all commands executed during the billing module audit for reproducibility.
 
@@ -18,19 +18,19 @@ ssh root@eatfit24.ru "find /opt /root /home -maxdepth 3 -name 'docker-compose.ym
 
 ### Check Docker Services
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose ps"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose ps"
 ```
 
 ### Get Container Logs
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose logs --tail=200 backend 2>&1 | tail -100"
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose logs --tail=200 db 2>&1 | tail -50"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose logs --tail=200 backend 2>&1 | tail -100"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose logs --tail=200 db 2>&1 | tail -50"
 ```
 
 ### Check Python/Django Versions
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python --version"
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend pip list | grep -E 'Django|djangorestframework|yookassa'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python --version"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend pip list | grep -E 'Django|djangorestframework|yookassa'"
 ```
 
 ---
@@ -39,27 +39,27 @@ ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend pip lis
 
 ### Check Environment Variables (Masked)
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && cat .env | grep -E 'YOOKASSA|CACHE|ALLOWED|REDIS' | sed 's/\\(API_KEY.*=\\)\\(.*\\)/\\1***MASKED***/; s/\\(SECRET.*=\\)\\(.*\\)/\\1***MASKED***/'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && cat .env | grep -E 'YOOKASSA|CACHE|ALLOWED|REDIS' | sed 's/\\(API_KEY.*=\\)\\(.*\\)/\\1***MASKED***/; s/\\(SECRET.*=\\)\\(.*\\)/\\1***MASKED***/'"
 ```
 
 ### Check Django Settings
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; print(\"YOOKASSA_MODE:\", settings.YOOKASSA_MODE); print(\"YOOKASSA_SHOP_ID:\", settings.YOOKASSA_SHOP_ID[:4] + \"***\" if settings.YOOKASSA_SHOP_ID else \"NOT SET\"); print(\"YOOKASSA_SECRET_KEY:\", \"***PRESENT***\" if settings.YOOKASSA_SECRET_KEY else \"NOT SET\"); print(\"YOOKASSA_RETURN_URL:\", settings.YOOKASSA_RETURN_URL)'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; print(\"YOOKASSA_MODE:\", settings.YOOKASSA_MODE); print(\"YOOKASSA_SHOP_ID:\", settings.YOOKASSA_SHOP_ID[:4] + \"***\" if settings.YOOKASSA_SHOP_ID else \"NOT SET\"); print(\"YOOKASSA_SECRET_KEY:\", \"***PRESENT***\" if settings.YOOKASSA_SECRET_KEY else \"NOT SET\"); print(\"YOOKASSA_RETURN_URL:\", settings.YOOKASSA_RETURN_URL)'"
 ```
 
 ### Check Cache Configuration
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; import pprint; print(\"ALLOWED_RETURN_URL_DOMAINS:\", getattr(settings, \"ALLOWED_RETURN_URL_DOMAINS\", \"NOT DEFINED\")); print(\"\\nCACHES:\"); pprint.pprint(settings.CACHES)'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; import pprint; print(\"ALLOWED_RETURN_URL_DOMAINS:\", getattr(settings, \"ALLOWED_RETURN_URL_DOMAINS\", \"NOT DEFINED\")); print(\"\\nCACHES:\"); pprint.pprint(settings.CACHES)'"
 ```
 
 ### Check Authentication Classes
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; import pprint; print(\"REST_FRAMEWORK authentication:\"); pprint.pprint(settings.REST_FRAMEWORK.get(\"DEFAULT_AUTHENTICATION_CLASSES\", []))'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; import pprint; print(\"REST_FRAMEWORK authentication:\"); pprint.pprint(settings.REST_FRAMEWORK.get(\"DEFAULT_AUTHENTICATION_CLASSES\", []))'"
 ```
 
 ### Check Webhook Settings
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; print(\"WEBHOOK_TRUST_XFF:\", getattr(settings, \"WEBHOOK_TRUST_XFF\", \"NOT SET (defaults to False)\"))'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c 'from django.conf import settings; print(\"WEBHOOK_TRUST_XFF:\", getattr(settings, \"WEBHOOK_TRUST_XFF\", \"NOT SET (defaults to False)\"))'"
 ```
 
 ---
@@ -68,12 +68,12 @@ ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python 
 
 ### Check Migrations Status
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py showmigrations billing telegram"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py showmigrations billing telegram"
 ```
 
 ### Check Subscription Plans
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.billing.models import SubscriptionPlan, Subscription
 from apps.users.models import User
 
@@ -96,7 +96,7 @@ print(f\"Active subscriptions: {active_subs}\")
 
 ### Check Payment Statistics
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.billing.models import Payment, WebhookLog
 from django.db.models import Count
 
@@ -121,8 +121,8 @@ except Exception as e:
 
 ### Search for Hardcoded Secrets
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && grep -r 'live_' backend/apps/billing/ || echo 'No hardcoded live_ keys found'"
-ssh root@eatfit24.ru "cd /opt/EatFit24 && grep -r 'test_' backend/apps/billing/ | grep -v '.pyc' | grep -v 'is_test' | head -20"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && grep -r 'live_' backend/apps/billing/ || echo 'No hardcoded live_ keys found'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && grep -r 'test_' backend/apps/billing/ | grep -v '.pyc' | grep -v 'is_test' | head -20"
 ```
 
 ### Find DailyUsage References
@@ -143,7 +143,7 @@ ssh root@eatfit24.ru 'curl -s http://localhost:8000/api/v1/billing/plans/ | head
 
 ### Create Test User and JWT Token
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.users.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -167,7 +167,7 @@ ssh root@eatfit24.ru 'TOKEN="<jwt_token>"; curl -s -H "Authorization: Bearer $TO
 
 ### Test Internal Services
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.users.models import User
 from apps.billing.models import Subscription
 from apps.billing.services import get_effective_plan_for_user
@@ -188,7 +188,7 @@ print(f\"Daily Photo Limit: {plan.daily_photo_limit}\")
 
 ### Test DailyUsage (This FAILED - P0 Bug Discovered)
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.billing.usage import DailyUsage
 from apps.users.models import User
 
@@ -205,7 +205,7 @@ print(f\"Today Photo Requests: {usage.photo_ai_requests}\")
 
 ### List Project Structure
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && ls -la"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && ls -la"
 ```
 
 ### Read Docker Compose File
@@ -235,13 +235,13 @@ cat docker-compose.yml
 
 ### Check Table Existence (Failed due to auth)
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T db psql -U eatfit24 -d eatfit24 -c '\\dt billing_*'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T db psql -U eatfit24 -d eatfit24 -c '\\dt billing_*'"
 # Failed: role "eatfit24" does not exist (psql auth issue)
 ```
 
 ### List Users with Telegram IDs
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c '
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c '
 from apps.users.models import User
 from apps.telegram.models import TelegramUser
 
@@ -304,7 +304,7 @@ cat backend/apps/billing/migrations/0002_add_daily_photo_limit_and_usage.py | gr
 cat backend/apps/billing/usage.py | grep -A 10 "class Meta"
 
 # Attempt to query (fails)
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell -c 'from apps.billing.usage import DailyUsage; DailyUsage.objects.count()'"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell -c 'from apps.billing.usage import DailyUsage; DailyUsage.objects.count()'"
 # Result: ProgrammingError: relation "billing_dailyusage" does not exist
 ```
 
@@ -326,7 +326,7 @@ ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python 
 
 All commands in this document can be re-run for verification:
 1. Ensure SSH access to root@eatfit24.ru
-2. Project must be at /opt/EatFit24
+2. Project must be at /opt/eatfit24
 3. Docker Compose must be running
 4. Some commands require .env to be configured
 

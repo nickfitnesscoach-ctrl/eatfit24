@@ -22,7 +22,7 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/apps/ai/services_legacy.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/services_legacy.py) |
+| **File** | [backend/apps/ai/services_legacy.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/services_legacy.py) |
 | **Size** | 3.9 KB (121 lines) |
 | **Proof** | `rg "services_legacy" backend/` — 0 matches. Не импортируется. |
 | **Additional** | Импортирует несуществующий `AIProxyRecognitionService` — сломан при попытке использования |
@@ -46,7 +46,7 @@ $ rg "recognize_and_save_meal" backend/
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/apps/ai/tests_legacy.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tests_legacy.py) |
+| **File** | [backend/apps/ai/tests_legacy.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tests_legacy.py) |
 | **Size** | 8.6 KB (232 lines) |
 | **Proof** | Патчит `apps.ai.services.AIProxyRecognitionService` — путь не существует. Тесты гарантированно не работают. |
 | **Additional** | Суффикс `_legacy` явно указывает на устаревший код |
@@ -79,7 +79,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/apps/billing/services.py:398-404](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/services.py#L398-L404) |
+| **File** | [backend/apps/billing/services.py:398-404](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/services.py#L398-L404) |
 | **Proof** | `rg "create_monthly_subscription_payment" backend/` — только определение |
 | **Note** | Помечено как "Legacy helper" в docstring |
 | **Recommendation** | ⚠️ **VERIFY** before removal — может использоваться внешними системами |
@@ -103,7 +103,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/db.sqlite3](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/db.sqlite3) |
+| **File** | [backend/db.sqlite3](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/db.sqlite3) |
 | **Size** | 434 KB |
 | **Proof** | Production использует PostgreSQL. SQLite — dev only. |
 | **Recommendation** | ✅ **REMOVE from git** (git rm --cached) |
@@ -114,7 +114,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/celerybeat-schedule](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/celerybeat-schedule) |
+| **File** | [backend/celerybeat-schedule](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/celerybeat-schedule) |
 | **Size** | 16 KB |
 | **Proof** | Runtime artifact от Celery Beat. Генерируется при запуске. |
 | **Recommendation** | ✅ **REMOVE from git** |
@@ -125,7 +125,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **File** | [backend/gunicorn.pid](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/gunicorn.pid) |
+| **File** | [backend/gunicorn.pid](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/gunicorn.pid) |
 | **Size** | 2 bytes |
 | **Proof** | PID файл процесса Gunicorn. Создаётся при старте. |
 | **Recommendation** | ✅ **REMOVE from git** |
@@ -138,7 +138,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **Location** | [serializers.py:96-121](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/serializers.py#L96-L121) |
+| **Location** | [serializers.py:96-121](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/serializers.py#L96-L121) |
 | **Status** | ✅ **USED** — called in validate() method |
 | **Note** | False positive — function IS used |
 
@@ -148,7 +148,7 @@ with patch("apps.ai.services.AIProxyRecognitionService") as MockService:
 
 | Attribute | Value |
 |-----------|-------|
-| **Location** | [adapter.py:147-164](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai_proxy/adapter.py#L147-L164) |
+| **Location** | [adapter.py:147-164](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai_proxy/adapter.py#L147-L164) |
 | **Status** | ✅ **USED** — called in normalize_proxy_response() as fallback |
 | **Note** | False positive — function IS used |
 

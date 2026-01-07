@@ -120,7 +120,7 @@ docker exec eatfit24-celery-beat ls -la /app/celerybeat-data
 
 **Команды:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose rm -f celery-beat
 docker compose up -d celery-beat
 ```
@@ -140,7 +140,7 @@ docker compose up -d celery-beat
 
 **Решение:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 
 # Остановить и удалить контейнер
 docker compose rm -f celery-beat

@@ -73,7 +73,7 @@ git commit -m "feat: add missing migration"
 git push
 
 # На production сервере
-cd /opt/EatFit24
+cd /opt/eatfit24
 git pull
 docker compose up -d backend  # Применит миграцию через entrypoint.sh
 ```
@@ -117,8 +117,8 @@ docker logs eatfit24-backend --tail 50 | grep "Applying migrations"
 **Recovery при нарушении**:
 ```bash
 # Исправить .env на проде
-sed -i 's/RUN_MIGRATIONS=true/RUN_MIGRATIONS=1/' /opt/EatFit24/.env
-sed -i 's/RUN_COLLECTSTATIC=true/RUN_COLLECTSTATIC=1/' /opt/EatFit24/.env
+sed -i 's/RUN_MIGRATIONS=true/RUN_MIGRATIONS=1/' /opt/eatfit24/.env
+sed -i 's/RUN_COLLECTSTATIC=true/RUN_COLLECTSTATIC=1/' /opt/eatfit24/.env
 
 # Пересоздать контейнер (НЕ restart)
 docker compose up -d backend
@@ -209,7 +209,7 @@ git commit -m "fix: sync uv.lock with pyproject.toml"
 git push
 
 # На production
-cd /opt/EatFit24
+cd /opt/eatfit24
 git pull
 docker compose up -d backend --build
 ```
@@ -462,7 +462,7 @@ fi
 **Crontab entry**:
 ```bash
 # /etc/cron.d/eatfit24-monitoring
-*/5 * * * * root /opt/EatFit24/scripts/runtime-anomaly-detector.sh >> /var/log/eatfit24-monitoring.log 2>&1
+*/5 * * * * root /opt/eatfit24/scripts/runtime-anomaly-detector.sh >> /var/log/eatfit24-monitoring.log 2>&1
 ```
 
 **Impact**: +∞ peace of mind. Немедленное уведомление о проблемах без необходимости poll вручную.

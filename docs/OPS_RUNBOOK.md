@@ -17,12 +17,12 @@ ssh eatfit24
 
 ### Project Location
 ```bash
-/opt/EatFit24
+/opt/eatfit24
 ```
 
 ### Service Status
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 sudo docker compose ps
 ```
 
@@ -40,7 +40,7 @@ sudo docker compose ps
 #### 1. Connect to Server
 ```bash
 ssh eatfit24
-cd /opt/EatFit24
+cd /opt/eatfit24
 ```
 
 #### 2. Backup Current State
@@ -109,7 +109,7 @@ curl -I https://eatfit24.ru/
 
 ```bash
 # 1. Container status
-cd /opt/EatFit24 && sudo docker compose ps
+cd /opt/eatfit24 && sudo docker compose ps
 
 # 2. Backend health (internal)
 curl -s http://127.0.0.1:8000/health/ | jq
@@ -126,7 +126,7 @@ curl -s https://eatfit24.ru/health/ | jq
 
 ### All Services
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 sudo docker compose logs -f
 ```
 
@@ -176,7 +176,7 @@ sudo tail -f /var/log/nginx/access.log
 
 #### 1. Check Last Working Commit
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 cat .last_deploy_commit
 # Output: <commit-hash>
 ```
@@ -200,7 +200,7 @@ curl -I https://eatfit24.ru/health/
 ### If Database Issue
 ```bash
 # List backups
-ls -lh /opt/EatFit24/backups/
+ls -lh /opt/eatfit24/backups/
 
 # Restore from backup
 gunzip < backups/postgres_backup_2025-12-25_010946.sql.gz | sudo docker exec -i eatfit24-db psql -U foodmind -d foodmind
@@ -341,7 +341,7 @@ sudo docker system df
 
 ### Backup Database (Manual)
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 mkdir -p backups
 sudo docker exec eatfit24-db pg_dump -U foodmind foodmind | gzip > backups/postgres_backup_$(date +%F_%H%M%S).sql.gz
 ```
@@ -382,7 +382,7 @@ sudo fail2ban-client status sshd
 
 **If you cannot resolve an issue:**
 1. Check logs first (`sudo docker compose logs`)
-2. Check audit report: `/opt/EatFit24/docs/audit.md`
+2. Check audit report: `/opt/eatfit24/docs/audit.md`
 3. Contact DevOps team with:
    - Error message
    - Relevant logs
@@ -395,7 +395,7 @@ sudo fail2ban-client status sshd
 If you need to restart services in specific order:
 
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 
 # 1. Stop all
 sudo docker compose down
@@ -422,9 +422,9 @@ sudo docker compose up -d celery-worker celery-beat bot frontend
 
 | File/Directory | Purpose |
 |---------------|---------|
-| `/opt/EatFit24/.env` | **CRITICAL** - Environment variables (secrets) |
-| `/opt/EatFit24/compose.yml` | Docker Compose configuration |
-| `/opt/EatFit24/backups/` | Database and .env backups |
+| `/opt/eatfit24/.env` | **CRITICAL** - Environment variables (secrets) |
+| `/opt/eatfit24/compose.yml` | Docker Compose configuration |
+| `/opt/eatfit24/backups/` | Database and .env backups |
 | `/etc/nginx/sites-enabled/eatfit24.ru` | Nginx site configuration |
 | `/var/log/nginx/` | Nginx logs |
 

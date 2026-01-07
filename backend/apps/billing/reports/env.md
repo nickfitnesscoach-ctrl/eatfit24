@@ -2,7 +2,7 @@
 
 **Date**: 2025-12-17
 **Server**: eatfit24.ru
-**Project Path**: /opt/EatFit24
+**Project Path**: /opt/eatfit24
 
 ## Docker Services Status
 

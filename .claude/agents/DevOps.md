@@ -50,7 +50,7 @@ color: green
 - **Hosting:** Timeweb VPS
 - **Domain:** `eatfit24.ru`
 - **Public IPv4:** 85.198.81.133`
-- **Project Path:** `/opt/EatFit24`
+- **Project Path:** `/opt/eatfit24`
 
 ### Stack
 - **Web Server:** Nginx (единственная публичная точка входа)
@@ -158,7 +158,7 @@ ignoreip = 127.0.0.1/8 185.171.80.128 79.172.67.203
 - **Docker ports:** localhost-only (не exposed наружу)
 - **PostgreSQL:** 127.0.0.1:5432
 - **Redis:** 127.0.0.1:6379
-- **Gunicorn:** unix socket `/opt/EatFit24/gunicorn.sock`
+- **Gunicorn:** unix socket `/opt/eatfit24/gunicorn.sock`
 
 ### Kernel Hardening (sysctl)
 ```

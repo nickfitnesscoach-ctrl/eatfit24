@@ -67,10 +67,10 @@ db_table = "daily_usage"
 ### Phase A: Diagnosis
 ```bash
 # Check service status
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose ps"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose ps"
 
 # Reproduce error
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose exec -T backend python manage.py shell"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose exec -T backend python manage.py shell"
 >>> from apps.billing.usage import DailyUsage
 >>> usage = DailyUsage.objects.get_today(user)
 # Result: ProgrammingError: relation "billing_dailyusage" does not exist
@@ -90,7 +90,7 @@ git push origin features
 git checkout main && git merge features && git push origin main
 
 # Production: Pull code
-ssh root@eatfit24.ru "cd /opt/EatFit24 && git pull origin main"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && git pull origin main"
 
 # Create and apply migrations
 docker compose exec -T backend python manage.py makemigrations billing telegram
@@ -205,7 +205,7 @@ eatfit24-redis-1           Up 9 days (healthy)
 **Status**: ⚠️ PENDING USER INPUT
 **Impact**: Medium - Bot webhook validation potentially compromised
 **Action Required**: User needs to provide secret from BotFather
-**Fix**: Add to `/opt/EatFit24/.env`:
+**Fix**: Add to `/opt/eatfit24/.env`:
 ```env
 TELEGRAM_BOT_API_SECRET=<secret_from_botfather>
 ```
@@ -230,7 +230,7 @@ If issues are discovered post-deployment:
 
 ### Step 1: Stop Services
 ```bash
-ssh root@eatfit24.ru "cd /opt/EatFit24 && docker compose stop backend celery-worker"
+ssh root@eatfit24.ru "cd /opt/eatfit24 && docker compose stop backend celery-worker"
 ```
 
 ### Step 2: Revert Code

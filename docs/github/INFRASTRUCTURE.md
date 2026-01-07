@@ -468,7 +468,7 @@ concurrency:
 │                    DEPLOY WORKFLOW                           │
 ├─────────────────────────────────────────────────────────────┤
 │  [1/9] Setup variables                                       │
-│        PROJECT_DIR="/opt/EatFit24"                           │
+│        PROJECT_DIR="/opt/eatfit24"                           │
 │        BRANCH="main"                                         │
 ├─────────────────────────────────────────────────────────────┤
 │  [2/9] Check project directory                               │
@@ -635,7 +635,7 @@ curl -sSIL --max-time 10 https://eatfit24.ru/health/ | tail -n 20
 | `Public HTTPS failed (code=000)` | SSL/timeout | Проверить host-level nginx, certbot |
 | `Public HTTPS failed (code=502)` | proxy_pass сломан | Проверить host nginx → :3000 |
 | `Public HTTPS failed (code=301)` | Бесконечный redirect | Проверить nginx rewrite rules |
-| `Permission denied` | Права на `/opt/EatFit24` | `chown -R user:user /opt/EatFit24` |
+| `Permission denied` | Права на `/opt/eatfit24` | `chown -R user:user /opt/eatfit24` |
 | `Image build failed` | requirements.txt | Собрать локально |
 | `Rollback also failed` | Фатально | SSH + `docker compose logs` |
 

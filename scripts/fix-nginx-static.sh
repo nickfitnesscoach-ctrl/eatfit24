@@ -27,14 +27,14 @@ echo ""
 
 # Update static path
 echo ">>> Updating static files path..."
-sed -i "s|alias /opt/EatFit24/backend/staticfiles/;|alias $STATIC_VOLUME/;|g" "$NGINX_CONF"
+sed -i "s|alias /opt/eatfit24/backend/staticfiles/;|alias $STATIC_VOLUME/;|g" "$NGINX_CONF"
 echo "✅ Static path updated to Docker volume"
 echo ""
 
 # Update media path (if needed)
 echo ">>> Updating media files path..."
-if grep -q "alias /opt/EatFit24/backend/media/" "$NGINX_CONF"; then
-    sed -i "s|alias /opt/EatFit24/backend/media/;|alias $MEDIA_VOLUME/;|g" "$NGINX_CONF"
+if grep -q "alias /opt/eatfit24/backend/media/" "$NGINX_CONF"; then
+    sed -i "s|alias /opt/eatfit24/backend/media/;|alias $MEDIA_VOLUME/;|g" "$NGINX_CONF"
     echo "✅ Media path updated to Docker volume"
 else
     echo "ℹ️  Media path already correct"

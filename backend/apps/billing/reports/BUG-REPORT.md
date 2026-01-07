@@ -130,7 +130,7 @@ docker compose logs shows:
 The "TELEGRAM_BOT_API_SECRET" variable is not set. Defaulting to a blank string.
 ```
 
-**Location**: `/opt/EatFit24/.env`
+**Location**: `/opt/eatfit24/.env`
 
 **Impact**:
 - Telegram bot webhook may not properly validate incoming requests
@@ -139,7 +139,7 @@ The "TELEGRAM_BOT_API_SECRET" variable is not set. Defaulting to a blank string.
 
 **Fix**:
 ```bash
-# In /opt/EatFit24/.env
+# In /opt/eatfit24/.env
 TELEGRAM_BOT_API_SECRET=<your_secret_from_botfather>
 ```
 
@@ -218,7 +218,7 @@ Your models in app(s): 'billing', 'telegram' have changes that are not yet refle
 
 **Fix**:
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose exec backend python manage.py makemigrations billing telegram
 docker compose exec backend python manage.py migrate
 docker compose restart backend
@@ -244,7 +244,7 @@ docker compose logs backend | grep "changes that are not"  # Should be empty
 **Description**:
 `.env` contains legacy `YOOKASSA_SHOP_ID` and `YOOKASSA_SECRET_KEY` alongside `_TEST` and `_PROD` variants.
 
-**Location**: `/opt/EatFit24/.env`
+**Location**: `/opt/eatfit24/.env`
 
 **Current State**:
 ```env

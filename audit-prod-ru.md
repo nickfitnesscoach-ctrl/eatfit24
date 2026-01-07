@@ -2,7 +2,7 @@
 
 **Дата:** 2025-12-26
 **Сервер:** 85.198.81.133
-**Проект:** /opt/EatFit24
+**Проект:** /opt/eatfit24
 **Инженер:** DevOps Audit
 
 ---
@@ -65,7 +65,7 @@ AI_PROXY_SECRET  # ❌ НЕ ЗАДАНА
 
 #### 2.2 Применённый Фикс
 
-Добавлены в `/opt/EatFit24/.env`:
+Добавлены в `/opt/eatfit24/.env`:
 ```bash
 # AI Proxy Configuration
 AI_PROXY_URL=http://185.171.80.128:8001
@@ -151,7 +151,7 @@ c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c  # ✅ ЗАГР
 
 ### Fix #1: Add AI_PROXY Environment Variables
 
-**Файл:** `/opt/EatFit24/.env`
+**Файл:** `/opt/eatfit24/.env`
 
 **Изменения:**
 ```diff
@@ -162,7 +162,7 @@ c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c  # ✅ ЗАГР
 
 **Команды:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose up -d --force-recreate backend celery-worker
 ```
 
@@ -273,8 +273,8 @@ $ curl http://185.171.80.128:8001/health
 
 ## 🔗 Related Files
 
-- Production ENV: `/opt/EatFit24/.env`
-- Docker Compose: `/opt/EatFit24/compose.yml`
+- Production ENV: `/opt/eatfit24/.env`
+- Docker Compose: `/opt/eatfit24/compose.yml`
 - Backend Settings: `backend/config/settings/production.py`
 - AI Client Code: `backend/apps/ai_proxy/client.py`
 - Celery Config: `backend/config/celery.py`

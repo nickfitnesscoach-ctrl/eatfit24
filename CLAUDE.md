@@ -344,7 +344,7 @@ git commit -m "feat: add missing migration"
 git push
 
 # On production server
-cd /opt/EatFit24
+cd /opt/eatfit24
 git pull
 docker compose up -d backend  # Triggers migration via entrypoint.sh
 ```

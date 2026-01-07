@@ -38,7 +38,7 @@ Your models in app(s): 'billing', 'telegram' have changes that are not yet refle
 
 **Action Required**:
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
 ```

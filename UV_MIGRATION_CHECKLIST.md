@@ -113,7 +113,7 @@ uv run python -c "from app.__main__ import main; print('Main imports OK')"
 ### Docker Build
 
 ```bash
-cd /path/to/Fitness-app
+cd /path/to/eatfit24
 
 # 1. Build backend image (no cache to ensure clean build)
 docker build --no-cache -t eatfit24-backend:uv-test -f backend/Dockerfile backend/
@@ -141,7 +141,7 @@ docker run --rm eatfit24-bot:uv-test /app/.venv/bin/python -c "import aiogram; p
 ### Docker Compose (Full Stack)
 
 ```bash
-cd /path/to/Fitness-app
+cd /path/to/eatfit24
 
 # 1. Stop any running containers
 docker compose down -v
@@ -207,7 +207,7 @@ curl -H "Host: eatfit24.ru" http://127.0.0.1:8000/health/
 ### 1. No Pip References
 ```bash
 # Search for forbidden pip usage
-cd /path/to/Fitness-app
+cd /path/to/eatfit24
 grep -r "pip install" --include="Dockerfile" --include="*.yml" --include="*.sh" backend/ bot/ .github/ docker-compose* compose*
 
 # Expected: NO MATCHES (except in DEPRECATED requirements.txt comments)

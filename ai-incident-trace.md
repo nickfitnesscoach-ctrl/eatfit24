@@ -92,7 +92,7 @@ APP_NAME=EatFit24 AI Proxy
 
 ### Step 4: Fix Applied ✅
 **Time:** 18:51 UTC
-**Action:** Add missing variables to `/opt/EatFit24/.env`
+**Action:** Add missing variables to `/opt/eatfit24/.env`
 
 ```bash
 # Added to .env:
@@ -102,7 +102,7 @@ AI_PROXY_SECRET=c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
 
 **Restart:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose up -d --force-recreate backend celery-worker
 ```
 
@@ -201,7 +201,7 @@ Gunicorn is ready. Spawning 5 workers
 1. **ENV Template:**
    ```bash
    # Create .env.example
-   cp /opt/EatFit24/.env /opt/EatFit24/.env.example
+   cp /opt/eatfit24/.env /opt/eatfit24/.env.example
    # Mask all secrets with placeholder values
    ```
 

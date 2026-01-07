@@ -29,11 +29,11 @@
 
 | App | Назначение | Ключевые файлы |
 |-----|-----------|----------------|
-| `ai` | AI распознавание фото | [views.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/views.py), [tasks.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tasks.py) |
-| `ai_proxy` | HTTP клиент к AI Proxy сервису | [client.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai_proxy/client.py), [adapter.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai_proxy/adapter.py) |
-| `billing` | Подписки, платежи, лимиты | [services.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/services.py), [usage.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/usage.py) |
-| `nutrition` | FoodLog, Meal, FoodItem | [models.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/nutrition/models.py) |
-| `telegram` | Telegram WebApp auth, bot API | [telegram_auth.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/telegram/telegram_auth.py) |
+| `ai` | AI распознавание фото | [views.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/views.py), [tasks.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tasks.py) |
+| `ai_proxy` | HTTP клиент к AI Proxy сервису | [client.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai_proxy/client.py), [adapter.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai_proxy/adapter.py) |
+| `billing` | Подписки, платежи, лимиты | [services.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/services.py), [usage.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/usage.py) |
+| `nutrition` | FoodLog, Meal, FoodItem | [models.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/nutrition/models.py) |
+| `telegram` | Telegram WebApp auth, bot API | [telegram_auth.py](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/telegram/telegram_auth.py) |
 | `users` | User, Profile модели | `models.py`, `serializers.py` |
 | `common` | Общие утилиты, validators | `validators.py`, `storage.py` |
 | `core` | Django core config | `settings/*` |
@@ -93,30 +93,30 @@ sequenceDiagram
 
 | ID | Проблема | Файл | Impact | Root Cause |
 |----|----------|------|--------|------------|
-| P0-1 | **Лимиты не списываются в async flow** | [tasks.py:159-172](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tasks.py#L159-L172) | FREE пользователи имеют безлимитный AI | `increment_photo_ai_requests` не вызывается после успешного AI |
-| P0-2 | **Legacy файлы импортируют несуществующий класс** | [services_legacy.py:13](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/services_legacy.py#L13) | Import error при использовании | `AIProxyRecognitionService` не существует в `ai_proxy.service` |
-| P0-3 | **Timezone mismatch в лимитах** | [usage.py:150](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/usage.py#L150) vs [serializers.py:95](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/nutrition/serializers.py#L95) | Лимиты могут сброситься не в полночь пользователя | `date.today()` vs `timezone.now().date()` |
+| P0-1 | **Лимиты не списываются в async flow** | [tasks.py:159-172](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tasks.py#L159-L172) | FREE пользователи имеют безлимитный AI | `increment_photo_ai_requests` не вызывается после успешного AI |
+| P0-2 | **Legacy файлы импортируют несуществующий класс** | [services_legacy.py:13](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/services_legacy.py#L13) | Import error при использовании | `AIProxyRecognitionService` не существует в `ai_proxy.service` |
+| P0-3 | **Timezone mismatch в лимитах** | [usage.py:150](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/usage.py#L150) vs [serializers.py:95](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/nutrition/serializers.py#L95) | Лимиты могут сброситься не в полночь пользователя | `date.today()` vs `timezone.now().date()` |
 
 ### P1 — Important (нужно исправить до production)
 
 | ID | Проблема | Файл | Impact |
 |----|----------|------|--------|
-| P1-1 | **Документация не соответствует коду** | [limits-and-usage.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/docs/limits-and-usage.md) | `can_analyze_photo`, `increment_usage` описаны, но не существуют |
-| P1-2 | **db.sqlite3 в репозитории** | [db.sqlite3](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/db.sqlite3) | 434KB файл, не должен быть в git |
-| P1-3 | **tests_legacy.py патчит неверный путь** | [tests_legacy.py:89](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tests_legacy.py#L89) | Тесты не работают |
-| P1-4 | **Нет проверки лимита ДО создания Meal** | [views.py:68-75](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/views.py#L68-L75) | Meal создаётся даже если лимит исчерпан |
-| P1-5 | **DEBUG_MODE_ENABLED bypass в prod** | [telegram_auth.py:121](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/telegram/telegram_auth.py#L121) | Потенциальный security bypass если флаг остался |
-| P1-6 | **grams vs amount_grams inconsistency** | [tasks.py:72](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tasks.py#L72) vs [tasks.py:167](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/ai/tasks.py#L167) | `amount_grams` в JSON response, но `grams` при сохранении — KeyError |
+| P1-1 | **Документация не соответствует коду** | [limits-and-usage.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/docs/limits-and-usage.md) | `can_analyze_photo`, `increment_usage` описаны, но не существуют |
+| P1-2 | **db.sqlite3 в репозитории** | [db.sqlite3](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/db.sqlite3) | 434KB файл, не должен быть в git |
+| P1-3 | **tests_legacy.py патчит неверный путь** | [tests_legacy.py:89](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tests_legacy.py#L89) | Тесты не работают |
+| P1-4 | **Нет проверки лимита ДО создания Meal** | [views.py:68-75](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/views.py#L68-L75) | Meal создаётся даже если лимит исчерпан |
+| P1-5 | **DEBUG_MODE_ENABLED bypass в prod** | [telegram_auth.py:121](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/telegram/telegram_auth.py#L121) | Потенциальный security bypass если флаг остался |
+| P1-6 | **grams vs amount_grams inconsistency** | [tasks.py:72](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tasks.py#L72) vs [tasks.py:167](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/ai/tasks.py#L167) | `amount_grams` в JSON response, но `grams` при сохранении — KeyError |
 
 ### P2 — Minor (cleanup, не критично)
 
 | ID | Проблема | Файл |
 |----|----------|------|
 | P2-1 | Legacy файлы должны быть удалены | `services_legacy.py`, `tests_legacy.py` |
-| P2-2 | celerybeat-schedule в репо | [celerybeat-schedule](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/celerybeat-schedule) |
-| P2-3 | gunicorn.pid в репо | [gunicorn.pid](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/gunicorn.pid) |
+| P2-2 | celerybeat-schedule в репо | [celerybeat-schedule](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/celerybeat-schedule) |
+| P2-3 | gunicorn.pid в репо | [gunicorn.pid](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/gunicorn.pid) |
 | P2-4 | Дублирование `_clamp_grams` | tasks.py и adapter.py |
-| P2-5 | `admin-credentials.txt` в корне | [admin-credentials.txt](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/admin-credentials.txt) |
+| P2-5 | `admin-credentials.txt` в корне | [admin-credentials.txt](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/admin-credentials.txt) |
 
 ---
 
@@ -174,11 +174,11 @@ rm backend/apps/ai/tests_legacy.py
 
 ## 4. Связанные документы
 
-- [AUDIT_RISK_REGISTER.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/docs/AUDIT_RISK_REGISTER.md) — Полный реестр рисков
-- [AUDIT_DEAD_CODE.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/docs/AUDIT_DEAD_CODE.md) — Мёртвый код
-- [AUDIT_CONTRACTS.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/docs/AUDIT_CONTRACTS.md) — API контракты
-- [AUDIT_INVARIANTS.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/docs/AUDIT_INVARIANTS.md) — Инварианты данных
-- [AUDIT_TEST_PLAN.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/docs/AUDIT_TEST_PLAN.md) — План тестирования
+- [AUDIT_RISK_REGISTER.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/docs/AUDIT_RISK_REGISTER.md) — Полный реестр рисков
+- [AUDIT_DEAD_CODE.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/docs/AUDIT_DEAD_CODE.md) — Мёртвый код
+- [AUDIT_CONTRACTS.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/docs/AUDIT_CONTRACTS.md) — API контракты
+- [AUDIT_INVARIANTS.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/docs/AUDIT_INVARIANTS.md) — Инварианты данных
+- [AUDIT_TEST_PLAN.md](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/docs/AUDIT_TEST_PLAN.md) — План тестирования
 
 ---
 

@@ -15,7 +15,7 @@
 
 **Использование:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 ./scripts/reset-celery-beat.sh
 ```
 
@@ -36,7 +36,7 @@ cd /opt/EatFit24
 
 **Использование:**
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 sudo ./scripts/smoke_test.sh
 ```
 
@@ -44,7 +44,7 @@ sudo ./scripts/smoke_test.sh
 
 ## Требования
 
-- Все скрипты должны запускаться из `/opt/EatFit24`
+- Все скрипты должны запускаться из `/opt/eatfit24`
 - Требуются права sudo для операций с Docker
 - Рекомендуется проверять вывод скриптов для диагностики
 

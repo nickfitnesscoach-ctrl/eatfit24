@@ -40,7 +40,7 @@ class Meal(models.Model):
 |-----------|-------|
 | **Statement** | `Meal.total_calories` = `sum(item.calories for item in meal.items.all())` |
 | **Current Status** | ✅ TRUE — реализовано как @property |
-| **Location** | [models.py:68-86](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/nutrition/models.py#L68-L86) |
+| **Location** | [models.py:68-86](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/nutrition/models.py#L68-L86) |
 
 ```python
 @property
@@ -58,7 +58,7 @@ def total_calories(self):
 |-----------|-------|
 | **Statement** | `grams` никогда не может быть 0 или отрицательным |
 | **Enforcement** | `MinValueValidator(1)` на модели |
-| **Location** | [models.py:116-118](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/nutrition/models.py#L116-L118) |
+| **Location** | [models.py:116-118](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/nutrition/models.py#L116-L118) |
 | **Current Status** | ✅ TRUE |
 
 ```python
@@ -88,7 +88,7 @@ grams = models.PositiveIntegerField(
 |-----------|-------|
 | **Statement** | Только одна запись использования на пользователя в день |
 | **Enforcement** | `unique_together = [["user", "date"]]` |
-| **Location** | [usage.py:169](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/usage.py#L169) |
+| **Location** | [usage.py:169](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/usage.py#L169) |
 | **Current Status** | ✅ TRUE |
 
 ---
@@ -151,7 +151,7 @@ grams = models.PositiveIntegerField(
 |-----------|-------|
 | **Statement** | `is_expired()` возвращает False для FREE |
 | **Enforcement** | Проверка `plan.code == "FREE"` в is_expired() |
-| **Location** | [models.py:209-217](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/models.py#L209-L217) |
+| **Location** | [models.py:209-217](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/models.py#L209-L217) |
 | **Current Status** | ✅ TRUE |
 
 ```python
@@ -169,7 +169,7 @@ def is_expired(self):
 |-----------|-------|
 | **Statement** | Цена никогда не приходит от клиента |
 | **Enforcement** | `create_subscription_payment` берёт `plan.price` |
-| **Location** | [services.py:346-350](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/services.py#L346-L350) |
+| **Location** | [services.py:346-350](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/services.py#L346-L350) |
 | **Current Status** | ✅ TRUE |
 
 ---
@@ -190,7 +190,7 @@ def is_expired(self):
 |-----------|-------|
 | **Statement** | Повторный webhook не меняет состояние |
 | **Enforcement** | Проверка `payment.status == "SUCCEEDED"` перед обработкой |
-| **Location** | [handlers.py:98-100](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/webhooks/handlers.py#L98-L100) |
+| **Location** | [handlers.py:98-100](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/webhooks/handlers.py#L98-L100) |
 | **Current Status** | ✅ TRUE |
 
 ```python
@@ -207,7 +207,7 @@ if payment.status == "SUCCEEDED":
 |-----------|-------|
 | **Statement** | После успешного webhook кеш плана сбрасывается |
 | **Enforcement** | `invalidate_user_plan_cache(user_id)` |
-| **Location** | [handlers.py:178](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/Fitness-app/backend/apps/billing/webhooks/handlers.py#L178) |
+| **Location** | [handlers.py:178](file:///d:/NICOLAS/1_PROJECTS/_IT_Projects/eatfit24/backend/apps/billing/webhooks/handlers.py#L178) |
 | **Current Status** | ✅ TRUE |
 
 ---

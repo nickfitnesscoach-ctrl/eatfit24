@@ -153,7 +153,7 @@ permission_classes = [IsAuthenticated]
 
 ### 5.3 Текущая конфигурация на сервере
 ```bash
-$ cat /opt/EatFit24/.env | grep DEBUG
+$ cat /opt/eatfit24/.env | grep DEBUG
 DEBUG=False
 DEBUG_MODE_ENABLED=False
 ```
@@ -220,7 +220,7 @@ Endpoint `/api/v1/ai/recognize/` требует аутентификацию:
 
 ```bash
 ssh root@eatfit24.ru
-cd /opt/EatFit24
+cd /opt/eatfit24
 nano .env
 ```
 
@@ -259,7 +259,7 @@ docker compose restart backend
 # Тест с debug auth:
 curl -X POST http://localhost:8000/api/v1/ai/recognize/ \
   -H "X-Debug-User-Id: 123456789" \
-  -F "image=@/opt/EatFit24/tests/assets/test_food_image.jpg"
+  -F "image=@/opt/eatfit24/tests/assets/test_food_image.jpg"
 ```
 
 ⚠️ **НЕ ВКЛЮЧАТЬ `DEBUG=True` в production!**

@@ -59,7 +59,7 @@ Output: `Superusers: 1`
 
 **Permissions:** `-rwxr-xr-x` (executable)
 
-**Location:** `/opt/EatFit24/scripts/fix-critical-security.sh`
+**Location:** `/opt/eatfit24/scripts/fix-critical-security.sh`
 
 **Status:** Ready to execute (not yet run)
 
@@ -147,7 +147,7 @@ From [SECURITY_AUDIT.md](SECURITY_AUDIT.md):
 
 ```bash
 ssh deploy@eatfit24.ru
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose exec backend python manage.py shell -c \
   "from django.contrib.auth import get_user_model; \
    User = get_user_model(); \

@@ -78,7 +78,7 @@ SWAGGER_AUTH_PASSWORD=$(openssl rand -base64 16)
 ```bash
 # Создать суперюзера
 ssh deploy@eatfit24.ru
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose exec backend python manage.py createsuperuser
 ```
 

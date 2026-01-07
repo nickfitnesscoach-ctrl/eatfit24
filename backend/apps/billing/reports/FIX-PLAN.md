@@ -80,7 +80,7 @@ sed -i '/class Meta:/a\        db_table = "daily_usage"' backend/apps/billing/us
 **Location**: Run on server or locally
 
 ```bash
-cd /opt/EatFit24  # or your local path
+cd /opt/eatfit24  # or your local path
 docker compose exec backend python manage.py makemigrations billing telegram
 ```
 
@@ -220,14 +220,14 @@ EOF
 
 #### Step 2.2: Update .env
 
-**File**: `/opt/EatFit24/.env`
+**File**: `/opt/eatfit24/.env`
 
 ```bash
 # SSH to server
 ssh root@eatfit24.ru
 
 # Edit .env
-nano /opt/EatFit24/.env
+nano /opt/eatfit24/.env
 
 # Add line:
 TELEGRAM_BOT_API_SECRET=your_actual_secret_here
@@ -236,7 +236,7 @@ TELEGRAM_BOT_API_SECRET=your_actual_secret_here
 #### Step 2.3: Restart Bot Service
 
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose restart bot
 ```
 
@@ -417,13 +417,13 @@ docker compose logs backend | grep "changes that are not" | wc -l
 
 ```bash
 ssh root@eatfit24.ru
-cd /opt/EatFit24
+cd /opt/eatfit24
 cp .env .env.backup_$(date +%Y%m%d_%H%M%S)
 ```
 
 #### Step 3.1.2: Remove Legacy Vars
 
-Edit `/opt/EatFit24/.env`:
+Edit `/opt/eatfit24/.env`:
 
 **Remove these lines**:
 ```env
@@ -659,7 +659,7 @@ grep "429" throttle_test.log | wc -l
 
 ```bash
 ssh root@eatfit24.ru
-cd /opt/EatFit24
+cd /opt/eatfit24
 
 # Backup database
 docker compose exec db pg_dump -U eatfit24 -d eatfit24 > backup_pre_billing_fix_$(date +%Y%m%d_%H%M%S).sql
@@ -671,7 +671,7 @@ cp .env .env.backup_pre_billing_fix_$(date +%Y%m%d_%H%M%S)
 #### Step 5.2: Pull Latest Code
 
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 git stash  # If local changes
 git pull origin main  # Or your deployment branch
 ```
@@ -728,7 +728,7 @@ docker compose stop backend celery-worker
 ### Rollback Step 2: Restore Previous Code
 
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 git log --oneline -5  # Find commit before deployment
 git reset --hard <previous_commit_hash>
 ```

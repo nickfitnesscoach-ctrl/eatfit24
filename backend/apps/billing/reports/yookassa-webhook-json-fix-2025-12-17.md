@@ -177,7 +177,7 @@ Commit: 0e8a981
 
 ### Production deployment
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 git pull
 docker compose restart backend
 ```

@@ -27,7 +27,7 @@ echo ""
 # Step 1: Verify we're in the right directory
 if [ ! -f "docker-compose.yml" ]; then
     echo -e "${RED}ERROR: docker-compose.yml not found${NC}"
-    echo "Please run this script from /opt/EatFit24 directory"
+    echo "Please run this script from /opt/eatfit24 directory"
     exit 1
 fi
 

@@ -58,7 +58,7 @@ jobs:
             exec 2>&1  # Redirect stderr to stdout for better logging
 
             echo ">>> [1/9] Setup variables"
-            PROJECT_DIR="/opt/EatFit24"
+            PROJECT_DIR="/opt/eatfit24"
             BRANCH="main"
             REPO_URL="https://github.com/${{ github.repository }}.git"
 

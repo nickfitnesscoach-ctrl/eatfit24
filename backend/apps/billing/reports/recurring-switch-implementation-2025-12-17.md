@@ -309,7 +309,7 @@ INFO Built YooKassa payload: mode=ONE_TIME, save_payment_method=False, amount=99
 
 ### Когда ЮKassa настроит recurring:
 
-**Шаг 1:** Измените флаг в `/opt/EatFit24/.env`:
+**Шаг 1:** Измените флаг в `/opt/eatfit24/.env`:
 ```bash
 BILLING_RECURRING_ENABLED=true
 ```
@@ -411,7 +411,7 @@ Built YooKassa payload: mode=RECURRING, save_payment_method=True, amount=990.00
 
 ### 1. Production .env настроен
 
-✅ Добавлено `BILLING_RECURRING_ENABLED=false` в `/opt/EatFit24/.env` на сервере
+✅ Добавлено `BILLING_RECURRING_ENABLED=false` в `/opt/eatfit24/.env` на сервере
 
 ### 2. Специфичная обработка исключений YooKassa
 

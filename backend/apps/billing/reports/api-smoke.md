@@ -32,7 +32,7 @@ django.db.utils.ProgrammingError: relation "billing_dailyusage" does not exist
 
 **Fix Required**:
 ```bash
-cd /opt/EatFit24
+cd /opt/eatfit24
 docker compose exec backend python manage.py makemigrations billing telegram
 docker compose exec backend python manage.py migrate
 docker compose restart backend
