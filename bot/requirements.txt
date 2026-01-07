@@ -1,3 +1,15 @@
+# ============================================================
+# DEPRECATED: This file is NO LONGER USED
+# ============================================================
+# Migration to uv completed on January 7, 2026
+# Dependencies are now managed via:
+#   - pyproject.toml (source of truth)
+#   - uv.lock (lockfile)
+#
+# This file is kept ONLY for emergency rollback.
+# DO NOT update this file. Use: uv add <package>
+# ============================================================
+
 # =============================================================================
 # CORE DEPENDENCIES
 # =============================================================================

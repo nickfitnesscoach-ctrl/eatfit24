@@ -101,7 +101,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eatfit24-celery-worker
-    command: celery -A config worker -l INFO --concurrency=2 -Q ai,billing,default
+    command: /app/.venv/bin/celery -A config worker -l INFO --concurrency=2 -Q ai,billing,default
     depends_on:
       backend:
         condition: service_healthy
@@ -110,6 +110,8 @@ services:
       - POSTGRES_HOST=db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    healthcheck:
+      disable: true
     deploy:
       resources:
         limits:
@@ -127,7 +129,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eatfit24-celery-beat
-    command: celery -A config beat -l INFO --schedule=/app/celerybeat-data/celerybeat-schedule
+    command: /app/.venv/bin/celery -A config beat -l INFO --schedule=/app/celerybeat-data/celerybeat-schedule
     depends_on:
       backend:
         condition: service_healthy
@@ -138,6 +140,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - celerybeat_data:/app/celerybeat-data
+    healthcheck:
+      disable: true
     deploy:
       resources:
         limits:

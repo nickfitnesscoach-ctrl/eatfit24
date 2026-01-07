@@ -1,0 +1,68 @@
+# EatFit24 - Development Docker Compose
+# Extends production configuration with development-specific settings
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# This file overrides production settings for local development:
+# - Uses local.py settings (DEBUG=True, WEBAPP_DEBUG_MODE_ENABLED=True)
+# - Adds volume mounts for live code reloading
+# - Exposes additional ports for debugging
+
+services:
+  # Django Backend API - Development Configuration
+  backend:
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DEBUG=True
+      - WEBAPP_DEBUG_MODE_ENABLED=True
+      - TELEGRAM_BOT_TOKEN=8533783346:AAH40qyzpW35zA425wNhsFAvLJxIrIktN0A
+    volumes:
+      # Add backend code as volume for live reloading
+      - ./backend:/app
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
+      - ./backend/logs:/app/logs
+      - backend_venv:/app/.venv  # Protect Docker-managed venv from host mount
+    command: >
+      sh -c "
+        /app/.venv/bin/python manage.py migrate &&
+        /app/.venv/bin/python manage.py runserver 0.0.0.0:8000
+      "
+
+  # Celery Worker - Development Configuration
+  celery-worker:
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DEBUG=True
+      - WEBAPP_DEBUG_MODE_ENABLED=True
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - ./backend/media:/app/media
+      - backend_venv:/app/.venv  # Protect Docker-managed venv from host mount
+
+  # Celery Beat - Development Configuration
+  celery-beat:
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DEBUG=True
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - backend_venv:/app/.venv  # Protect Docker-managed venv from host mount
+
+  # Telegram Bot - Development Configuration
+  bot:
+    environment:
+      - DEBUG=True
+      - TELEGRAM_BOT_TOKEN=8533783346:AAH40qyzpW35zA425wNhsFAvLJxIrIktN0A
+    volumes:
+      - ./bot:/app
+      - ./bot/logs:/app/logs
+      - bot_venv:/app/.venv  # Protect Docker-managed venv from host mount
+
+# Named volumes for development
+volumes:
+  backend_venv:  # Isolate backend's uv-managed venv
+  bot_venv:      # Isolate bot's uv-managed venv

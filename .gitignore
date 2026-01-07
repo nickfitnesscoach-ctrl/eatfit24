@@ -86,7 +86,7 @@ gunicorn.pid
 # Docker
 *.env.docker
 docker-compose.override.yml
-docker-compose.dev.yml
+# docker-compose.dev.yml — removed from ignore, now tracked (needed for uv venv volumes)
 
 # OS
 Thumbs.db

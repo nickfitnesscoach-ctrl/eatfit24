@@ -78,7 +78,7 @@ echo "[Entrypoint] PostgreSQL is ready!"
 if [ "$RUN_MIGRATIONS" = "1" ]; then
     echo "[Entrypoint] Running Django migrations..."
 
-    if python manage.py migrate --settings="$DJANGO_SETTINGS_MODULE"; then
+    if /app/.venv/bin/python manage.py migrate --settings="$DJANGO_SETTINGS_MODULE"; then
         echo "[Entrypoint] Migrations completed successfully"
     else
         if [ "$MIGRATIONS_STRICT" = "1" ]; then
@@ -118,7 +118,7 @@ if [ "$RUN_COLLECTSTATIC" = "1" ]; then
 
     echo "[Entrypoint] Collecting static files..."
 
-    if python manage.py collectstatic --noinput --settings="$DJANGO_SETTINGS_MODULE"; then
+    if /app/.venv/bin/python manage.py collectstatic --noinput --settings="$DJANGO_SETTINGS_MODULE"; then
         echo "[Entrypoint] Static files collected successfully"
     else
         if [ "$MIGRATIONS_STRICT" = "1" ]; then
@@ -138,4 +138,4 @@ fi
 # ============================================================
 
 echo "[Entrypoint] Starting Gunicorn with config gunicorn_config.py..."
-exec gunicorn --config gunicorn_config.py config.wsgi:application
+exec /app/.venv/bin/gunicorn --config gunicorn_config.py config.wsgi:application

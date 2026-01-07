@@ -1,38 +1,66 @@
-# Используем официальный Python образ
-FROM python:3.12-slim
+# Dockerfile for EatFit24 Telegram Bot (UV-based)
 
-# Устанавливаем рабочую директорию
+# ============================================================
+# Builder Stage - Install uv and dependencies
+# ============================================================
+FROM python:3.12-slim AS builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_LINK_MODE=copy
+
 WORKDIR /app
 
-# Устанавливаем зависимости системы
-RUN apt-get update && apt-get install -y \
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    postgresql-client \
-    dos2unix \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем файл зависимостей
-COPY requirements.txt .
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:/root/.cargo/bin:$PATH"
 
-# Устанавливаем Python зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependency files FIRST (for Docker layer caching)
+COPY pyproject.toml uv.lock ./
 
-# Создаём non-root пользователя для безопасности
+# Install Python dependencies (production only)
+RUN uv sync --no-dev
+
+# ============================================================
+# Runtime Stage - Final image
+# ============================================================
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/app/.venv/bin:$PATH
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    dos2unix \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
 RUN useradd -m -s /bin/bash appuser
 
-# Копируем весь проект с правильными правами
+# Copy installed Python packages from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy project files with proper ownership
 COPY --chown=appuser:appuser . .
 
-# Создаём директорию для логов
+# Create logs directory
 RUN mkdir -p logs && chown -R appuser:appuser logs
 
-# Копируем и делаем исполняемым entrypoint скрипт
-COPY entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+# Fix line endings and make entrypoint executable
+RUN dos2unix /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Переключаемся на non-root пользователя
+# Switch to non-root user
 USER appuser
 
-# Используем ENTRYPOINT для запуска
-ENTRYPOINT ["/entrypoint.sh"]
+# Use ENTRYPOINT for startup
+ENTRYPOINT ["/app/entrypoint.sh"]

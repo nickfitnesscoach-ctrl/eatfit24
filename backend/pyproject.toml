@@ -1,3 +1,70 @@
+[project]
+name = "eatfit24-backend"
+version = "1.0.0"
+description = "EatFit24 Django Backend API with Celery"
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = [
+    # Django Core
+    "django>=5.0",
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.3",
+    "drf-spectacular>=0.27",
+    "django-filter>=24.2",
+    "django-cors-headers>=4.4",
+
+    # Database
+    "psycopg2-binary>=2.9",
+
+    # Redis & Caching
+    "redis>=5.0",
+    "django-redis>=5.4",
+
+    # Celery (async tasks)
+    "celery>=5.3",
+
+    # HTTP Client
+    "requests>=2.31",
+
+    # Image Processing
+    "pillow>=10.4",
+    "pillow-heif>=0.16",
+
+    # Payments
+    "yookassa>=3.0",
+
+    # AI
+    "openai>=1.0",
+
+    # Static Files
+    "whitenoise>=6.6",
+
+    # Configuration
+    "python-dotenv>=1.0",
+
+    # Production Server
+    "gunicorn>=21.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=8.0",
+    "pytest-django>=4.5",
+
+    # Linting & Formatting
+    "black>=24.0",
+    "ruff>=0.1.0",
+
+    # Type Checking
+    "mypy>=1.8",
+    "django-stubs>=4.2",
+    "djangorestframework-stubs>=3.14",
+
+    # Runtime Type Checking
+    "beartype>=0.17",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -10,3 +77,35 @@ ignore = ["E501"]
 known-first-party = ["apps", "config"]
 combine-as-imports = true
 force-sort-within-sections = true
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "yookassa.*",
+    "openai.*",
+    "pillow_heif.*",
+]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.local"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["apps"]
+addopts = "-v --strict-markers --tb=short"

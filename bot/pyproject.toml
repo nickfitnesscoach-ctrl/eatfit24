@@ -1,13 +1,63 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "fitness-bot"
+name = "eatfit24-bot"
 version = "1.0.0"
-description = "Telegram bot for AI-powered fitness lead generation"
+description = "EatFit24 Telegram Bot (aiogram 3.x)"
 requires-python = ">=3.12"
 readme = "README.md"
+dependencies = [
+    # Telegram Bot Framework
+    "aiogram==3.14.0",
+
+    # Async I/O
+    "aiofiles==23.2.1",
+
+    # HTTP Client
+    "httpx==0.27.2",
+
+    # Retry Logic
+    "tenacity==9.0.0",
+
+    # Redis (FSM Storage & Caching)
+    "redis==5.2.0",
+    "aioredis==2.0.1",
+
+    # Configuration & Validation
+    "pydantic>=2.4.1,<2.10",
+    "pydantic-settings==2.6.1",
+    "python-dotenv==1.0.1",
+
+    # Timezone & Date/Time
+    "pytz==2024.2",
+    "python-dateutil==2.9.0",
+
+    # Logging
+    "loguru==0.7.3",
+
+    # Image Processing
+    "pillow==11.0.0",
+
+    # JSON Handling
+    "orjson==3.10.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "pytest-mock>=3.11.0",
+
+    # Linting & Formatting
+    "black==24.10.0",
+    "ruff==0.8.2",
+
+    # Type Checking
+    "mypy>=1.8",
+
+    # Runtime Type Checking
+    "beartype>=0.17",
+]
 
 [tool.ruff]
 line-length = 120
@@ -20,6 +70,24 @@ ignore = ["E501"]
 [tool.black]
 line-length = 120
 target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "aiogram.*",
+    "aiofiles.*",
+    "aioredis.*",
+    "loguru.*",
+    "orjson.*",
+    "tenacity.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
