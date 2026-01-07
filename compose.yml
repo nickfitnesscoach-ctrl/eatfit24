@@ -88,7 +88,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 768M
+          memory: 1.5G
     restart: unless-stopped
     networks:
       - eatfit24-network
@@ -101,7 +101,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eatfit24-celery-worker
-    command: /app/.venv/bin/celery -A config worker -l INFO --concurrency=2 -Q ai,billing,default
+    command: /app/.venv/bin/celery -A config worker -l INFO --concurrency=2 --max-memory-per-child=300000 --max-tasks-per-child=100 -Q ai,billing,default
     depends_on:
       backend:
         condition: service_healthy
@@ -116,7 +116,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: 1G
     restart: unless-stopped
     networks:
       - eatfit24-network
@@ -146,7 +146,7 @@ services:
       resources:
         limits:
           cpus: "0.25"
-          memory: 256M
+          memory: 512M
     restart: unless-stopped
     networks:
       - eatfit24-network
