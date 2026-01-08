@@ -70,6 +70,14 @@ export function setupMockTelegram(): void {
         secondary_bg_color: '#f0f0f0',
       },
 
+      // Safe area insets (mock values for debug mode)
+      safeAreaInset: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      },
+
       // Back Button
       BackButton: {
         isVisible: false,

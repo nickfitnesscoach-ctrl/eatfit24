@@ -124,6 +124,9 @@ async function _doInitTelegramWebApp(): Promise<TelegramAuthData | null> {
         // Применяем тему
         applyTelegramTheme(tg);
 
+        // Применяем safe-area insets
+        applySafeAreaInsets(tg);
+
         const user = tg.initDataUnsafe.user as TelegramUserInfo;
 
         _telegramAuthData = {
@@ -227,6 +230,24 @@ export function applyTelegramTheme(tg: any) {
     };
 
     Object.entries(themeVars).forEach(([key, value]) => {
+        document.documentElement.style.setProperty(key, value);
+    });
+}
+
+/**
+ * Применение safe-area insets из Telegram WebApp к CSS переменным
+ */
+export function applySafeAreaInsets(tg: any) {
+    if (!tg?.safeAreaInset) return;
+
+    const insetVars: Record<string, string> = {
+        '--tg-safe-area-inset-top': `${tg.safeAreaInset.top}px`,
+        '--tg-safe-area-inset-bottom': `${tg.safeAreaInset.bottom}px`,
+        '--tg-safe-area-inset-left': `${tg.safeAreaInset.left}px`,
+        '--tg-safe-area-inset-right': `${tg.safeAreaInset.right}px`,
+    };
+
+    Object.entries(insetVars).forEach(([key, value]) => {
         document.documentElement.style.setProperty(key, value);
     });
 }

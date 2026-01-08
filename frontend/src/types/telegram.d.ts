@@ -19,6 +19,12 @@ interface TelegramWebApp {
     backgroundColor: string;
     MainButton: any;
     BackButton: any;
+    safeAreaInset?: {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+    };
 
     ready(): void;
     expand(): void;
