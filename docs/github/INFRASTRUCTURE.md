@@ -336,6 +336,13 @@ location /api/ {
 > Nginx по умолчанию НЕ прокидывает заголовки с подчёркиваниями.  
 > Telegram WebApp отправляет `X-Telegram-Init-Data`, и без явного `proxy_set_header` Django его не увидит.
 
+> [!IMPORTANT]
+> **Telegram initData Header — SSOT**
+> - **SSOT:** `X-Telegram-Init-Data`
+> - **Backend ожидает:** `HTTP_X_TELEGRAM_INIT_DATA`
+> - **Host nginx:** принимает и старый `X-TG-INIT-DATA`, мапит в SSOT через `map`
+> - **Container nginx:** передаёт `X-Telegram-Init-Data` напрямую
+
 ### 5.3 Почему CORS не на уровне Nginx
 
 ```nginx
