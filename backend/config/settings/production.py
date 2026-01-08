@@ -150,8 +150,10 @@ WEBHOOK_TRUSTED_PROXIES = os.environ.get("WEBHOOK_TRUSTED_PROXIES", "172.24.0.0/
 # Security: Trusted Proxies for Audit Logs (общая настройка)
 # -----------------------------------------------------------------------------
 # В production включаем доверие к XFF для всех audit логов (не только webhooks).
-# По умолчанию доверяем Docker сети (172.24.0.0/16) где работает Nginx.
+# ВАЖНО: TRUSTED_PROXIES должен явно указывать подсеть Docker в .env
+# (не используем hardcoded default, т.к. подсеть может отличаться между окружениями)
 #
 # Используется в apps/common/audit.py -> get_client_ip()
-TRUSTED_PROXIES_ENABLED = os.environ.get("TRUSTED_PROXIES_ENABLED", "true").lower() == "true"
-TRUSTED_PROXIES = os.environ.get("TRUSTED_PROXIES", "172.24.0.0/16").split(",")
+# Примеры: TRUSTED_PROXIES=172.23.0.0/16,10.0.0.0/8
+TRUSTED_PROXIES_ENABLED = os.environ.get("TRUSTED_PROXIES_ENABLED", "false").lower() == "true"
+TRUSTED_PROXIES = os.environ.get("TRUSTED_PROXIES", "").split(",") if os.environ.get("TRUSTED_PROXIES") else []

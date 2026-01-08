@@ -161,6 +161,8 @@ curl -f -H "Host: eatfit24.ru" http://localhost:8000/health/
 - `POSTGRES_*` — подключение к БД
 - `TELEGRAM_BOT_TOKEN` — для валидации WebApp init data
 - `YOOKASSA_*` — платёжная система
+- `TRUSTED_PROXIES_ENABLED` — доверие X-Forwarded-For для audit logs (должно быть `true` в production)
+- `TRUSTED_PROXIES` — Docker subnet для доверенных прокси (определяется через `docker network inspect eatfit24-network`)
 
 ---
 
@@ -343,7 +345,52 @@ location /api/ {
 > - **Host nginx:** принимает и старый `X-TG-INIT-DATA`, мапит в SSOT через `map`
 > - **Container nginx:** передаёт `X-Telegram-Init-Data` напрямую
 
-### 5.3 Почему CORS не на уровне Nginx
+### 5.3 X-Forwarded-For и Real Client IP
+
+**Проблема:** Django за Nginx-прокси видит IP прокси (`172.23.0.x`) вместо реального IP клиента.
+
+**Решение:** Доверять `X-Forwarded-For` заголовку, но **только от проверенных прокси**.
+
+**Конфигурация в .env:**
+```bash
+TRUSTED_PROXIES_ENABLED=true
+TRUSTED_PROXIES=172.23.0.0/16
+```
+
+**Как определить правильную подсеть:**
+```bash
+docker network inspect eatfit24-network --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+# Ожидаемо: 172.23.0.0/16
+```
+
+> [!WARNING]
+> **Критично для безопасности:**
+> - **Слишком широкая подсеть** (например, `172.0.0.0/8`) → атакующий может подделать IP в логах
+> - **Отсутствие настройки** → все audit logs показывают IP прокси → невозможно расследовать инциденты
+> - **Неправильная подсеть** → Django не доверяет XFF → rate limiting работает неправильно
+
+**Используется в:**
+- `apps/common/audit.py` → `get_client_ip()` для security audit logs
+- Throttling по IP (rate limiting)
+- Webhook handlers (YooKassa IP whitelist verification)
+
+**Проверка корректности:**
+```python
+# В Django shell на production
+from django.test import RequestFactory
+from apps.common.audit import get_client_ip
+
+factory = RequestFactory()
+request = factory.get("/")
+request.META["REMOTE_ADDR"] = "172.23.0.6"  # Proxy IP
+request.META["HTTP_X_FORWARDED_FOR"] = "203.0.113.1, 172.23.0.6"  # Real IP, Proxy
+
+client_ip = get_client_ip(request)
+# Ожидается: "203.0.113.1" (реальный IP)
+# Если возвращает "172.23.0.6" → проверить TRUSTED_PROXIES
+```
+
+### 5.4 Почему CORS не на уровне Nginx
 
 ```nginx
 # CORS handled by Django middleware (corsheaders)
@@ -355,7 +402,7 @@ location /api/ {
 2. Django `corsheaders` позволяет точно настроить `CORS_ALLOWED_ORIGINS`
 3. Wildcard CORS (`Access-Control-Allow-Origin: *`) — дыра в безопасности
 
-### 5.4 Content Security Policy (CSP)
+### 5.5 Content Security Policy (CSP)
 
 ```nginx
 add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.web.telegram.org https://telegram.org https://*.telegram.org;" always;
@@ -364,7 +411,7 @@ add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.
 **Зачем:** позволяет Telegram Web App встраивать наш сайт в iframe.  
 Без этого заголовка приложение не откроется в Telegram Web.
 
-### 5.5 Кэширование
+### 5.6 Кэширование
 
 | Ресурс | Cache-Control | Почему |
 |--------|---------------|--------|
@@ -373,7 +420,7 @@ add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.
 | Лендинг HTML | `1h` | Редко меняется |
 | Лендинг CSS/img | `1d` | — |
 
-### 5.6 server_name _
+### 5.7 server_name _
 
 ```nginx
 server_name _;
