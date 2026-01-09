@@ -1,23 +1,10 @@
 """
-Telegram WebApp authentication backends.
+DRF authentication backends для Telegram WebApp.
 
-Зачем этот файл:
-- DRF "authentication backends" — это куски кода, которые определяют:
-  "кто делает запрос" и "можно ли этому человеку доверять".
-
-Здесь 3 режима (и только так):
-1) TelegramWebAppAuthentication (PROD и основной)
-   - проверяет подпись initData от Telegram Mini App
-   - это правильный и безопасный путь
-
-2) DebugModeAuthentication (ТОЛЬКО DEV)
-   - нужен, чтобы разрабатывать фронт без Telegram
-   - в PROD выключен железно
-
-3) TelegramHeaderAuthentication (ОПЦИОНАЛЬНО)
-   - доверяет заголовкам, которые поставил Nginx/прокси
-   - по умолчанию ВЫКЛЮЧЕН, потому что это потенциальная дыра,
-     если кто-то сможет слать запросы напрямую к backend без Nginx.
+Три режима:
+1) TelegramWebAppAuthentication — основной, безопасный (подпись initData)
+2) DebugModeAuthentication — ТОЛЬКО DEV (без Telegram)
+3) TelegramHeaderAuthentication — опционально, по умолчанию выключено (опасно)
 """
 
 from __future__ import annotations
@@ -28,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import authentication, exceptions
 
 from apps.telegram.auth.services.webapp_auth import get_webapp_auth_service
@@ -39,15 +26,8 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------
-# Общие хелперы
-# ---------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class TelegramIdentity:
-    """Нормализованные данные, которые мы извлекли из Telegram."""
-
     telegram_id: int
     username: str = ""
     first_name: str = ""
@@ -56,28 +36,12 @@ class TelegramIdentity:
     is_premium: bool = False
 
 
-def _is_dev_debug_allowed() -> bool:
-    """
-    Разрешаем debug-auth только в DEV.
-
-    В PROD (DEBUG=False) debug режим ДОЛЖЕН быть выключен.
-    Дополнительно можно включать флагом WEBAPP_DEBUG_MODE_ENABLED,
-    но он имеет смысл только если DEBUG=True.
-    """
-    if not getattr(settings, "DEBUG", False):
-        return False
-    return bool(getattr(settings, "WEBAPP_DEBUG_MODE_ENABLED", True))
-
-
 def _get_header(request, name: str) -> str:
-    """Безопасно достать заголовок (DRF/Django разные способы)."""
-    # Django превращает заголовки в HTTP_X_...
     meta_key = "HTTP_" + name.upper().replace("-", "_")
     return (request.META.get(meta_key) or request.headers.get(name) or "").strip()
 
 
 def _parse_int(value: str, field_name: str) -> int:
-    """Перевод в int с нормальной ошибкой."""
     try:
         x = int(value)
     except (ValueError, TypeError):
@@ -87,65 +51,65 @@ def _parse_int(value: str, field_name: str) -> int:
     return x
 
 
+def _is_dev_debug_allowed() -> bool:
+    # Debug auth должен работать ТОЛЬКО в DEV.
+    if not getattr(settings, "DEBUG", False):
+        return False
+    if getattr(settings, "APP_ENV", "") != "dev":
+        return False
+    return bool(getattr(settings, "WEBAPP_DEBUG_MODE_ENABLED", False))
+
+
 def _ensure_user_and_profiles(identity: TelegramIdentity) -> User:
     """
-    SSOT логика создания пользователя:
-    - TelegramUser хранит telegram_id и данные
-    - Django User — основной пользователь для приложения
-    - Profile обязателен (у тебя он используется в webapp_auth/view)
+    Создание/обновление связок:
+    - Django User (основной пользователь)
+    - TelegramUser (telegram_id -> user)
+    - Profile (обязателен)
+
+    Важно: устойчивость к гонкам:
+    - если TelegramUser уже есть, он является SSOT и определяет user.
     """
-    telegram_id = identity.telegram_id
+    telegram_id = int(identity.telegram_id)
     django_username = f"tg_{telegram_id}"
 
     with transaction.atomic():
-        try:
-            tg = TelegramUser.objects.select_related("user").get(telegram_id=telegram_id)
+        tg = TelegramUser.objects.select_related("user").filter(telegram_id=telegram_id).first()
+        if tg:
             user = tg.user
-        except TelegramUser.DoesNotExist:
-            # создаём Django user, если его нет
-            user, created = User.objects.get_or_create(
+        else:
+            user, _ = User.objects.get_or_create(
                 username=django_username,
                 defaults={
                     "email": f"tg{telegram_id}@telegram.user",
-                    "first_name": identity.first_name[:150],
-                    "last_name": identity.last_name[:150],
+                    "first_name": (identity.first_name or "")[:150],
+                    "last_name": (identity.last_name or "")[:150],
                 },
             )
-            # на всякий: пароль не нужен, вход только через Telegram
-            if created:
-                try:
-                    user.set_unusable_password()
-                    user.save(update_fields=["password"])
-                except Exception:
-                    # не критично
-                    pass
+            # пароль не нужен
+            try:
+                user.set_unusable_password()
+                user.save(update_fields=["password"])
+            except Exception:
+                pass
 
-            # Используем get_or_create чтобы избежать race condition
-            # (если между запросами TelegramUser уже был создан)
-            tg, tg_created = TelegramUser.objects.get_or_create(
-                telegram_id=telegram_id,
-                defaults={
-                    "user": user,
-                    "username": identity.username or "",
-                    "first_name": identity.first_name or "",
-                    "last_name": identity.last_name or "",
-                    "language_code": identity.language_code or "ru",
-                    "is_premium": bool(identity.is_premium),
-                },
-            )
-            if tg_created:
-                logger.info(
-                    "[Auth] Created new TelegramUser: telegram_id=%s username=%s",
-                    telegram_id,
-                    django_username,
+            try:
+                tg = TelegramUser.objects.create(
+                    telegram_id=telegram_id,
+                    user=user,
+                    username=identity.username or "",
+                    first_name=identity.first_name or "",
+                    last_name=identity.last_name or "",
+                    language_code=identity.language_code or "ru",
+                    is_premium=bool(identity.is_premium),
                 )
-            else:
-                logger.info(
-                    "[Auth] Reused existing TelegramUser: telegram_id=%s (debug user or race condition)",
-                    telegram_id,
-                )
+                logger.info("[Auth] Created TelegramUser telegram_id=%s", telegram_id)
+            except IntegrityError:
+                # Гонка: кто-то создал TelegramUser раньше
+                tg = TelegramUser.objects.select_related("user").get(telegram_id=telegram_id)
+                user = tg.user
 
-        # обновляем данные при каждом логине (это нормально)
+        # Обновление данных при каждом логине — нормально
         changed = False
         if tg.username != (identity.username or ""):
             tg.username = identity.username or ""
@@ -164,42 +128,36 @@ def _ensure_user_and_profiles(identity: TelegramIdentity) -> User:
             changed = True
 
         if changed:
-            tg.save()
+            tg.save(
+                update_fields=["username", "first_name", "last_name", "language_code", "is_premium"]
+            )
 
-        # гарантируем Profile
         Profile.objects.get_or_create(user=user)
 
     return user
 
 
-# ---------------------------------------------------------------------
-# 1) DebugModeAuthentication — только DEV
-# ---------------------------------------------------------------------
-
-
 class DebugModeAuthentication(authentication.BaseAuthentication):
     """
-    DEV-only аутентификация для разработки без Telegram.
+    DEV-only auth: для разработки фронта без Telegram.
 
-    Как включается:
-    - settings.DEBUG == True
-    - settings.WEBAPP_DEBUG_MODE_ENABLED == True (по умолчанию True в DEV)
-    - заголовок: X-Debug-Mode: true
+    Включение:
+    - DEBUG=True
+    - APP_ENV=dev
+    - WEBAPP_DEBUG_MODE_ENABLED=True
+    - header: X-Debug-Mode: true
 
-    Опционально можно указать:
-    - X-Debug-User-Id: 999999999 (или любой int)
-    - X-Telegram-First-Name / X-Telegram-Last-Name / X-Telegram-Username
+    Важно:
+    - не логируем заголовки целиком
     """
 
     DEFAULT_DEBUG_USER_ID = 999999999
 
     def authenticate(self, request) -> Optional[Tuple[User, Dict[str, Any]]]:
-        debug_mode = _get_header(request, "X-Debug-Mode").lower()
-        if debug_mode != "true":
+        if _get_header(request, "X-Debug-Mode").lower() != "true":
             return None
 
         if not _is_dev_debug_allowed():
-            # В PROD всегда отрублено. Важно: не "None", а явный fail.
             raise exceptions.AuthenticationFailed("Debug mode is disabled")
 
         raw_id = _get_header(request, "X-Debug-User-Id") or str(self.DEFAULT_DEBUG_USER_ID)
@@ -215,73 +173,50 @@ class DebugModeAuthentication(authentication.BaseAuthentication):
         )
 
         user = _ensure_user_and_profiles(identity)
-
-        # логируем без персональных деталей (только факт)
         logger.warning("[SECURITY] DebugModeAuthentication used (DEV only). path=%s", request.path)
-
         return user, {"auth": "debug"}
 
     def authenticate_header(self, request) -> str:
         return 'DebugMode realm="api"'
 
 
-# ---------------------------------------------------------------------
-# 2) TelegramWebAppAuthentication — основной безопасный путь
-# ---------------------------------------------------------------------
-
-
 class TelegramWebAppAuthentication(authentication.BaseAuthentication):
     """
-    Основной способ: проверяем initData от Telegram Mini App.
-
-    Где ищем initData:
-    - заголовок X-Telegram-Init-Data
-    - тело запроса (initData / init_data) для POST/PUT/PATCH
+    Основной безопасный путь: проверяем initData подписью Telegram.
     """
 
     def authenticate(self, request) -> Optional[Tuple[User, Dict[str, Any]]]:
         init_data = _get_header(request, "X-Telegram-Init-Data")
+
+        # Для POST/PUT/PATCH допускаем initData в body, но НЕ требуем.
         if not init_data and request.method in {"POST", "PUT", "PATCH"}:
-            init_data = (
-                request.data.get("initData") or request.data.get("init_data") or ""
-            ).strip()
+            try:
+                init_data = (
+                    request.data.get("initData") or request.data.get("init_data") or ""
+                ).strip()
+            except Exception:
+                init_data = ""
 
         if not init_data:
-            # Not our auth method - let other backends try
             return None
-
-        # Log auth attempt for diagnostics (path only, no sensitive data)
-        logger.debug("[TelegramAuth] Attempting auth for path=%s", request.path)
 
         auth_service = get_webapp_auth_service()
         parsed = auth_service.validate_init_data(init_data)
         if not parsed:
-            # Log more detail - validate_init_data logs specific reason internally
+            # Никаких prefix initData в логах
             logger.warning(
-                "[TelegramAuth] Auth FAILED: invalid initData signature. "
-                "path=%s, initData_len=%d, initData_prefix=%s",
+                "[TelegramAuth] invalid initData signature. path=%s len=%d",
                 request.path,
                 len(init_data),
-                init_data[:20] + "..." if len(init_data) > 20 else init_data,
             )
             raise exceptions.AuthenticationFailed("Invalid Telegram initData signature")
 
         user_data = auth_service.get_user_data_from_init_data(parsed)
-        if not user_data:
-            logger.warning(
-                "[TelegramAuth] Auth FAILED: no user data in initData. path=%s", request.path
-            )
+        if not user_data or not user_data.get("id"):
             raise exceptions.AuthenticationFailed("Invalid Telegram user data")
 
-        telegram_id = user_data.get("id")
-        if not telegram_id:
-            logger.warning(
-                "[TelegramAuth] Auth FAILED: no telegram_id in user data. path=%s", request.path
-            )
-            raise exceptions.AuthenticationFailed("Telegram ID is required")
-
         identity = TelegramIdentity(
-            telegram_id=int(telegram_id),
+            telegram_id=int(user_data["id"]),
             first_name=user_data.get("first_name", "") or "",
             last_name=user_data.get("last_name", "") or "",
             username=user_data.get("username", "") or "",
@@ -290,38 +225,37 @@ class TelegramWebAppAuthentication(authentication.BaseAuthentication):
         )
 
         user = _ensure_user_and_profiles(identity)
-        logger.info("[TelegramAuth] Auth OK: user_id=%s telegram_id=%s", user.id, telegram_id)
         return user, {"auth": "telegram_webapp"}
-
-
-# ---------------------------------------------------------------------
-# 3) TelegramHeaderAuthentication — опционально, выключено по умолчанию
-# ---------------------------------------------------------------------
 
 
 class TelegramHeaderAuthentication(authentication.BaseAuthentication):
     """
-    ОПЦИОНАЛЬНЫЙ режим: доверяем заголовкам X-Telegram-Id и т.п.
+    ОПАСНЫЙ режим: доверие заголовкам.
 
-    Важно:
-    - это безопасно только если backend НЕ доступен напрямую из интернета,
-      а все запросы идут через Nginx, который сам валидирует initData.
-    - поэтому этот режим ВЫКЛЮЧЕН по умолчанию.
+    Разрешаем только:
+    - в DEV, или
+    - если backend реально недоступен напрямую (твоя архитектура должна это гарантировать)
 
-    Включение:
-      settings.TELEGRAM_HEADER_AUTH_ENABLED = True
+    По умолчанию выключено (settings.TELEGRAM_HEADER_AUTH_ENABLED=False).
     """
 
     def authenticate(self, request) -> Optional[Tuple[User, Dict[str, Any]]]:
         if not bool(getattr(settings, "TELEGRAM_HEADER_AUTH_ENABLED", False)):
             return None
 
+        # В проде запрещаем, если нет явного INTERNAL_ONLY флага.
+        if getattr(settings, "APP_ENV", "") == "prod" and not bool(
+            getattr(settings, "INTERNAL_ONLY", False)
+        ):
+            raise exceptions.AuthenticationFailed(
+                "Header auth is forbidden in production without INTERNAL_ONLY"
+            )
+
         telegram_id_raw = _get_header(request, "X-Telegram-Id")
         if not telegram_id_raw:
             return None
 
         telegram_id = _parse_int(telegram_id_raw, "telegram_id")
-
         identity = TelegramIdentity(
             telegram_id=telegram_id,
             first_name=_get_header(request, "X-Telegram-First-Name") or "",

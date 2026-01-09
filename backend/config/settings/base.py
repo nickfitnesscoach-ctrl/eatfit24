@@ -1,13 +1,11 @@
 """
-base.py — общие настройки Django, которые используются и в локалке, и в проде.
+config/settings/base.py
 
-Простыми словами:
-- этот файл = “общая база”
-- local.py / production.py / test.py берут этот файл и переопределяют то, что отличается
+Общие настройки Django (нейтральные по окружению).
 
-ВАЖНОЕ ПРАВИЛО:
-- НИКАКИХ настроек, зависящих от окружения (типа Redis/LocMem cache) — здесь.
-  Это задаётся в local.py / production.py / test.py, чтобы не было путаницы.
+Ключевой принцип:
+- base.py не должен "угадывать" окружение.
+- Всё окружение определяется через APP_ENV и конкретные settings-файлы (local/production/test).
 """
 
 from __future__ import annotations
@@ -15,44 +13,44 @@ from __future__ import annotations
 from datetime import timedelta
 import os
 from pathlib import Path
-
-from django.core.exceptions import ImproperlyConfigured  # noqa: F401
+from typing import List
 
 # BASE_DIR указывает на корень backend-проекта (где manage.py и т.д.)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
-# -----------------------------------------------------------------------------
-# Безопасность: секретный ключ
-# -----------------------------------------------------------------------------
-# SECRET_KEY читается из окружения. Проверка на непустоту происходит позже,
-# чтобы test.py мог переопределить его.
-SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("DJANGO_SECRET_KEY") or ""
+# =============================================================================
+# ENV / РЕЖИМ ОКРУЖЕНИЯ
+# =============================================================================
 
-
-# -----------------------------------------------------------------------------
-# DEBUG
-# -----------------------------------------------------------------------------
-# По умолчанию DEBUG выключен (безопаснее).
-# В local.py он будет включаться явно.
+APP_ENV = (
+    os.environ.get("APP_ENV", "").strip().lower()
+)  # dev|prod|test (пусто = ошибка конфигурации)
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
 
-# -----------------------------------------------------------------------------
-# Hosts (какие домены имеют право обращаться к Django)
-# -----------------------------------------------------------------------------
-# В base держим максимально безопасный дефолт.
-# В production.py будет строгая проверка, что ALLOWED_HOSTS не пустой.
-ALLOWED_HOSTS = [
+# =============================================================================
+# Безопасность: SECRET_KEY
+# =============================================================================
+
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("DJANGO_SECRET_KEY") or ""
+
+
+# =============================================================================
+# Hosts
+# =============================================================================
+
+ALLOWED_HOSTS: List[str] = [
     h.strip()
     for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if h.strip()
 ]
 
 
-# -----------------------------------------------------------------------------
-# Приложения
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Apps
+# =============================================================================
+
 DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -64,7 +62,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
-    "rest_framework_simplejwt",  # используется точечно (если нужно генерировать токены)
+    "rest_framework_simplejwt",
     "drf_spectacular",
     "django_filters",
     "corsheaders",
@@ -84,18 +82,19 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # Middleware
-# -----------------------------------------------------------------------------
+# =============================================================================
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files in production
-    "corsheaders.middleware.CorsMiddleware",  # CORS должен быть высоко в списке
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # Ограничение доступа к админке/ручкам Telegram (ваш кастомный middleware)
+    # Ограничение доступа к /dj-admin/* и админским ручкам (Telegram admin)
     "apps.telegram.telegram_auth.TelegramAdminOnlyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -105,9 +104,10 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # Templates
-# -----------------------------------------------------------------------------
+# =============================================================================
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -125,60 +125,44 @@ TEMPLATES = [
 ]
 
 
-# -----------------------------------------------------------------------------
-# Database (общий дефолт = PostgreSQL)
-# -----------------------------------------------------------------------------
-# В local.py/test.py можно переопределить SQLite, если нужно.
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "foodmind"),
-        "USER": os.getenv("POSTGRES_USER", "foodmind"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "foodmind"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-    }
-}
-
-
-# -----------------------------------------------------------------------------
-# Cache
-# -----------------------------------------------------------------------------
-# Здесь намеренно НЕ задаём cache backend.
-# Причина: чтобы не было “двойных CACHES”, как у тебя раньше.
-# См. local.py / production.py / test.py
+# =============================================================================
+# Database / Cache
+# =============================================================================
+# base.py не должен задавать реальные окруженческие значения.
+# Окружение обязано настроить DATABASES и CACHES в local.py / production.py / test.py.
+DATABASES = {}
 CACHES = {}
 
 
-# -----------------------------------------------------------------------------
-# Internationalization
-# -----------------------------------------------------------------------------
+# =============================================================================
+# I18N
+# =============================================================================
+
 LANGUAGE_CODE = "ru-ru"
 TIME_ZONE = "Europe/Moscow"
 USE_I18N = True
 USE_TZ = True
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # Static / Media
-# -----------------------------------------------------------------------------
+# =============================================================================
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Если проект за прокси (nginx) — для корректной генерации ссылок
 USE_X_FORWARDED_HOST = True
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-# -----------------------------------------------------------------------------
-# Django REST Framework
-# -----------------------------------------------------------------------------
+# =============================================================================
+# DRF
+# =============================================================================
+
 REST_FRAMEWORK = {
-    # Аутентификация: сначала debug (только dev), потом Telegram WebApp
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "apps.telegram.auth.authentication.DebugModeAuthentication",
         "apps.telegram.auth.authentication.TelegramWebAppAuthentication",
@@ -201,26 +185,20 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.MultiPartParser",
         "rest_framework.parsers.FormParser",
     ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Throttling = антиспам-защита (не тарифные лимиты)
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-    # ВАЖНО: имена scope должны совпадать с throttles.py в apps.ai
     "DEFAULT_THROTTLE_RATES": {
         "anon": "500/hour",
         "user": "5000/hour",
-        # AI
         "ai_per_minute": "10/minute",
         "ai_per_day": "100/day",
-        "task_status": "60/minute",  # scope для polling статуса задачи
-        # Billing/Webhooks (если используешь)
+        "task_status": "60/minute",
         "webhook": "100/hour",
         "billing_create_payment": "20/hour",
-        "billing_polling": "120/min",  # scope для polling /billing/me/ и /billing/subscription/
+        "billing_polling": "120/min",
     },
-    # Единый формат ошибок для фронта
     "EXCEPTION_HANDLER": "apps.core.exception_handler.custom_exception_handler",
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%S%z",
     "DATE_FORMAT": "%Y-%m-%d",
@@ -228,9 +206,10 @@ REST_FRAMEWORK = {
 }
 
 
-# -----------------------------------------------------------------------------
-# OpenAPI (Swagger)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# OpenAPI
+# =============================================================================
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "EatFit24 REST API",
     "DESCRIPTION": "REST API для EatFit24 (КБЖУ + распознавание по фото)",
@@ -241,10 +220,10 @@ SPECTACULAR_SETTINGS = {
 }
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # CORS
-# -----------------------------------------------------------------------------
-# В base: максимально безопасно. В local.py разрешим localhost.
+# =============================================================================
+
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
@@ -252,6 +231,9 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
+
+# Важно: заголовки Telegram для initData.
+# Никогда не доверяем X-Telegram-Id и прочим, если нет валидного initData.
 CORS_ALLOW_HEADERS = [
     "accept",
     "accept-encoding",
@@ -262,83 +244,84 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
-    # Telegram WebApp auth
     "x-telegram-init-data",
-    "x-telegram-id",
+    # Debug mode (DEV only)
+    "x-debug-mode",
+    "x-debug-user-id",
     "x-telegram-first-name",
     "x-telegram-last-name",
     "x-telegram-username",
     "x-telegram-language-code",
-    # Debug mode (DEV only)
-    "x-debug-mode",
-    "x-debug-user-id",
 ]
 
 
-# -----------------------------------------------------------------------------
-# Security: Trusted Proxies for Real Client IP Detection
-# -----------------------------------------------------------------------------
-# Django работает за reverse proxy (Nginx). Чтобы получить реальный IP клиента,
-# нужно доверять X-Forwarded-For заголовку, но ТОЛЬКО от доверенных прокси.
-#
-# Secure default: не доверять XFF (защита от подделки IP).
-# Production: доверять только проверенным прокси (Nginx в Docker сети).
-#
-# Используется в apps/common/audit.py -> get_client_ip() для логов.
+# =============================================================================
+# Trusted Proxies (audit / ip)
+# =============================================================================
+
 TRUSTED_PROXIES_ENABLED = os.environ.get("TRUSTED_PROXIES_ENABLED", "false").lower() == "true"
 TRUSTED_PROXIES = [p.strip() for p in os.environ.get("TRUSTED_PROXIES", "").split(",") if p.strip()]
 
 
-# -----------------------------------------------------------------------------
-# AI Proxy (внутренний сервис)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# AI Proxy
+# =============================================================================
+
 AI_PROXY_URL = os.environ.get("AI_PROXY_URL", "")
 AI_PROXY_SECRET = os.environ.get("AI_PROXY_SECRET", "")
+AI_ASYNC_ENABLED = os.environ.get("AI_ASYNC_ENABLED", "True").lower() == "true"
 
 
-# -----------------------------------------------------------------------------
-# Telegram Bot
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Telegram settings (без парсинга "магией")
+# =============================================================================
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_ADMINS = os.environ.get("TELEGRAM_ADMINS", "")
 
 
-# -----------------------------------------------------------------------------
-# Celery
-# -----------------------------------------------------------------------------
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+def _env_int_list(name: str) -> list[int]:
+    raw = os.environ.get(name, "")
+    if not raw.strip():
+        return []
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            raise RuntimeError(f"[SAFETY] {name} must be comma-separated integers, got: {part!r}")
+    return out
+
+
+TELEGRAM_ADMINS: list[int] = _env_int_list("TELEGRAM_ADMINS")
+
+
+# =============================================================================
+# Celery (только базовые значения, маршрутизация — в celery.py)
+# =============================================================================
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 300  # 5 минут на задачу
-
-CELERY_TASK_ROUTES = {
-    "apps.ai.tasks.*": {"queue": "ai"},
-    "apps.billing.tasks.*": {"queue": "billing"},
-    "apps.billing.webhooks.tasks.*": {"queue": "billing"},
-}
-
-# ВАЖНО: чтобы не было случайного “sync AI” в проде — включаем async по умолчанию.
-AI_ASYNC_ENABLED = os.environ.get("AI_ASYNC_ENABLED", "True").lower() == "true"
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_ROUTES = {}  # задаётся в config/celery.py
 
 
-# -----------------------------------------------------------------------------
-# Billing: Recurring Payments (Auto-renew)
-# -----------------------------------------------------------------------------
-# Feature flag для автопродления подписок.
-# Включить только после полного тестирования!
+# =============================================================================
+# Billing
+# =============================================================================
+
 BILLING_RECURRING_ENABLED = os.environ.get("BILLING_RECURRING_ENABLED", "False").lower() == "true"
 
-
-# -----------------------------------------------------------------------------
-# Billing: YooKassa Payment Provider
-# -----------------------------------------------------------------------------
 YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
 YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
-YOOKASSA_MODE = os.environ.get("YOOKASSA_MODE", "test")
+YOOKASSA_MODE = os.environ.get("YOOKASSA_MODE", "")
 YOOKASSA_RETURN_URL = os.environ.get("YOOKASSA_RETURN_URL", "")
 YOOKASSA_WEBHOOK_URL = os.environ.get("YOOKASSA_WEBHOOK_URL", "")
 YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = (
@@ -346,9 +329,10 @@ YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = (
 )
 
 
-# -----------------------------------------------------------------------------
-# JWT (если нужно)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# JWT
+# =============================================================================
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -358,50 +342,3 @@ SIMPLE_JWT = {
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
-
-# Явно перечисляем, что можно импортировать из base.py в local/production/test.
-# Это убирает "магические" зависимости и помогает линтерам (Ruff).
-__all__ = [
-    "BASE_DIR",
-    "SECRET_KEY",
-    "DEBUG",
-    "ALLOWED_HOSTS",
-    "INSTALLED_APPS",
-    "MIDDLEWARE",
-    "ROOT_URLCONF",
-    "WSGI_APPLICATION",
-    "TEMPLATES",
-    "DATABASES",
-    "CACHES",
-    "REST_FRAMEWORK",
-    "LANGUAGE_CODE",
-    "TIME_ZONE",
-    "USE_I18N",
-    "USE_TZ",
-    "STATIC_URL",
-    "STATIC_ROOT",
-    "MEDIA_URL",
-    "MEDIA_ROOT",
-    "DEFAULT_AUTO_FIELD",
-    "SPECTACULAR_SETTINGS",
-    "CORS_ALLOW_ALL_ORIGINS",
-    "CORS_ALLOWED_ORIGINS",
-    "CORS_ALLOW_CREDENTIALS",
-    "CORS_ALLOW_METHODS",
-    "CORS_ALLOW_HEADERS",
-    "AI_PROXY_URL",
-    "AI_PROXY_SECRET",
-    "AI_ASYNC_ENABLED",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_ADMINS",
-    "CELERY_BROKER_URL",
-    "CELERY_RESULT_BACKEND",
-    "CELERY_ACCEPT_CONTENT",
-    "CELERY_TASK_SERIALIZER",
-    "CELERY_RESULT_SERIALIZER",
-    "CELERY_TIMEZONE",
-    "CELERY_TASK_TRACK_STARTED",
-    "CELERY_TASK_TIME_LIMIT",
-    "CELERY_TASK_ROUTES",
-    "SIMPLE_JWT",
-]
