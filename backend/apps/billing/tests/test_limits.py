@@ -25,9 +25,9 @@ from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
-from .models import Payment, Subscription, SubscriptionPlan
-from .services import get_effective_plan_for_user
-from .usage import DailyUsage
+from apps.billing.models import Payment, Subscription, SubscriptionPlan
+from apps.billing.services import get_effective_plan_for_user
+from apps.billing.usage import DailyUsage
 
 
 class DailyUsageTestCase(TestCase):

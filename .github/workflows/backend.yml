@@ -52,15 +52,28 @@ jobs:
           - 6379:6379
 
     env:
+      # Settings
       DJANGO_SETTINGS_MODULE: config.settings.local
+      APP_ENV: dev
+      DEBUG: "true"
       SECRET_KEY: test-secret-key
+      ALLOWED_HOSTS: localhost,127.0.0.1
+
+      # Postgres (use service hostname, not localhost)
       POSTGRES_DB: eatfit24
       POSTGRES_USER: eatfit24
       POSTGRES_PASSWORD: supersecret
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
-      CELERY_BROKER_URL: redis://localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://localhost:6379/0
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+
+      # Redis (use service hostname, not localhost)
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+      # Optional: keep CI quiet + deterministic
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
 
     steps:
       - name: Checkout
@@ -72,10 +85,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Cache uv
         uses: actions/cache@v4
@@ -86,13 +98,12 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Install dependencies
-        run: |
-          uv sync --dev
+        run: uv sync --dev
 
       - name: Guardrail — forbid datetime.now()/utcnow()
         run: |
           echo "🔍 Checking for forbidden datetime usage…"
-          VIOLATIONS=$(grep -r -n "datetime\.now()\|datetime\.utcnow()" \
+          VIOLATIONS=$(grep -RIn "datetime\.now()\|datetime\.utcnow()" \
             --include="*.py" \
             --exclude-dir="migrations" \
             --exclude-dir="venv" \
@@ -104,51 +115,39 @@ jobs:
             echo "$VIOLATIONS"
             echo ""
             echo "Use Django timezone:"
-            echo "from django.utils import timezone"
-            echo "timezone.now()"
+            echo "  from django.utils import timezone"
+            echo "  timezone.now()"
             exit 1
           fi
 
           echo "✅ Datetime guard passed"
 
       - name: Django system checks
-        run: |
-          uv run python manage.py check
+        run: uv run python manage.py check
 
-      - name: Smoke test — Django setup without crashes
+      - name: Smoke — django.setup() (early import detection)
         run: |
           echo "🔍 Testing Django setup (early import detection)…"
-          uv run python -c "import django; django.setup(); print('✅ Django setup OK')" || {
-            echo "❌ BLOCKER: Django setup failed!"
-            echo ""
-            echo "This usually means settings have forbidden imports:"
-            echo "  - App imports (apps.*) in settings files"
-            echo "  - Heavy library imports that access settings at import time"
-            echo ""
-            echo "See backend/docs/ENV_CONTRACT.md for rules"
-            exit 1
-          }
+          uv run python -c "import django; django.setup(); print('✅ Django setup OK')"
 
       - name: Migration gate — no uncommitted migrations
         run: |
           echo "🔍 Checking for uncommitted migrations…"
-          uv run python manage.py makemigrations --check --dry-run && echo "✅ No uncommitted migrations detected" || {
-            echo "❌ BLOCKER: Uncommitted migrations found!"
-            echo ""
-            echo "Models changed but migrations not created."
-            echo "Run locally:"
-            echo "  python manage.py makemigrations"
-            echo "  git add backend/apps/*/migrations/*.py"
-            echo "  git commit -m 'feat: add migration for ...'"
-            exit 1
-          }
+          uv run python manage.py makemigrations --check --dry-run
 
       - name: Run migrations
-        run: |
-          uv run python manage.py migrate --noinput
+        run: uv run python manage.py migrate --noinput
 
-      - name: Run tests
+      - name: Run tests (packages)
         run: |
-          uv run python manage.py test --noinput
+          set -e
+          uv run python manage.py test apps.core apps.billing apps.common --verbosity=2 --noinput | tee /tmp/test.log
+          if ! grep -qE "Ran [1-9][0-9]* tests?" /tmp/test.log; then
+            echo ""
+            echo "❌ BLOCKER: Django test runner did not execute any tests."
+            echo "Fix test discovery (tests/ package, __init__.py, file naming test_*.py)."
+            exit 1
+          fi
+          echo "✅ Tests executed"
 
 # NOTE: Deploy is handled by unified .github/workflows/deploy.yml

@@ -4,7 +4,7 @@ Tests for core exceptions.
 
 from django.test import TestCase
 
-from .exceptions import (
+from apps.core.exceptions import (
     FoodMindException,
     ValidationError,
     NotFoundError,
@@ -35,9 +35,7 @@ class ExceptionsTestCase(TestCase):
     def test_base_exception_custom_values(self):
         """Test FoodMindException with custom values."""
         exc = FoodMindException(
-            message="Custom error",
-            code="custom_code",
-            details={"key": "value"}
+            message="Custom error", code="custom_code", details={"key": "value"}
         )
         self.assertEqual(exc.message, "Custom error")
         self.assertEqual(exc.code, "custom_code")
@@ -45,17 +43,16 @@ class ExceptionsTestCase(TestCase):
 
     def test_exception_to_dict(self):
         """Test to_dict method."""
-        exc = FoodMindException(
-            message="Test error",
-            code="test_error",
-            details={"field": "name"}
-        )
+        exc = FoodMindException(message="Test error", code="test_error", details={"field": "name"})
         result = exc.to_dict()
-        self.assertEqual(result, {
-            "error": "test_error",
-            "message": "Test error",
-            "details": {"field": "name"},
-        })
+        self.assertEqual(
+            result,
+            {
+                "error": "test_error",
+                "message": "Test error",
+                "details": {"field": "name"},
+            },
+        )
 
     def test_validation_error(self):
         """Test ValidationError defaults."""
