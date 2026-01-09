@@ -64,13 +64,27 @@ def build_start_keyboard(*, is_admin: bool, panel_url: str | None) -> InlineKeyb
 
     if is_admin:
         if panel_url:
+            # Telegram WebApp требует HTTPS, локальные URL не работают
+            # Для DEV нужен туннель (localtunnel, ngrok с платной подпиской, etc)
             web_app_url = f"{panel_url.rstrip('/')}/panel/"
-            panel_button = InlineKeyboardButton(
-                text="📟 Открыть панель тренера",
-                web_app=WebAppInfo(url=web_app_url),
+            is_valid_webapp_url = (
+                web_app_url.startswith("https://")
+                and "localhost" not in web_app_url
+                and "127.0.0.1" not in web_app_url
             )
-            builder.row(panel_button)
-            logger.info("[START] Добавлена WebApp кнопка панели тренера: %s", web_app_url)
+
+            if is_valid_webapp_url:
+                panel_button = InlineKeyboardButton(
+                    text="📟 Открыть панель тренера",
+                    web_app=WebAppInfo(url=web_app_url),
+                )
+                builder.row(panel_button)
+                logger.info("[START] Добавлена WebApp кнопка панели тренера: %s", web_app_url)
+            else:
+                logger.warning(
+                    "[START] TRAINER_PANEL_BASE_URL не подходит для WebApp (нужен HTTPS туннель): %s",
+                    web_app_url
+                )
     else:
         builder.row(
             InlineKeyboardButton(

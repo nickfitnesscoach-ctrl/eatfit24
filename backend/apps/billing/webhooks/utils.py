@@ -37,6 +37,10 @@ YOOKASSA_IP_RANGES = [
     "77.75.156.35/32",
     "77.75.154.128/25",
     "2a02:5180::/32",  # IPv6 (одним блоком; оставлено как есть)
+    # DEV: localhost и Docker bridge для тестирования webhook
+    "127.0.0.1/32",
+    "::1/128",  # IPv6 localhost
+    "172.16.0.0/12",  # Docker default bridge networks
 ]
 
 

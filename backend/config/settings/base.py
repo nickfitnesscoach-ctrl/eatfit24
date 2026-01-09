@@ -286,9 +286,7 @@ CORS_ALLOW_HEADERS = [
 #
 # Используется в apps/common/audit.py -> get_client_ip() для логов.
 TRUSTED_PROXIES_ENABLED = os.environ.get("TRUSTED_PROXIES_ENABLED", "false").lower() == "true"
-TRUSTED_PROXIES = [
-    p.strip() for p in os.environ.get("TRUSTED_PROXIES", "").split(",") if p.strip()
-]
+TRUSTED_PROXIES = [p.strip() for p in os.environ.get("TRUSTED_PROXIES", "").split(",") if p.strip()]
 
 
 # -----------------------------------------------------------------------------
@@ -302,6 +300,7 @@ AI_PROXY_SECRET = os.environ.get("AI_PROXY_SECRET", "")
 # Telegram Bot
 # -----------------------------------------------------------------------------
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_ADMINS = os.environ.get("TELEGRAM_ADMINS", "")
 
 
 # -----------------------------------------------------------------------------
@@ -342,7 +341,9 @@ YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
 YOOKASSA_MODE = os.environ.get("YOOKASSA_MODE", "test")
 YOOKASSA_RETURN_URL = os.environ.get("YOOKASSA_RETURN_URL", "")
 YOOKASSA_WEBHOOK_URL = os.environ.get("YOOKASSA_WEBHOOK_URL", "")
-YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = os.environ.get("YOOKASSA_WEBHOOK_VERIFY_SIGNATURE", "true").lower() == "true"
+YOOKASSA_WEBHOOK_VERIFY_SIGNATURE = (
+    os.environ.get("YOOKASSA_WEBHOOK_VERIFY_SIGNATURE", "true").lower() == "true"
+)
 
 
 # -----------------------------------------------------------------------------
@@ -392,6 +393,7 @@ __all__ = [
     "AI_PROXY_SECRET",
     "AI_ASYNC_ENABLED",
     "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_ADMINS",
     "CELERY_BROKER_URL",
     "CELERY_RESULT_BACKEND",
     "CELERY_ACCEPT_CONTENT",

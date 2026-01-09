@@ -26,12 +26,12 @@ const ClientLayout: React.FC = () => {
                     paddingBottom: 'var(--safe-bottom)',
                 }}
             >
-                <div style={{ height: 'var(--tap-h)' }} className="flex justify-between items-center">
+                <div style={{ height: 'var(--tap-h)' }} className="flex justify-between items-stretch">
                 <NavLink
                     to="/"
                     end
                     className={({ isActive }) =>
-                        `flex-1 flex flex-col items-center justify-center gap-1 h-full transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
+                        `flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
                     }
                 >
                     <Home size={22} />
@@ -41,7 +41,7 @@ const ClientLayout: React.FC = () => {
                 <NavLink
                     to="/log"
                     className={({ isActive }) =>
-                        `flex-1 flex flex-col items-center justify-center gap-1 h-full transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
+                        `flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
                     }
                 >
                     <Camera size={22} />
@@ -51,7 +51,7 @@ const ClientLayout: React.FC = () => {
                 <NavLink
                     to="/subscription"
                     className={({ isActive }) =>
-                        `flex-1 flex flex-col items-center justify-center gap-1 h-full transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
+                        `flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
                     }
                 >
                     <CreditCard size={22} />
@@ -61,7 +61,7 @@ const ClientLayout: React.FC = () => {
                 <NavLink
                     to="/profile"
                     className={({ isActive }) =>
-                        `flex-1 flex flex-col items-center justify-center gap-1 h-full transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
+                        `flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400'}`
                     }
                 >
                     <User size={22} />

@@ -101,18 +101,6 @@ export async function initTelegramWebApp(): Promise<TelegramAuthData | null> {
 }
 
 async function _doInitTelegramWebApp(): Promise<TelegramAuthData | null> {
-    // Проверяем Browser Debug Mode
-    if (IS_DEBUG) {
-        console.log('[Telegram] Browser Debug Mode enabled');
-        _isBrowserDebug = true;
-        _telegramAuthData = {
-            initData: 'debug_mode_init_data',
-            user: DEBUG_TELEGRAM_USER,
-        };
-        console.log('[Telegram] Debug user initialized:', DEBUG_TELEGRAM_USER.username);
-        return _telegramAuthData;
-    }
-
     const tg = getTelegramWebApp();
 
     // Telegram WebApp доступен
@@ -126,6 +114,9 @@ async function _doInitTelegramWebApp(): Promise<TelegramAuthData | null> {
 
         // Применяем safe-area insets
         applySafeAreaInsets(tg);
+
+        // Подписываемся на динамические изменения safe-area
+        subscribeToSafeAreaChanges(tg);
 
         const user = tg.initDataUnsafe.user as TelegramUserInfo;
 
@@ -142,7 +133,19 @@ async function _doInitTelegramWebApp(): Promise<TelegramAuthData | null> {
         return _telegramAuthData;
     }
 
-    // Telegram недоступен
+    // Telegram недоступен - проверяем Browser Debug Mode
+    if (shouldUseDebugMode()) {
+        console.log('[Telegram] Browser Debug Mode enabled (DEV only, no Telegram available)');
+        _isBrowserDebug = true;
+        _telegramAuthData = {
+            initData: 'debug_mode_init_data',
+            user: DEBUG_TELEGRAM_USER,
+        };
+        console.log('[Telegram] Debug user initialized:', DEBUG_TELEGRAM_USER.username);
+        return _telegramAuthData;
+    }
+
+    // Telegram недоступен и не DEV
     console.error('[Telegram] WebApp not available');
     return null;
 }
@@ -250,6 +253,46 @@ export function applySafeAreaInsets(tg: any) {
     Object.entries(insetVars).forEach(([key, value]) => {
         document.documentElement.style.setProperty(key, value);
     });
+
+    console.log('[Telegram] Safe area insets applied:', {
+        top: tg.safeAreaInset.top,
+        bottom: tg.safeAreaInset.bottom,
+        left: tg.safeAreaInset.left,
+        right: tg.safeAreaInset.right,
+    });
+}
+
+/**
+ * Подписка на динамические изменения safe-area
+ * Telegram может менять safe-area при изменениях viewport/панелей
+ */
+export function subscribeToSafeAreaChanges(tg: any) {
+    if (!tg) return;
+
+    // Telegram WebApp API v6.1+ поддерживает события safe area
+    if (typeof tg.onEvent === 'function') {
+        // safeAreaChanged - основное событие изменения safe area
+        tg.onEvent('safeAreaChanged', () => {
+            console.log('[Telegram] safeAreaChanged event fired');
+            applySafeAreaInsets(tg);
+        });
+
+        // contentSafeAreaChanged - изменение content safe area
+        tg.onEvent('contentSafeAreaChanged', () => {
+            console.log('[Telegram] contentSafeAreaChanged event fired');
+            applySafeAreaInsets(tg);
+        });
+
+        // viewportChanged - изменение viewport (может повлиять на safe area)
+        tg.onEvent('viewportChanged', () => {
+            console.log('[Telegram] viewportChanged event fired');
+            applySafeAreaInsets(tg);
+        });
+
+        console.log('[Telegram] Subscribed to safe-area change events');
+    } else {
+        console.warn('[Telegram] Event subscription not supported (old API version)');
+    }
 }
 
 /**

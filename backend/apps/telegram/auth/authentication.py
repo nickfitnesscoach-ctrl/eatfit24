@@ -103,7 +103,7 @@ def _ensure_user_and_profiles(identity: TelegramIdentity) -> User:
             user = tg.user
         except TelegramUser.DoesNotExist:
             # создаём Django user, если его нет
-            user, _ = User.objects.get_or_create(
+            user, created = User.objects.get_or_create(
                 username=django_username,
                 defaults={
                     "email": f"tg{telegram_id}@telegram.user",
@@ -112,22 +112,38 @@ def _ensure_user_and_profiles(identity: TelegramIdentity) -> User:
                 },
             )
             # на всякий: пароль не нужен, вход только через Telegram
-            try:
-                user.set_unusable_password()
-                user.save(update_fields=["password"])
-            except Exception:
-                # не критично
-                pass
+            if created:
+                try:
+                    user.set_unusable_password()
+                    user.save(update_fields=["password"])
+                except Exception:
+                    # не критично
+                    pass
 
-            tg = TelegramUser.objects.create(
-                user=user,
+            # Используем get_or_create чтобы избежать race condition
+            # (если между запросами TelegramUser уже был создан)
+            tg, tg_created = TelegramUser.objects.get_or_create(
                 telegram_id=telegram_id,
-                username=identity.username or "",
-                first_name=identity.first_name or "",
-                last_name=identity.last_name or "",
-                language_code=identity.language_code or "ru",
-                is_premium=bool(identity.is_premium),
+                defaults={
+                    "user": user,
+                    "username": identity.username or "",
+                    "first_name": identity.first_name or "",
+                    "last_name": identity.last_name or "",
+                    "language_code": identity.language_code or "ru",
+                    "is_premium": bool(identity.is_premium),
+                },
             )
+            if tg_created:
+                logger.info(
+                    "[Auth] Created new TelegramUser: telegram_id=%s username=%s",
+                    telegram_id,
+                    django_username,
+                )
+            else:
+                logger.info(
+                    "[Auth] Reused existing TelegramUser: telegram_id=%s (debug user or race condition)",
+                    telegram_id,
+                )
 
         # обновляем данные при каждом логине (это нормально)
         changed = False

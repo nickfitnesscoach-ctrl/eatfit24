@@ -105,27 +105,36 @@ def _handle_payment_succeeded(payload: Dict[str, Any], *, trace_id: str = None) 
         # Идемпотентность по внутреннему статусу:
         # если уже успешно обработан — выходим без ошибок
         if payment.status == "SUCCEEDED":
-            logger.info(f"[payment.succeeded] already processed: payment_id={payment.id}")
+            logger.info(
+                "[payment.succeeded] already processed: payment_id=%s, trace_id=%s",
+                payment.id,
+                trace_id,
+            )
             return
 
         # Если по каким-то причинам уже REFUNDED/CANCELED — тоже не ломаемся
         if payment.status in {"REFUNDED", "CANCELED", "FAILED"}:
             logger.warning(
-                f"[payment.succeeded] ignored due to status={payment.status}: "
-                f"payment_id={payment.id}, yk_id={yk_payment_id}"
+                "[payment.succeeded] ignored due to status=%s: payment_id=%s, yk_id=%s, trace_id=%s",
+                payment.status,
+                payment.id,
+                yk_payment_id,
+                trace_id,
             )
             return
 
-        # Достаём payment_method (может отсутствовать)
-        payment_method_id, card_mask, card_brand = _extract_payment_method_info(obj)
+        # P0-A: Достаём payment_method с проверкой payment_method.saved
+        payment_method_id, card_mask, card_brand, payment_method_saved = (
+            _extract_payment_method_info(obj)
+        )
 
         # 1) Помечаем платёж успешным
         payment.status = "SUCCEEDED"
         payment.paid_at = timezone.now()
         payment.webhook_processed_at = timezone.now()
 
-        # сохраняем payment_method_id в Payment, если разрешено
-        if payment.save_payment_method and payment_method_id:
+        # P0-A: Сохраняем payment_method_id в Payment только если saved=True
+        if payment.save_payment_method and payment_method_id and payment_method_saved:
             payment.yookassa_payment_method_id = payment_method_id
 
         payment.save(
@@ -147,7 +156,10 @@ def _handle_payment_succeeded(payload: Dict[str, Any], *, trace_id: str = None) 
         if plan.code == "FREE" or plan.price <= 0:
             # Такое не должно происходить, но на всякий случай не ломаем систему
             logger.warning(
-                f"[payment.succeeded] paid payment has FREE/zero plan: payment_id={payment.id}, plan={plan.code}"
+                "[payment.succeeded] paid payment has FREE/zero plan: payment_id=%s, plan=%s, trace_id=%s",
+                payment.id,
+                plan.code,
+                trace_id,
             )
             return
 
@@ -162,9 +174,14 @@ def _handle_payment_succeeded(payload: Dict[str, Any], *, trace_id: str = None) 
             duration_days=duration_days,
         )
 
-        # 3) Если мы сохраняли карту — обновляем данные карты в Subscription
-        # и разрешаем автопродление (бизнес-решение: успешная оплата с сохранением карты = можно renew)
-        if payment.save_payment_method and payment_method_id:
+        # P0-A: Если это НЕ recurring платёж и карта сохранена — обновляем Subscription
+        # Для recurring платежей мы НЕ обновляем payment_method (он уже сохранён)
+        if (
+            not payment.is_recurring
+            and payment.save_payment_method
+            and payment_method_id
+            and payment_method_saved
+        ):
             subscription.yookassa_payment_method_id = payment_method_id
             subscription.card_mask = card_mask
             subscription.card_brand = card_brand
@@ -183,6 +200,14 @@ def _handle_payment_succeeded(payload: Dict[str, Any], *, trace_id: str = None) 
                 ]
             )
 
+            logger.info(
+                "[payment.succeeded] Saved payment method: sub_id=%s, card_mask=%s, card_brand=%s, trace_id=%s",
+                subscription.id,
+                card_mask,
+                card_brand,
+                trace_id,
+            )
+
         # 4) Кэш плана пользователя — в ноль
         invalidate_user_plan_cache(payment.user_id)
 
@@ -197,12 +222,21 @@ def _handle_payment_succeeded(payload: Dict[str, Any], *, trace_id: str = None) 
             except Exception as notify_err:
                 # Ошибка уведомления не должна ломать основной процесс
                 logger.warning(
-                    f"[payment.succeeded] Не удалось отправить уведомление: {notify_err}"
+                    "[payment.succeeded] Не удалось отправить уведомление: %s, trace_id=%s",
+                    notify_err,
+                    trace_id,
                 )
 
         logger.info(
-            f"[payment.succeeded] ok: payment_id={payment.id}, yk_id={yk_payment_id}, "
-            f"user_id={payment.user_id}, plan={plan.code}, duration_days={duration_days}"
+            "[payment.succeeded] ok: payment_id=%s, yk_id=%s, user_id=%s, plan=%s, "
+            "duration_days=%s, is_recurring=%s, trace_id=%s",
+            payment.id,
+            yk_payment_id,
+            payment.user_id,
+            plan.code,
+            duration_days,
+            payment.is_recurring,
+            trace_id,
         )
 
 
@@ -212,6 +246,7 @@ def _handle_payment_canceled(payload: Dict[str, Any], *, trace_id: str = None) -
     - находим Payment
     - если уже SUCCEEDED/REFUNDED — не трогаем
     - иначе помечаем CANCELED + webhook_processed_at
+    - P0-C: для recurring платежей обрабатываем cancellation_details.reason
     """
     obj = payload.get("object") or {}
     yk_payment_id = obj.get("id")
@@ -219,23 +254,60 @@ def _handle_payment_canceled(payload: Dict[str, Any], *, trace_id: str = None) -
         raise ValueError("payment.canceled payload has no object.id")
 
     with transaction.atomic():
-        payment = Payment.objects.select_for_update().get(yookassa_payment_id=yk_payment_id)
+        payment = (
+            Payment.objects.select_for_update()
+            .select_related("subscription")
+            .get(yookassa_payment_id=yk_payment_id)
+        )
 
         if payment.status in {"SUCCEEDED", "REFUNDED"}:
             logger.info(
-                f"[payment.canceled] ignored: status={payment.status}, payment_id={payment.id}"
+                "[payment.canceled] ignored: status=%s, payment_id=%s, trace_id=%s",
+                payment.status,
+                payment.id,
+                trace_id,
             )
             return
 
         if payment.status == "CANCELED":
-            logger.info(f"[payment.canceled] already processed: payment_id={payment.id}")
+            logger.info(
+                "[payment.canceled] already processed: payment_id=%s, trace_id=%s",
+                payment.id,
+                trace_id,
+            )
             return
+
+        # P0-C: Извлекаем cancellation_details для recurring платежей
+        cancellation_details = obj.get("cancellation_details") or {}
+        cancellation_reason = cancellation_details.get("reason")
 
         payment.status = "CANCELED"
         payment.webhook_processed_at = timezone.now()
-        payment.save(update_fields=["status", "webhook_processed_at", "updated_at"])
 
-        logger.info(f"[payment.canceled] ok: payment_id={payment.id}, yk_id={yk_payment_id}")
+        # Сохраняем причину отмены в error_message для отладки
+        if cancellation_reason:
+            payment.error_message = f"Cancellation reason: {cancellation_reason}"
+
+        payment.save(
+            update_fields=["status", "webhook_processed_at", "error_message", "updated_at"]
+        )
+
+        # P0-C: Обрабатываем cancellation для recurring платежей
+        if payment.is_recurring and payment.subscription and cancellation_reason:
+            _handle_recurring_cancellation(
+                subscription=payment.subscription,
+                cancellation_reason=cancellation_reason,
+                trace_id=trace_id,
+            )
+
+        logger.info(
+            "[payment.canceled] ok: payment_id=%s, yk_id=%s, is_recurring=%s, reason=%s, trace_id=%s",
+            payment.id,
+            yk_payment_id,
+            payment.is_recurring,
+            cancellation_reason,
+            trace_id,
+        )
 
 
 def _handle_payment_waiting_for_capture(payload: Dict[str, Any], *, trace_id: str = None) -> None:
@@ -341,20 +413,87 @@ def _handle_refund_succeeded(payload: Dict[str, Any], *, trace_id: str = None) -
 # ---------------------------------------------------------------------
 
 
+def _handle_recurring_cancellation(
+    *, subscription: "Subscription", cancellation_reason: str, trace_id: str = None
+) -> None:
+    """
+    P0-C: Обрабатываем отмену recurring платежа в зависимости от причины.
+
+    Reasons from YooKassa API:
+    - "permission_revoked" — пользователь отозвал разрешение на списание
+    - "card_expired" — карта истекла
+    - "insufficient_funds" — недостаточно средств (временная проблема)
+    - "3d_secure_failed" — не прошла 3DS аутентификация
+    - "call_issuer" — нужно связаться с банком
+    - "canceled_by_merchant" — отменено мерчантом
+    - "general_decline" — общий отказ банка
+
+    Бизнес-логика:
+    - permission_revoked, card_expired → выключаем auto_renew, очищаем payment_method
+    - insufficient_funds → НЕ выключаем auto_renew (разрешаем retry через 24h)
+    - остальные → НЕ выключаем auto_renew (могут быть временными)
+    """
+    PERMANENT_FAILURE_REASONS = {"permission_revoked", "card_expired"}
+
+    if cancellation_reason in PERMANENT_FAILURE_REASONS:
+        # Permanent failure — выключаем auto_renew и очищаем payment_method
+        subscription.auto_renew = False
+        subscription.yookassa_payment_method_id = None
+        subscription.card_mask = None
+        subscription.card_brand = None
+        subscription.save(
+            update_fields=[
+                "auto_renew",
+                "yookassa_payment_method_id",
+                "card_mask",
+                "card_brand",
+                "updated_at",
+            ]
+        )
+
+        logger.warning(
+            "[RECURRING_CANCEL] Auto-renew disabled due to permanent failure: "
+            "sub_id=%s, reason=%s, trace_id=%s",
+            subscription.id,
+            cancellation_reason,
+            trace_id,
+        )
+    elif cancellation_reason == "insufficient_funds":
+        # Temporary failure — разрешаем retry, не выключаем auto_renew
+        logger.info(
+            "[RECURRING_CANCEL] Insufficient funds (will retry): "
+            "sub_id=%s, reason=%s, trace_id=%s",
+            subscription.id,
+            cancellation_reason,
+            trace_id,
+        )
+    else:
+        # Другие причины — тоже не выключаем auto_renew (могут быть временными)
+        logger.info(
+            "[RECURRING_CANCEL] Recurring payment failed (will retry): "
+            "sub_id=%s, reason=%s, trace_id=%s",
+            subscription.id,
+            cancellation_reason,
+            trace_id,
+        )
+
+
 def _extract_payment_method_info(
     obj: Dict[str, Any],
-) -> tuple[Optional[str], Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str], Optional[str], bool]:
     """
     Аккуратно вытаскиваем payment_method данные из payload.
     Возвращаем:
-      (payment_method_id, card_mask, card_brand)
+      (payment_method_id, card_mask, card_brand, saved)
 
     Примечание:
     - YooKassa может прислать payment_method не всегда.
     - card last4 и brand могут быть внутри payment_method.card.
+    - saved=True означает, что карта сохранена для рекуррентных платежей (P0-A)
     """
     payment_method = obj.get("payment_method") or {}
     payment_method_id = payment_method.get("id")
+    payment_method_saved = payment_method.get("saved", False)
 
     card = payment_method.get("card") or {}
     last4 = card.get("last4")
@@ -363,4 +502,4 @@ def _extract_payment_method_info(
     card_mask = f"•••• {last4}" if last4 else None
     card_brand = brand if brand else None
 
-    return payment_method_id, card_mask, card_brand
+    return payment_method_id, card_mask, card_brand, payment_method_saved

@@ -220,3 +220,11 @@ CELERY_TASK_ROUTES = base.CELERY_TASK_ROUTES
 
 # JWT настройки — берём из base
 SIMPLE_JWT = base.SIMPLE_JWT
+
+# YooKassa billing настройки — берём из base (там читаются из env)
+YOOKASSA_SHOP_ID = base.YOOKASSA_SHOP_ID
+YOOKASSA_SECRET_KEY = base.YOOKASSA_SECRET_KEY
+
+# Telegram настройки — берём из base (там читаются из env)
+TELEGRAM_BOT_TOKEN = base.TELEGRAM_BOT_TOKEN
+TELEGRAM_ADMINS = base.TELEGRAM_ADMINS

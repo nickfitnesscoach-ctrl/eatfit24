@@ -20,6 +20,14 @@ export default defineConfig({
     ),
   },
   server: {
+    // Allow access through tunnels for Telegram WebApp testing
+    allowedHosts: [
+      'localhost',
+      '.trycloudflare.com',  // cloudflared quick tunnels (RECOMMENDED)
+      '.loca.lt',  // localtunnel domains
+      '.ngrok-free.dev',  // ngrok free domains
+      '.ngrok.io',  // ngrok legacy domains
+    ],
     proxy: {
       '/api/v1': {
         target: 'http://localhost:8000',
