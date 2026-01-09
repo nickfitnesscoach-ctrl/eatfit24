@@ -17,6 +17,9 @@ from . import base
 
 logger = logging.getLogger(__name__)
 
+# Детекция CI окружения (GitHub Actions и другие CI системы)
+IS_CI = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
+
 
 # -----------------------------------------------------------------------------
 # Хелперы
@@ -93,9 +96,8 @@ else:
 
     # Жёстко запрещаем "подозрительные" имена (кроме CI)
     # В CI разрешаем дефолтное имя "eatfit24" для обратной совместимости
-    is_ci = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
     forbidden = {"eatfit24_prod", "foodmind", "foodmind_prod"}
-    if not is_ci:
+    if not IS_CI:
         forbidden.add("eatfit24")  # В локальной разработке требуем явно eatfit24_dev
 
     if db_name in forbidden or db_name.endswith("_prod") or "_prod" in db_name:
@@ -144,21 +146,23 @@ else:
 TELEGRAM_BOT_TOKEN = base.TELEGRAM_BOT_TOKEN
 TELEGRAM_ADMINS = base.TELEGRAM_ADMINS
 
-if not TELEGRAM_BOT_TOKEN:
+# В CI токен не нужен для базовых проверок Django
+if not TELEGRAM_BOT_TOKEN and not IS_CI:
     raise RuntimeError(
         "[SAFETY] TELEGRAM_BOT_TOKEN is empty in DEV. "
         "WebApp auth / trainer panel will fail. Set it in .env.local"
     )
 
 # В dev админы могут быть пустыми, но тогда панель заблокирована — лучше явно знать.
-if not TELEGRAM_ADMINS:
+if not TELEGRAM_ADMINS and not IS_CI:
     logger.warning("[DEV] TELEGRAM_ADMINS is empty. Trainer panel will be denied.")
 
 # -----------------------------------------------------------------------------
-# Billing: в dev запрещаем live ключи
+# Billing: в dev запрещаем live ключи (кроме CI)
 # -----------------------------------------------------------------------------
 
-if base.YOOKASSA_SECRET_KEY.startswith("live_"):
+# В CI может не быть YooKassa ключа вообще
+if base.YOOKASSA_SECRET_KEY and base.YOOKASSA_SECRET_KEY.startswith("live_") and not IS_CI:
     raise RuntimeError("[SAFETY] live_ YooKassa key detected in DEV. Use test_ keys only.")
 
 # -----------------------------------------------------------------------------
