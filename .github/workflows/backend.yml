@@ -165,7 +165,7 @@ jobs:
           set -e
           # TEMP: apps.billing excluded due to FOR UPDATE incompatibility with SQLite in CI
           # TODO: Fix webhook handlers to handle SQLite or add PostgreSQL to CI services
-          uv run python manage.py test apps.core apps.common --verbosity=2 --noinput | tee /tmp/test.log
+          uv run python manage.py test apps.core apps.common --verbosity=2 --noinput 2>&1 | tee /tmp/test.log
           grep -qE "Ran [1-9][0-9]* tests?" /tmp/test.log
 
 # NOTE: Deploy is handled by unified .github/workflows/deploy.yml
