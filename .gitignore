@@ -46,12 +46,22 @@ backend/staticfiles/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+*.env
 .env.local
 .env.*.local
-!.env.example
+.env.patch*
 backend/.env
 bot/.env
 frontend/.env
+
+# Secrets (NEVER commit)
+*credentials*
+*.pem
+*.key
+id_rsa*
+*.p12
 
 # IDE
 .idea/

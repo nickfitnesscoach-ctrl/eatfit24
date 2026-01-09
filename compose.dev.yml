@@ -3,7 +3,7 @@
 #
 # Usage:
 #   1. Copy .env.local to .env: cp .env.local .env
-#   2. Start services: docker compose -f compose.yml -f docker-compose.dev.yml up -d
+#   2. Start services: docker compose -f compose.yml -f compose.dev.yml up -d
 #
 # This file overrides production settings for local development:
 # - Uses local.py settings (DEBUG=True, WEBAPP_DEBUG_MODE_ENABLED=True)

@@ -1,26 +1,16 @@
 # Документация Billing
 
+> **SSOT** — единственный источник истины по биллингу.
+
 Система биллинга EatFit24: подписки, платежи, лимиты, интеграция с YooKassa.
-
-## Содержание
-
-| Документ | Описание |
-|----------|----------|
-| [architecture.md](./architecture.md) | Архитектура модуля |
-| [payment-flow.md](./payment-flow.md) | Поток платежа |
-| [subscription-lifecycle.md](./subscription-lifecycle.md) | Жизненный цикл подписки |
-| [webhooks.md](./webhooks.md) | Обработка webhook |
-| [security.md](./security.md) | Безопасность |
-| [limits-and-usage.md](./limits-and-usage.md) | Лимиты и использование |
-| [operations.md](./operations.md) | Эксплуатация |
 
 ---
 
 ## Быстрый старт
 
-1. Прочитай [architecture.md](./architecture.md) — понять структуру
-2. Прочитай [payment-flow.md](./payment-flow.md) — понять flow денег
-3. Прочитай [security.md](./security.md) — понять ограничения
+1. Ключевые принципы (раздел ниже)
+2. API Endpoints (раздел ниже)
+3. Модели и конфигурация (разделы ниже)
 
 ---
 

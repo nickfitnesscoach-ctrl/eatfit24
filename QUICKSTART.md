@@ -9,7 +9,7 @@
 cp .env.local .env
 
 # 2. Запуск backend + БД + Redis + Celery (в DEV режиме)
-docker compose -f compose.yml -f docker-compose.dev.yml up -d
+docker compose -f compose.yml -f compose.dev.yml up -d
 
 # 3. Запуск frontend (в отдельном терминале)
 cd frontend && npm run dev
@@ -46,7 +46,7 @@ nano .env  # Настроить prod-ключи (YOOKASSA_SECRET_KEY, DJANGO_SEC
 # 2. Проверить что ENV=production
 grep "ENV=" .env
 
-# 3. Запуск production (без docker-compose.dev.yml!)
+# 3. Запуск production (без compose.dev.yml!)
 docker compose up -d --build
 
 # 4. Проверка
@@ -54,7 +54,7 @@ docker compose ps
 curl -k https://eatfit24.ru/health/
 ```
 
-**КРИТИЧНО:** На сервере НЕ использовать `.env.local` и НЕ использовать `docker-compose.dev.yml`!
+**КРИТИЧНО:** На сервере НЕ использовать `.env.local` и НЕ использовать `compose.dev.yml`!
 
 ---
 
