@@ -308,7 +308,7 @@ ADMIN_IDS=310151740,987654321
 ```bash
 # ✅ CORRECT - Generate strong secrets
 openssl rand -hex 32
-# Output: c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
+# Output: your-randomly-generated-hex-secret-here
 ```
 
 ### CORS Rules

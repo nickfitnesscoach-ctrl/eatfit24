@@ -220,7 +220,7 @@ sysctl -p
 
 ### Current Configuration
 - **Port:** 8001
-- **API Secret:** c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
+- **API Secret:** your-actual-secret-key-placeholder (SCRUBBED)
 - **Health Check:** http://185.171.80.128:8001/health
 
 ### Security Recommendations

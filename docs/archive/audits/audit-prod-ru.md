@@ -69,7 +69,7 @@ AI_PROXY_SECRET  # ❌ НЕ ЗАДАНА
 ```bash
 # AI Proxy Configuration
 AI_PROXY_URL=http://185.171.80.128:8001
-AI_PROXY_SECRET=c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
+AI_PROXY_SECRET=your-actual-secret-key-placeholder (SCRUBBED)
 ```
 
 #### 2.3 Верификация (После Фикса)
@@ -157,7 +157,7 @@ c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c  # ✅ ЗАГР
 ```diff
 + # AI Proxy Configuration
 + AI_PROXY_URL=http://185.171.80.128:8001
-+ AI_PROXY_SECRET=c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
++ AI_PROXY_SECRET=your-actual-secret-key-placeholder (SCRUBBED)
 ```
 
 **Команды:**

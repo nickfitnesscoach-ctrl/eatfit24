@@ -127,7 +127,7 @@ AI_PROXY_SECRET=changeme_long_random_string
 
 **After:**
 ```
-AI_PROXY_SECRET=c6b837b17429b1e7b488cc6333759dce6a326b9f6cee73a1c228670867a44a5c
+AI_PROXY_SECRET=your-actual-secret-key-placeholder (SCRUBBED)
 ```
 
 **Risk:** AI Proxy authentication was effectively disabled.

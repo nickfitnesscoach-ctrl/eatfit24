@@ -22,7 +22,7 @@ SECRET_KEY=CHANGE_ME_GENERATE_WITH_openssl_rand_-hex_32
 
 **Есть дубликат:**
 ```bash
-DJANGO_SECRET_KEY=4rmqovlZ7tD8jTuiY2SfAh5ppUEfbKxv/n+zfx9/k0j82aMAFfo7T+JIpdFhDmpD
+DJANGO_SECRET_KEY=your-actual-secret-key-placeholder
 ```
 
 **Риск:** 🔴 КРИТИЧЕСКИЙ
@@ -32,7 +32,7 @@ DJANGO_SECRET_KEY=4rmqovlZ7tD8jTuiY2SfAh5ppUEfbKxv/n+zfx9/k0j82aMAFfo7T+JIpdFhDm
 ```bash
 # Удалить старую строку SECRET_KEY
 # Переименовать DJANGO_SECRET_KEY в SECRET_KEY
-SECRET_KEY=4rmqovlZ7tD8jTuiY2SfAh5ppUEfbKxv/n+zfx9/k0j82aMAFfo7T+JIpdFhDmpD
+SECRET_KEY=your-actual-secret-key-placeholder
 ```
 
 ---
@@ -144,7 +144,7 @@ YOOKASSA_SECRET_KEY=test_your_secret_key_or_live_your_secret_key
 
 **Расположение:** `.env`
 ```bash
-TELEGRAM_BOT_TOKEN=7611657073:AAG4oviiDPJH-oN3EIIEqvBzg1J28XhCBpc
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
 ```
 
 **Проблема:**
@@ -189,7 +189,7 @@ DJANGO_ALLOWED_HOSTS=eatfit24.ru,...  # Дубликат!
 ### 8. Пароль БД в .env
 
 ```bash
-POSTGRES_PASSWORD=c439d0524d76a12a98f2c25fa4d47d70b06beb476f653f1b
+POSTGRES_PASSWORD=your-secure-postgres-password-placeholder
 ```
 
 **Статус:** ✅ Хороший длинный пароль (48 символов hex)
