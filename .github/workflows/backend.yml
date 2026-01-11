@@ -78,6 +78,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Secret leak detection (BLOCKER)
+        run: |
+          echo "🔐 Running secret leak detection…"
+          chmod +x scripts/check-secrets-leak.sh
+          ./scripts/check-secrets-leak.sh
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
