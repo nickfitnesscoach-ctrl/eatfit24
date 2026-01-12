@@ -128,7 +128,7 @@ eatfit24/
 │
 ├── compose.yml         # Базовая конфигурация (читает .env)
 ├── compose.dev.yml     # DEV overrides
-├── compose.prod.yml    # PROD overrides (НЕ используется, все в .env)
+├── compose.prod.yml    # Legacy/опциональный. Production задаётся через .env + compose.yml
 │
 ├── backend/
 │   └── entrypoint.sh   # 🛡️ Environment Guards здесь
@@ -324,13 +324,17 @@ fi
 | `production` | `false` | ✅ Разрешено |
 | `production` | `true` | ❌ Ошибка: "ENV=production but DEBUG=true" |
 
-**Default (из кода `entrypoint.sh:87`):**
+**Default (из кода `entrypoint.sh:100`):**
 ```bash
 ENV_VALUE="${ENV:-production}"  # По умолчанию production!
 ```
 
+> [!TIP]
+> **В DEV явно ставьте `ENV=local`.**
+> Иначе дефолт `production` вызовет ожидаемое падение при `DEBUG=true`.
+
 **Где используется:**
-- `backend/entrypoint.sh` - ENV/DEBUG conflict guard (строки 82-107)
+- `backend/entrypoint.sh` - ENV/DEBUG conflict guard (строки 95-120)
 
 #### POSTGRES_DB
 
@@ -802,6 +806,20 @@ WORKERS=$(curl -s https://eatfit24.ru/health/ | jq -r '.celery_workers')
 
 ## Changelog
 
+### v2.2 (2026-01-12)
+
+**BREAKING CHANGE:**
+- 🚨 `APP_ENV` теперь **обязателен** (fail-fast), нет дефолта
+
+**Added:**
+- ✅ SSOT для DJANGO_SETTINGS_MODULE закреплён
+- ✅ Предупреждение про ENV дефолт=production
+
+**Changed:**
+- 📝 gitignore шаблон: `.env.*` вместо `*.env`
+- 📝 `eatfit24_prod` помечен как legacy
+- 📝 `compose.prod.yml` уточнён как legacy/опциональный
+
 ### v2.0 (2026-01-12)
 
 **Added:**
@@ -813,7 +831,6 @@ WORKERS=$(curl -s https://eatfit24.ru/health/ | jq -r '.celery_workers')
 
 **Changed:**
 - 📝 Упрощена схема: один `.env` файл вместо `.env.prod`/симлинков
-- 📝 Убрана зависимость от `compose.prod.yml` (все в `.env`)
 
 **Security:**
 - 🛡️ DEV не может подключиться к PROD БД
@@ -892,6 +909,6 @@ docker compose up -d
 
 ---
 
-**Версия документа:** 2.0  
+**Версия документа:** 2.2  
 **Production Ready:** ✅ Да  
 **Last Verified:** 2026-01-12
