@@ -112,6 +112,8 @@ class BackendAPIClient:
             headers = {}
             if self.secret:
                 headers["X-Bot-Secret"] = self.secret
+            # Indicate request came through HTTPS proxy to prevent SSL redirect
+            headers["X-Forwarded-Proto"] = "https"
 
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
                 response = await client.request(
