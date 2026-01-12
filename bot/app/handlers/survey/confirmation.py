@@ -5,6 +5,7 @@
 import asyncio
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
@@ -62,7 +63,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                 f"Максимум планов в день: <b>{settings.MAX_PLANS_PER_DAY}</b>.\n\n"
                 f"Попробуйте завтра или свяжитесь с тренером для индивидуальной консультации.",
                 parse_mode="HTML",
-                reply_markup=get_contact_trainer_keyboard()
+                reply_markup=get_contact_trainer_keyboard(),
             )
             await state.clear()
             logger.warning(f"User {user_id} hit rate limit: {plans_today} plans today")
@@ -77,7 +78,15 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
     data = await state.get_data()
 
     # Показать сообщение о генерации
-    progress_msg = await callback.message.edit_text(GENERATING_PLAN, parse_mode="HTML")
+    try:
+        progress_msg = await callback.message.edit_text(GENERATING_PLAN, parse_mode="HTML")
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            # Сообщение уже содержит нужный текст, используем текущее
+            progress_msg = callback.message
+            logger.debug(f"Message already shows GENERATING_PLAN for user {user_id}, skipping edit")
+        else:
+            raise
     await callback.answer()
 
     # Запустить фоновую задачу для обновления прогресса
@@ -90,7 +99,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                     chat_id=callback.message.chat.id,
                     message_id=progress_msg.message_id,
                     text=f"⏳ Генерирую ваш персональный план... ({i * 10} сек)",
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
             except Exception as e:
                 # Игнорируем ошибки редактирования (например, если сообщение уже изменено)
@@ -111,17 +120,11 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
         "training_level": data.get("training_level"),
         "body_goals": data.get("body_goals", []),
         "health_limitations": data.get("health_limitations", []),
-        "body_now": {
-            "id": data["body_now_id"],
-            "label": data.get("body_now_label", "")
-        },
-        "body_ideal": {
-            "id": data["body_ideal_id"],
-            "label": data.get("body_ideal_label", "")
-        },
+        "body_now": {"id": data["body_now_id"], "label": data.get("body_now_label", "")},
+        "body_ideal": {"id": data["body_ideal_id"], "label": data.get("body_ideal_label", "")},
         "tz": data["tz"],
         "utc_offset_minutes": data["utc_offset_minutes"],
-        "notes": ""
+        "notes": "",
     }
 
     # Определить цель автоматически
@@ -170,7 +173,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
             await backend_api.get_or_create_user(
                 telegram_id=user_id,
                 username=callback.from_user.username if callback.from_user else None,
-                full_name=callback.from_user.full_name if callback.from_user else None
+                full_name=callback.from_user.full_name if callback.from_user else None,
             )
 
             # Сохранить ответы опроса
@@ -192,7 +195,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                 body_ideal_label=data.get("body_ideal_label"),
                 body_ideal_file=data["body_ideal_file"],
                 timezone=data["tz"],
-                utc_offset_minutes=data["utc_offset_minutes"]
+                utc_offset_minutes=data["utc_offset_minutes"],
             )
 
             # Сохранить план
@@ -201,7 +204,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                 survey_id=survey_response["id"],
                 ai_text=ai_text,
                 ai_model=ai_model,
-                prompt_version=prompt_version
+                prompt_version=prompt_version,
             )
 
             log_survey_completed(user_id)
@@ -209,7 +212,9 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
 
         except BackendAPIError as api_error:
             # Критическая ошибка: план сгенерирован, но не сохранён в Backend API
-            logger.critical(f"Backend API save failed after AI generation for user {user_id}: {api_error}", exc_info=True)
+            logger.critical(
+                f"Backend API save failed after AI generation for user {user_id}: {api_error}", exc_info=True
+            )
 
             # Отправить план пользователю с предупреждением
             await callback.message.answer(
@@ -217,7 +222,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
                 f"Пожалуйста, сохраните текст плана:\n\n{ai_text}\n\n"
                 f"Обратитесь к администратору для восстановления данных.",
                 parse_mode="HTML",
-                disable_notification=True
+                disable_notification=True,
             )
             await state.clear()
             return
@@ -241,7 +246,7 @@ async def confirm_and_generate(callback: CallbackQuery, state: FSMContext, bot: 
             CONTACT_TRAINER_CTA,
             reply_markup=get_contact_trainer_keyboard(),
             parse_mode="HTML",
-            disable_notification=True
+            disable_notification=True,
         )
 
         # Очистить FSM состояние
@@ -276,7 +281,7 @@ async def confirm_edit(callback: CallbackQuery, state: FSMContext):
         "🔄 <b>Начинаем опрос заново</b>\n\n" + GENDER_QUESTION,
         reply_markup=get_gender_keyboard(),
         parse_mode="HTML",
-        disable_notification=True
+        disable_notification=True,
     )
 
     # Устанавливаем состояние GENDER (первый шаг)

@@ -48,6 +48,37 @@ class HealthEndpointsSmokeTest(TestCase):
         response = self.client.get("/health/")
         self.assertEqual(response.status_code, 200)
 
+    def test_health_comprehensive_response(self):
+        """Health endpoint returns comprehensive response structure."""
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+
+        data = response.data
+        # Verify core fields
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("version", data)
+        self.assertIn("python_version", data)
+        self.assertIn("app_env", data)
+        self.assertIn("timestamp", data)
+        self.assertIn("checks", data)
+
+        # Verify checks structure
+        checks = data["checks"]
+        self.assertIn("database", checks)
+        self.assertIn("redis", checks)
+        self.assertIn("celery", checks)
+
+        # Database and Redis should be 'ok'
+        self.assertEqual(checks["database"], "ok")
+        self.assertEqual(checks["redis"], "ok")
+
+        # Celery might be ok or warning (non-critical)
+        self.assertIn(checks["celery"], ["ok", "warning: no active workers"])
+
+        # Verify celery_workers count exists
+        if "celery_workers" in data:
+            self.assertIsInstance(data["celery_workers"], int)
+
 
 class BillingPlansIntegrityTest(TestCase):
     """Billing plans are correct after migrations."""

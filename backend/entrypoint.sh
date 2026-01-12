@@ -25,11 +25,59 @@ MIGRATIONS_STRICT="${MIGRATIONS_STRICT:-1}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 RUN_COLLECTSTATIC="${RUN_COLLECTSTATIC:-1}"
 
+# Default APP_ENV if not set (safer than assuming)
+APP_ENV="${APP_ENV:-prod}"
+
 echo "[Entrypoint] Configuration:"
 echo "  - DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE"
 echo "  - MIGRATIONS_STRICT=$MIGRATIONS_STRICT"
 echo "  - RUN_MIGRATIONS=$RUN_MIGRATIONS"
 echo "  - RUN_COLLECTSTATIC=$RUN_COLLECTSTATIC"
+
+# ============================================================
+# ENVIRONMENT ISOLATION GUARDS (Critical P0 Security)
+# ============================================================
+# Log environment information for audit trail
+echo "[STARTUP] APP_ENV=${APP_ENV}"
+echo "[STARTUP] POSTGRES_DB=${POSTGRES_DB:-unset}"
+echo "[STARTUP] YOOKASSA_MODE=${YOOKASSA_MODE:-unset}"
+
+# Guard 1: Prevent DEV from connecting to PROD database
+if [ "${APP_ENV}" = "dev" ]; then
+    if [ "${POSTGRES_DB}" = "eatfit24_prod" ] || [ "${POSTGRES_DB}" = "eatfit24" ]; then
+        echo "[FATAL] DEV environment cannot connect to PROD database (${POSTGRES_DB})"
+        echo "[FATAL] Expected: eatfit24_dev"
+        echo "[FATAL] Got: ${POSTGRES_DB}"
+        exit 1
+    fi
+    echo "[Entrypoint] Environment isolation check passed: DEV → ${POSTGRES_DB}"
+fi
+
+# Guard 2: Prevent PROD from connecting to DEV database or using test keys
+if [ "${APP_ENV}" = "prod" ]; then
+    # Check database name
+    if [ "${POSTGRES_DB}" = "eatfit24_dev" ] || [ "${POSTGRES_DB}" = "test" ]; then
+        echo "[FATAL] PROD environment cannot connect to DEV/TEST database (${POSTGRES_DB})"
+        echo "[FATAL] Expected: eatfit24_prod or eatfit24"
+        echo "[FATAL] Got: ${POSTGRES_DB}"
+        exit 1
+    fi
+    
+    # Check for test payment keys (if YooKassa secret is set)
+    if [ -n "${YOOKASSA_SECRET_KEY}" ]; then
+        if echo "${YOOKASSA_SECRET_KEY}" | grep -q "test_"; then
+            echo "[FATAL] PROD environment cannot use test YooKassa key"
+            echo "[FATAL] YooKassa secret key starts with 'test_'"
+            echo "[FATAL] Use live_ key for production"
+            exit 1
+        fi
+    fi
+    
+    echo "[Entrypoint] Environment isolation check passed: PROD → ${POSTGRES_DB}"
+fi
+
+echo "[Entrypoint] Environment guards: PASSED ✓"
+
 
 # ============================================================
 # ENV/DEBUG Conflict Guard

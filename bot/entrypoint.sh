@@ -3,6 +3,14 @@ set -e
 
 echo "🚀 Starting bot entrypoint..."
 
+# ============================================================
+# ENVIRONMENT LOGGING (Audit Trail)
+# ============================================================
+echo "[BOT STARTUP] APP_ENV=${APP_ENV:-unset}"
+echo "[BOT STARTUP] ENVIRONMENT=${ENVIRONMENT:-unset}"
+echo "[BOT STARTUP] BACKEND_URL=${DJANGO_API_URL:-unset}"
+
+
 # Ждём доступности Django Backend API
 echo "⏳ Waiting for Backend API to be ready..."
 BACKEND_URL="${DJANGO_API_URL:-http://backend:8000/api/v1}"
