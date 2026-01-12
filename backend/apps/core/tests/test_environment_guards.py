@@ -29,6 +29,15 @@ class EnvironmentGuardTests(TestCase):
         self.assertIn("eatfit24_prod", content, "Проверка на PROD DB есть")
         self.assertIn("FATAL", content, "FATAL ошибки должны быть")
 
+    def test_entrypoint_app_env_is_required(self):
+        """Entrypoint should fail-fast if APP_ENV is not set."""
+        with open(self.backend_entrypoint, "r") as f:
+            content = f.read()
+
+        # Verify APP_ENV is required (no dangerous default)
+        self.assertIn("APP_ENV is not set", content, "APP_ENV обязателен")
+        self.assertIn("APP_ENV must be", content, "Валидация значений APP_ENV")
+
     def test_entrypoint_has_payment_key_guard(self):
         """Entrypoint should prevent PROD from using test payment keys."""
         with open(self.backend_entrypoint, "r") as f:

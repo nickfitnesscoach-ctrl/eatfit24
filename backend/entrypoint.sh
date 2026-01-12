@@ -25,14 +25,27 @@ MIGRATIONS_STRICT="${MIGRATIONS_STRICT:-1}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 RUN_COLLECTSTATIC="${RUN_COLLECTSTATIC:-1}"
 
-# Default APP_ENV if not set (safer than assuming)
-APP_ENV="${APP_ENV:-prod}"
+# APP_ENV is REQUIRED - no dangerous defaults
+# This prevents accidental production runs with misconfigured environment
+APP_ENV="${APP_ENV:-}"
+if [ -z "${APP_ENV}" ]; then
+    echo "[FATAL] APP_ENV is not set. This is required."
+    echo "[FATAL] Set APP_ENV=dev for development or APP_ENV=prod for production"
+    echo "[FATAL] Example: Add APP_ENV=dev to your .env file"
+    exit 1
+fi
+
+if [ "${APP_ENV}" != "dev" ] && [ "${APP_ENV}" != "prod" ]; then
+    echo "[FATAL] APP_ENV must be 'dev' or 'prod', got: '${APP_ENV}'"
+    exit 1
+fi
 
 echo "[Entrypoint] Configuration:"
 echo "  - DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE"
 echo "  - MIGRATIONS_STRICT=$MIGRATIONS_STRICT"
 echo "  - RUN_MIGRATIONS=$RUN_MIGRATIONS"
 echo "  - RUN_COLLECTSTATIC=$RUN_COLLECTSTATIC"
+echo "  - APP_ENV=$APP_ENV"
 
 # ============================================================
 # ENVIRONMENT ISOLATION GUARDS (Critical P0 Security)

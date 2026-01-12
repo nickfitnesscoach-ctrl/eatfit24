@@ -1,6 +1,6 @@
 # Environment Configuration Contract
 
-**Version:** 2.0  
+**Version:** 2.2  
 **Last Updated:** 2026-01-12  
 **Status:** ✅ Production Ready
 
@@ -145,12 +145,15 @@ eatfit24/
 | `.env.local`  | Используется     | Не используется | ✅ Да  | DEV шаблон |
 | `.env.example`| Не используется  | Не используется | ✅ Да  | Документация |
 
-**Gitignore:**
+**Gitignore (рекомендуемый шаблон):**
 ```gitignore
-.env           # Никогда не коммитить!
-*.env          # Никакие .env* файлы кроме явно разрешенных
-!.env.local    # Разрешить .env.local
-!.env.example  # Разрешить .env.example
+# Environment files
+.env
+.env.*
+
+# Исключения (коммитятся)
+!.env.local
+!.env.example
 ```
 
 ---
@@ -282,20 +285,33 @@ docker compose up backend
 | `dev`    | Локальная разработка | Блокирует подключение к `eatfit24` или `eatfit24_prod` |
 | `prod`   | Production сервер | Блокирует подключение к `eatfit24_dev` или `test` |
 
-**Default (из кода `entrypoint.sh:29`):**
+> [!CAUTION]
+> **APP_ENV обязателен!** Нет дефолта.
+> 
+> Если не задан → контейнер падает:
+> ```
+> [FATAL] APP_ENV is not set. This is required.
+> [FATAL] Set APP_ENV=dev for development or APP_ENV=prod for production
+> ```
+
+**Из кода `entrypoint.sh:27-41`:**
 ```bash
-APP_ENV="${APP_ENV:-prod}"  # По умолчанию prod!
+APP_ENV="${APP_ENV:-}"  # Нет дефолта!
+if [ -z "${APP_ENV}" ]; then
+    echo "[FATAL] APP_ENV is not set. This is required."
+    exit 1
+fi
 ```
 
 **Влияет на:**
-- Environment guards в entrypoint.sh (строки 46-77)
+- Environment guards в entrypoint.sh (строки 59-90)
 - Django settings guard (`production.py:17-19`, `local.py:56-58`)
 - Health check (отображается в `/health/`)
 
 > [!WARNING]
 > **APP_ENV ≠ ENV!** Это **разные** переменные:
-> - `APP_ENV` — для guards (dev/prod)
-> - `ENV` — для DEBUG validation (local/production)
+> - `APP_ENV` — для guards (dev/prod), **обязателен**
+> - `ENV` — для DEBUG validation (local/production), имеет дефолт
 
 #### ENV
 
@@ -324,6 +340,10 @@ ENV_VALUE="${ENV:-production}"  # По умолчанию production!
 |-----------|----------|---------|
 | DEV       | `eatfit24_dev` | ✅ Разрешено если APP_ENV=dev |
 | PROD      | `eatfit24` | ✅ Разрешено если APP_ENV=prod |
+
+> [!NOTE]
+> **Legacy:** `eatfit24_prod` — устаревшее имя, не использовать.
+> Guards блокируют его для DEV, но для PROD рекомендуется `eatfit24`.
 
 **Связанные переменные:**
 ```env
@@ -392,17 +412,23 @@ YOOKASSA_SECRET_KEY=live_***    # PROD: начинается с live_
 
 ```env
 # Окружение
-APP_ENV=dev|prod                           # Environment guards (CRITICAL)
-ENV=local|production                       # ENV/DEBUG validation (отдельная переменная!)
+APP_ENV=dev|prod                           # Environment guards (CRITICAL, обязателен!)
+ENV=local|production                       # ENV/DEBUG validation (default: production)
 DEBUG=true|false                           # Django DEBUG mode
 COMPOSE_PROJECT_NAME=eatfit24_dev          # Префикс Docker volumes
 
 # Django
-DJANGO_SETTINGS_MODULE=config.settings.local|production
+DJANGO_SETTINGS_MODULE=config.settings.local|production  # SSOT для выбора settings
 SECRET_KEY=***                             # Django secret (CRITICAL)
 ALLOWED_HOSTS=localhost,eatfit24.ru        # Разрешенные хосты
 DOMAIN_NAME=localhost|eatfit24.ru
 ```
+
+> [!IMPORTANT]
+> **SSOT для Django Settings:**
+> - `DJANGO_SETTINGS_MODULE` — **SSOT** для выбора settings модуля (local/production/test)
+> - `APP_ENV` — только для environment guards, не выбирает settings
+> - `ENV` — только для валидации пары ENV/DEBUG в entrypoint
 
 #### Database
 
@@ -566,11 +592,11 @@ SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
 
 **Проблема:** Вы изменили `.env`, но контейнер использует старые переменные
 
-**Причина:** Docker кеширует переменные окружения
+**Причина:** Переменные окружения фиксируются при создании контейнера
 
 **Решение:**
 ```bash
-# Полный рестарт с пересозданием контейнеров
+# Пересоздайте контейнеры (не просто restart!)
 docker compose down
 docker compose up -d --force-recreate
 
