@@ -121,7 +121,9 @@ class BackendAPIClient:
                     json=json,
                     headers=headers,
                 )
-                response.raise_for_status()
+                # Check only 4xx and 5xx errors, ignore 3xx redirects (handled by follow_redirects=True)
+                if response.status_code >= 400:
+                    response.raise_for_status()
                 return response.json()
 
         try:
