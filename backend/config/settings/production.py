@@ -113,10 +113,14 @@ CORS_ALLOWED_ORIGINS = [o.strip() for o in raw_origins.split(",") if o.strip()]
 # -----------------------------------------------------------------------------
 
 TELEGRAM_BOT_TOKEN = base.TELEGRAM_BOT_TOKEN
+TELEGRAM_BOT_API_SECRET = base.TELEGRAM_BOT_API_SECRET
 TELEGRAM_ADMINS = base.TELEGRAM_ADMINS
 
 if not TELEGRAM_BOT_TOKEN:
     raise RuntimeError("[SAFETY] TELEGRAM_BOT_TOKEN must be set in production.")
+
+if not TELEGRAM_BOT_API_SECRET:
+    raise RuntimeError("[SAFETY] TELEGRAM_BOT_API_SECRET must be set in production.")
 
 # ЖЕЛЕЗНО запрещаем debug bypass в production
 WEBAPP_DEBUG_MODE_ENABLED = False
