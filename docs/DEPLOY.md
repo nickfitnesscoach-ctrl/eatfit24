@@ -38,11 +38,12 @@
 
 ### Deployment Steps
 1. **Pull latest code**: `git pull origin main`
-2. **Update Environment**: Ensure `.env.prod` is up to date.
+2. **Update Environment**: Ensure `.env` is up to date with production values.
 3. **Deploy**:
    ```bash
-   docker compose -f compose.yml -f compose.prod.yml --env-file .env.prod up -d --build
+   docker compose up -d --build
    ```
+   **Note:** Production uses `compose.yml` + `.env` (single-file strategy). Legacy `compose.prod.yml` is **deprecated** and should not be used.
 4. **Automatic Migrations**: Handled by the `backend` container's entrypoint in production.
 
 ---
@@ -66,5 +67,9 @@ We use a multi-stage pipeline:
 Automated nightly dumps are stored in `/var/lib/eatfit24/backups/` and rotated weekly.
 
 ### Common Issues
-- **Redis Connection**: If workers fail to pick up tasks, check if `CELERY_BROKER_URL` in `.env.prod` points to `redis://redis:6379/0`.
+- **Redis Connection**: If workers fail to pick up tasks, check if `CELERY_BROKER_URL` in `.env` points to correct Redis DB (prod: `redis://redis:6379/1`).
 - **Media Permissions**: Ensure `/var/lib/eatfit24/media` is owned by the user running Docker.
+
+### Legacy Files
+- **`compose.prod.yml`**: Deprecated as of 2026-01-12. Do not use. Production uses `compose.yml` + `.env`.
+- **`.env.prod`**: Deprecated. Use single `.env` file with production values.

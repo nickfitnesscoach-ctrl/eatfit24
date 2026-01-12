@@ -47,7 +47,7 @@ npm run test                            # Vitest
 
 ### Docker (All Services)
 ```bash
-docker compose up -d                    # Start all services
+docker compose up -d                    # Start all services (uses compose.yml + .env)
 docker compose up -d --build            # Rebuild and start
 docker compose ps                       # Check status
 docker compose logs -f backend          # View logs
