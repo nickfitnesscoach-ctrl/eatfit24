@@ -66,7 +66,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # env_file: moved to compose.dev.yml / compose.prod.yml
+    env_file: .env
     environment:
       - POSTGRES_HOST=db
       # CELERY_BROKER_URL and CELERY_RESULT_BACKEND come from .env
@@ -105,7 +105,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    # env_file: moved to compose.dev.yml / compose.prod.yml
+    env_file: .env
     environment:
       - POSTGRES_HOST=db
       # CELERY_BROKER_URL and CELERY_RESULT_BACKEND come from .env
@@ -133,7 +133,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    # env_file: moved to compose.dev.yml / compose.prod.yml
+    env_file: .env
     environment:
       - POSTGRES_HOST=db
       # CELERY_BROKER_URL and CELERY_RESULT_BACKEND come from .env
