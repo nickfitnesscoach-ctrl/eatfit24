@@ -48,6 +48,7 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DEBUG=True
       - WEBAPP_DEBUG_MODE_ENABLED=True
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - ./backend:/app
       - ./backend/logs:/app/logs

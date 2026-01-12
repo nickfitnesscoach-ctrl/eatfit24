@@ -19,6 +19,7 @@ Welcome to the Single Source of Truth (SSOT) repository for the EatFit24 project
 | [AI_PROXY.md](AI_PROXY.md) | AI recognition, image normalization, and LLM contracts. |
 | [BOOT_AND_RUNTIME.md](../backend/docs/BOOT_AND_RUNTIME.md) | Server startup, process management, and health checks. |
 | [ROOT_FILES_MAP.md](../backend/docs/ROOT_FILES_MAP.md) | Deep-dive file inventory and purpose of root directories. |
+| [TELEGRAM_DEV_RU.md](TELEGRAM_DEV_RU.md) | 🇷🇺 Guide: Telegram Mini App local dev, tunneling & debugging. |
 
 ---
 

@@ -25,8 +25,12 @@ import { IS_DEV } from '../../config/env';
  * - Production build (ALWAYS)
  */
 export const IS_DEBUG = IS_DEV || (
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    new URLSearchParams(window.location.search).get('debug') === '1' ||
+    new URLSearchParams(window.location.search).get('debug') === 'true'
+  )
 );
 
 if (typeof window !== 'undefined') {
