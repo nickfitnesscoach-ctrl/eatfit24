@@ -275,21 +275,46 @@ docker compose up backend
 
 #### APP_ENV
 
-**Что делает:** Определяет окружение выполнения
+**Что делает:** Определяет логическое окружение для environment guards
 
 | Значение | Использование | Guards |
-|----------|---------------|---------|
+|----------|---------------|--------|
 | `dev`    | Локальная разработка | Блокирует подключение к `eatfit24` или `eatfit24_prod` |
 | `prod`   | Production сервер | Блокирует подключение к `eatfit24_dev` или `test` |
 
+**Default (из кода `entrypoint.sh:29`):**
+```bash
+APP_ENV="${APP_ENV:-prod}"  # По умолчанию prod!
+```
+
 **Влияет на:**
-- Environment guards в entrypoint.sh
-- Логирование при старте
-- Мониторинг (отображается в `/health/`)
+- Environment guards в entrypoint.sh (строки 46-77)
+- Django settings guard (`production.py:17-19`, `local.py:56-58`)
+- Health check (отображается в `/health/`)
+
+> [!WARNING]
+> **APP_ENV ≠ ENV!** Это **разные** переменные:
+> - `APP_ENV` — для guards (dev/prod)
+> - `ENV` — для DEBUG validation (local/production)
+
+#### ENV
+
+**Что делает:** Определяет режим отладки (ENV/DEBUG validation)
+
+| Значение | DEBUG | Результат |
+|----------|-------|----------|
+| `local` | `true` | ✅ Разрешено |
+| `local` | `false` | ❌ Ошибка: "ENV=local but DEBUG=false" |
+| `production` | `false` | ✅ Разрешено |
+| `production` | `true` | ❌ Ошибка: "ENV=production but DEBUG=true" |
+
+**Default (из кода `entrypoint.sh:87`):**
+```bash
+ENV_VALUE="${ENV:-production}"  # По умолчанию production!
+```
 
 **Где используется:**
-- `backend/entrypoint.sh` - guards
-- `backend/apps/common/views.py` - health check
+- `backend/entrypoint.sh` - ENV/DEBUG conflict guard (строки 82-107)
 
 #### POSTGRES_DB
 
@@ -312,6 +337,15 @@ POSTGRES_PORT=5432              # Одинаково
 
 **Что делает:** Django secret key для криптографии
 
+**Как работает (из кода `base.py:36`):**
+```python
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("DJANGO_SECRET_KEY") or ""
+```
+
+**Приоритет:**
+1. `SECRET_KEY` — основной (рекомендуется)
+2. `DJANGO_SECRET_KEY` — fallback для совместимости
+
 **Требования:**
 - Минимум 50 символов
 - Случайная строка
@@ -323,8 +357,11 @@ import secrets
 print(secrets.token_hex(32))
 ```
 
-**DEV:**
+**DEV (.env.local):**
 ```env
+# Оба варианта работают, используйте один:
+SECRET_KEY=local-dev-secret-key
+# или
 DJANGO_SECRET_KEY=local-dev-secret-key
 ```
 
@@ -355,8 +392,8 @@ YOOKASSA_SECRET_KEY=live_***    # PROD: начинается с live_
 
 ```env
 # Окружение
-APP_ENV=dev|prod                           # Тип окружения (CRITICAL)
-ENV=local|production                       # Синоним APP_ENV
+APP_ENV=dev|prod                           # Environment guards (CRITICAL)
+ENV=local|production                       # ENV/DEBUG validation (отдельная переменная!)
 DEBUG=true|false                           # Django DEBUG mode
 COMPOSE_PROJECT_NAME=eatfit24_dev          # Префикс Docker volumes
 
