@@ -54,8 +54,8 @@ const SubscriptionPage: React.FC = () => {
     }
 
     return (
-        <div className="bg-gray-50">
-            <PageContainer withSafeTop={true} className="pt-3 pb-4">
+        <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <PageContainer withSafeTop={true} className="py-6 space-y-[var(--section-gap)]">
                 <div className="flex flex-col gap-5">
                     <SubscriptionHeader
                         topStatusText={subscriptionStatus.topStatusText}
@@ -63,57 +63,59 @@ const SubscriptionPage: React.FC = () => {
                         headerSubtitle={subscriptionStatus.headerSubtitle}
                     />
 
-                    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {loadingPlans ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                <Loader2 className="animate-spin text-slate-400" size={28} />
-                                <p className="text-sm text-slate-400 font-medium">Загружаем тарифы...</p>
-                            </div>
-                        ) : error ? (
-                            <div className="text-center p-6 bg-red-50 rounded-2xl border border-red-100">
-                                <p className="text-sm text-red-600 font-medium">{error}</p>
-                            </div>
-                        ) : (
-                            plans.map((plan) => {
-                                const cardState = buildPlanCardState({
-                                    plan,
-                                    subscription: billing.subscription,
-                                    billing: {
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {loadingPlans ? (
+                                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                    <Loader2 className="animate-spin text-slate-400" size={28} />
+                                    <p className="text-sm text-slate-400 font-medium">Загружаем тарифы...</p>
+                                </div>
+                            ) : error ? (
+                                <div className="text-center p-6 bg-red-50 rounded-2xl border border-red-100">
+                                    <p className="text-sm text-red-600 font-medium">{error}</p>
+                                </div>
+                            ) : (
+                                plans.map((plan) => {
+                                    const cardState = buildPlanCardState({
+                                        plan,
                                         subscription: billing.subscription,
-                                        billingMe: billing.billingMe,
-                                    },
-                                    isPro: subscriptionStatus.isPro,
-                                    isExpired: subscriptionStatus.isExpired,
-                                    expiresAt: billing.subscription?.expires_at ?? null,
-                                    loadingPlanCode,
-                                    togglingAutoRenew,
-                                    handleSelectPlan,
-                                    handleToggleAutoRenew,
-                                    handleAddCard,
-                                    navigate,
-                                });
+                                        billing: {
+                                            subscription: billing.subscription,
+                                            billingMe: billing.billingMe,
+                                        },
+                                        isPro: subscriptionStatus.isPro,
+                                        isExpired: subscriptionStatus.isExpired,
+                                        expiresAt: billing.subscription?.expires_at ?? null,
+                                        loadingPlanCode,
+                                        togglingAutoRenew,
+                                        handleSelectPlan,
+                                        handleToggleAutoRenew,
+                                        handleAddCard,
+                                        navigate,
+                                    });
 
-                                return (
-                                    <PlanCard
-                                        key={plan.code}
-                                        plan={plan}
-                                        isCurrent={cardState.isCurrent}
-                                        isLoading={loadingPlanCode === plan.code}
-                                        onSelect={handleSelectPlan}
-                                        customButtonText={cardState.customButtonText}
-                                        disabled={cardState.disabled}
-                                        bottomContent={cardState.bottomContent}
-                                    />
-                                );
-                            })
-                        )}
-                    </div>
+                                    return (
+                                        <PlanCard
+                                            key={plan.code}
+                                            plan={plan}
+                                            isCurrent={cardState.isCurrent}
+                                            isLoading={loadingPlanCode === plan.code}
+                                            onSelect={handleSelectPlan}
+                                            customButtonText={cardState.customButtonText}
+                                            disabled={cardState.disabled}
+                                            bottomContent={cardState.bottomContent}
+                                        />
+                                    );
+                                })
+                            )}
+                        </div>
 
-                    <div className="pt-4">
-                        <p className="text-center text-[10px] text-slate-400 leading-relaxed uppercase tracking-wider opacity-60">
-                            Нажимая кнопку, вы соглашаетесь с условиями использования и политикой конфиденциальности.
-                            Подписка продлевается автоматически, отмена в любое время.
-                        </p>
+                        <div className="max-w-md mx-auto text-center text-[10px] text-slate-400 leading-tight uppercase tracking-wider opacity-60">
+                            <span className="block">
+                                Нажимая кнопку, вы соглашаетесь с условиями использования и политикой конфиденциальности.
+                            </span>
+                            <span className="block mt-0.5">Подписка продлевается автоматически, отмена в любое время.</span>
+                        </div>
                     </div>
                 </div>
             </PageContainer>

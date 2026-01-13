@@ -9,19 +9,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Bot**: Telegram bot using aiogram 3.x
 - **Frontend**: React Telegram MiniApp (Vite + TypeScript)
 
+**Tech stack**: Django 5, PostgreSQL, Redis, Celery, React, Vite, TypeScript, Docker, aiogram 3.x
+
+**Package managers**: Backend and Bot use `uv` for Python dependencies. Frontend uses `npm`.
+
+## Quick Reference
+
+### Development Startup
+```bash
+# 1. Copy dev environment
+cp .env.local .env  # OR ensure .env has APP_ENV=dev
+
+# 2. Start all services
+docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
+
+# 3. Check logs
+docker compose -f compose.yml -f compose.dev.yml logs -f backend
+
+# 4. For Telegram Mini App: Start Cloudflare tunnel (see "Local Development with Telegram Mini App" below)
+```
+
+### Production Deployment
+```bash
+# 1. CRITICAL: Run pre-deploy checks
+./scripts/pre-deploy-check.sh
+
+# 2. Deploy
+git pull
+docker compose up -d --build
+
+# 3. Verify health
+curl -H "Host: eatfit24.ru" http://localhost:8000/health/
+```
+
 ## Quick Commands
 
 ### Backend (Django)
 ```bash
 cd backend
+
+# Dependency management (uv)
+uv sync                                 # Install/sync dependencies from uv.lock
+uv add package-name                     # Add new dependency
+uv lock                                 # Update lock file after pyproject.toml changes
+
+# Development
 python manage.py runserver              # Dev server
 python manage.py test                   # Run all tests
 pytest -v                               # Alternative: pytest
 pytest apps/billing/tests/test_webhooks.py -v   # Single file
 pytest -k "test_payment" -v                     # By pattern
+
+# Migrations
 python manage.py makemigrations         # Create migrations
 python manage.py migrate                # Apply migrations
 python manage.py migrate --plan         # Check pending migrations
+
+# Code quality
 ruff check .                            # Lint
 black .                                 # Format
 ```
@@ -29,8 +73,16 @@ black .                                 # Format
 ### Bot (Telegram)
 ```bash
 cd bot
+
+# Dependency management (uv)
+uv sync                                 # Install/sync dependencies
+uv add package-name                     # Add new dependency
+
+# Development
 python main.py                          # Run bot
 pytest tests/ -v                        # Run tests
+
+# Migrations (Alembic)
 alembic upgrade head                    # Apply migrations
 alembic revision --autogenerate -m "description"  # Create migration
 ```
@@ -45,16 +97,69 @@ npm run type-check                      # TypeScript check
 npm run test                            # Vitest
 ```
 
-### Docker (All Services)
+### Local Development with Telegram Mini App
+
+**Important**: Telegram Mini Apps require a public HTTPS URL. Use Cloudflare Tunnel for local development.
+
+**Quick setup**:
 ```bash
-docker compose up -d                    # Start all services (uses compose.yml + .env)
-docker compose up -d --build            # Rebuild and start
+# 1. Start Cloudflare tunnel (in separate terminal)
+cloudflared tunnel --url http://localhost:3000 --protocol http2
+
+# 2. Copy the generated URL (e.g., https://tba-codes.trycloudflare.com)
+
+# 3. Update .env.local with the tunnel URL
+WEB_APP_URL=https://your-tunnel-url.trycloudflare.com/app
+TRAINER_PANEL_URL=https://your-tunnel-url.trycloudflare.com/panel
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,backend,db,redis,.trycloudflare.com
+
+# 4. Start services
+docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
+
+# 5. Open with debug mode (bypasses Telegram auth signature check)
+# URL: https://your-tunnel-url.trycloudflare.com/app?debug=1
+```
+
+**How debug mode works**:
+- Frontend: `?debug=1` parameter sets fake user data (ID 100) and sends `X-Debug-Mode: true` header
+- Backend: When `DEBUG=True` + `X-Debug-Mode: true` header, skips Telegram signature validation
+
+**Troubleshooting**:
+- **502 Bad Gateway**: Backend still starting, wait 1-2 minutes
+- **DisallowedHost error**: Add `.trycloudflare.com` to `ALLOWED_HOSTS` in `.env.local`
+- **AI errors (AI_SERVER_ERROR)**: Use direct IP instead of domain in `AI_PROXY_URL` (e.g., `http://185.171.80.128:8001`)
+- **Images not loading (404)**: Check `frontend/nginx.conf` has `location ^~ /media/` block with priority
+
+### Docker (All Services)
+
+**File structure**:
+- `compose.yml` — Base production configuration (always used)
+- `compose.dev.yml` — Development overrides (volume mounts, DEBUG=True, runserver)
+- `compose.prod.yml` — Production overrides (if needed)
+- `.env` — Active environment file (copy from `.env.local` for dev or set prod values)
+- `.env.local` — Development template (tracked in git)
+- `.env.example` — Documentation template
+
+**Development**:
+```bash
+# Use compose.yml + compose.dev.yml with .env.local
+docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
+docker compose -f compose.yml -f compose.dev.yml ps
+docker compose -f compose.yml -f compose.dev.yml logs -f backend
+```
+
+**Production** (on server):
+```bash
+# Uses compose.yml + .env (production values)
+docker compose up -d --build            # Start all services
 docker compose ps                       # Check status
 docker compose logs -f backend          # View logs
 docker compose restart backend          # Restart service
 docker compose down                     # Stop all
 docker compose down -v                  # Stop all and remove volumes
 ```
+
+**Key difference**: Dev uses `runserver` with live reload, Prod uses `gunicorn`.
 
 ## Architecture
 
@@ -151,9 +256,29 @@ Uses Vitest + Testing Library.
 
 ## Environment Variables
 
-All services read from root `.env` file. See `.env.example` for required variables.
+**SSOT Pattern**: All services read from a single `.env` file. The `APP_ENV` variable controls environment guards and behavior.
+
+See `.env.example` for full reference and `docs/ENV_SSOT.md` for detailed documentation.
+
+**Environment determination**:
+- `APP_ENV=dev` → Development mode (uses `eatfit24_dev` DB, YooKassa test mode, relaxed guards)
+- `APP_ENV=prod` → Production mode (uses `eatfit24` DB, YooKassa prod mode, strict guards)
+
+**Quick verification**:
+```bash
+# Development
+docker compose logs backend | grep "\[STARTUP\]"
+# Expected: APP_ENV=dev, POSTGRES_DB=eatfit24_dev, YOOKASSA_MODE=test
+
+# Production
+docker exec eatfit24-backend env | grep -E "APP_ENV|POSTGRES_DB|DEBUG"
+# Expected: APP_ENV=prod, POSTGRES_DB=eatfit24, DEBUG=false
+```
 
 Key variables:
+- `APP_ENV` — `dev` or `prod` (controls environment guards and behavior)
+- `COMPOSE_PROJECT_NAME` — `eatfit24_dev` (dev) or `eatfit24` (prod) for container isolation
+- `POSTGRES_DB` — `eatfit24_dev` (dev) or `eatfit24` (prod)
 - `POSTGRES_PASSWORD` — Required, shared by backend and bot
 - `SECRET_KEY` — Django secret (generate with: `openssl rand -hex 32`)
 - `TELEGRAM_BOT_TOKEN` — Bot token (from @BotFather)
