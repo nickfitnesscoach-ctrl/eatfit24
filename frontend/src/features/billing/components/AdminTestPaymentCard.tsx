@@ -1,4 +1,9 @@
-import React from 'react';
+// frontend/src/features/billing/components/AdminTestPaymentCard.tsx
+//
+// Админский компонент для тестирования live-платежей.
+// Показывает кнопку создания тестового платежа на 1₽.
+// Доступен только администраторам (логика доступа снаружи).
+
 import { TestTube } from 'lucide-react';
 import { MODE } from '../../../config/env';
 
@@ -7,16 +12,13 @@ interface AdminTestPaymentCardProps {
     onCreateTestPayment: () => Promise<void> | void;
 }
 
-/**
- * Admin-only component for testing live payments
- * Displays a button to create a 1₽ test payment in production mode
- */
-const AdminTestPaymentCard: React.FC<AdminTestPaymentCardProps> = ({
+export default function AdminTestPaymentCard({
     creatingTestPayment,
     onCreateTestPayment,
-}) => {
+}: AdminTestPaymentCardProps) {
     return (
         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl">
+            {/* Заголовок и описание */}
             <div className="flex items-start gap-3 mb-3">
                 <TestTube size={20} className="text-yellow-600 mt-0.5" />
                 <div className="flex-1">
@@ -28,7 +30,10 @@ const AdminTestPaymentCard: React.FC<AdminTestPaymentCardProps> = ({
                     </p>
                 </div>
             </div>
+
+            {/* Кнопка запуска тестового платежа */}
             <button
+                type="button"
                 onClick={onCreateTestPayment}
                 disabled={creatingTestPayment}
                 className="w-full py-2.5 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -45,11 +50,11 @@ const AdminTestPaymentCard: React.FC<AdminTestPaymentCardProps> = ({
                     </>
                 )}
             </button>
+
+            {/* Подвал с режимом окружения */}
             <p className="text-xs text-yellow-600 mt-2 text-center">
                 Доступно только админам • Режим: {MODE}
             </p>
         </div>
     );
-};
-
-export default AdminTestPaymentCard;
+}

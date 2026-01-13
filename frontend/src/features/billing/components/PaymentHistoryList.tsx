@@ -1,4 +1,14 @@
-import React from 'react';
+// frontend/src/features/billing/components/PaymentHistoryList.tsx
+//
+// Список истории платежей пользователя.
+// Отображает:
+// - пустое состояние, если платежей нет
+// - карточки платежей со статусом, датой и суммой
+//
+// Важно:
+// - React импортировать не нужно (современный JSX transform)
+// - используем обычную функцию вместо React.FC
+
 import type { PaymentHistoryItem } from '../../../types/billing';
 import { PAYMENT_STATUS_BADGES, PAYMENT_STATUS_LABELS } from '../../../constants/billing';
 import { formatBillingDate } from '../utils/date';
@@ -7,11 +17,14 @@ interface PaymentHistoryListProps {
     payments: PaymentHistoryItem[];
 }
 
-const PaymentHistoryList: React.FC<PaymentHistoryListProps> = ({ payments }) => {
+export default function PaymentHistoryList({ payments }: PaymentHistoryListProps) {
+    // Получаем css-класс бейджа по статусу платежа
+    // Если статус неизвестен — используем pending
     const getStatusBadge = (status: string) => {
         return PAYMENT_STATUS_BADGES[status] || PAYMENT_STATUS_BADGES.pending;
     };
 
+    // Пустое состояние
     if (payments.length === 0) {
         return (
             <div className="text-center text-gray-500 py-8">
@@ -21,20 +34,25 @@ const PaymentHistoryList: React.FC<PaymentHistoryListProps> = ({ payments }) => 
     }
 
     return (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
             {payments.map((payment) => (
                 <div
                     key={payment.id}
                     className="bg-white rounded-xl p-4 shadow-sm"
                 >
-                    <div className="flex justify-between items-start mb-2">
-                        <div>
-                            <div className="font-medium">{payment.description}</div>
+                    <div className="flex justify-between items-start gap-4">
+                        {/* Левая часть: описание + дата */}
+                        <div className="flex flex-col gap-0.5">
+                            <div className="font-medium">
+                                {payment.description}
+                            </div>
                             <div className="text-sm text-gray-500">
                                 {formatBillingDate(payment.paid_at)}
                             </div>
                         </div>
-                        <div className="text-right">
+
+                        {/* Правая часть: сумма + статус */}
+                        <div className="flex flex-col items-end gap-1">
                             <div className="font-bold">
                                 {payment.amount} {payment.currency}
                             </div>
@@ -49,6 +67,4 @@ const PaymentHistoryList: React.FC<PaymentHistoryListProps> = ({ payments }) => 
             ))}
         </div>
     );
-};
-
-export default PaymentHistoryList;
+}

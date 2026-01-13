@@ -1,23 +1,49 @@
 /**
- * DEV-only mock data for subscription plans.
- * 
- * RULES:
- * 1. Only imported in useSubscriptionPlans.ts
- * 2. Matches API response 1:1 (SubscriptionPlan interface)
- * 3. Stress-tests UI: long texts, edge cases, 0₽
- * 
- * @see src/types/billing.ts for SubscriptionPlan interface
+ * DEV-only мок данных для тарифов подписки.
+ *
+ * Назначение:
+ * - используется ТОЛЬКО в DEV-режиме
+ * - подменяет реальный API для разработки и тестирования UI
+ *
+ * ПРАВИЛА ИСПОЛЬЗОВАНИЯ:
+ * 1. Импортируется ТОЛЬКО в useSubscriptionPlans.ts
+ * 2. Структура данных совпадает с API 1:1 (SubscriptionPlan)
+ * 3. Содержит edge-cases для стресс-теста интерфейса:
+ *    - цена 0₽
+ *    - null / -1 значения
+ *    - длинные тексты
+ *    - old_price только у годового тарифа
+ *
+ * ⚠️ ВАЖНО:
+ * Этот файл НЕ ДОЛЖЕН попасть в production-сборку.
+ * Если это произойдёт — значит нарушена архитектура.
+ *
+ * @see src/types/billing.ts — источник истины для SubscriptionPlan
  */
+
 import type { SubscriptionPlan } from '../../../types/billing';
 
+// Защита от случайного использования в production
+if (import.meta.env.PROD) {
+    throw new Error('mockSubscriptionPlans cannot be used in production build');
+}
+
+/**
+ * Порядок тарифов ВАЖЕН для UI:
+ * FREE → PRO_MONTHLY → PRO_YEARLY
+ */
 export const mockSubscriptionPlans: SubscriptionPlan[] = [
+    /**
+     * FREE — базовый тариф
+     * Используется для онбординга и знакомства с продуктом
+     */
     {
         code: 'FREE',
         display_name: 'Базовый',
         price: 0,
-        duration_days: 0,
-        daily_photo_limit: 3,
-        history_days: 7,
+        duration_days: 0,               // бессрочный
+        daily_photo_limit: 3,           // лимит фото в день
+        history_days: 7,                // история за 7 дней
         ai_recognition: true,
         advanced_stats: false,
         priority_support: false,
@@ -27,13 +53,18 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
             'История питания (7 дней)',
         ],
     },
+
+    /**
+     * PRO_MONTHLY — платный тариф на месяц
+     * Основной entry-point для монетизации
+     */
     {
         code: 'PRO_MONTHLY',
         display_name: 'PRO Месяц',
         price: 299,
         duration_days: 30,
-        daily_photo_limit: null,
-        history_days: -1,
+        daily_photo_limit: null,        // безлимит
+        history_days: -1,               // без ограничений
         ai_recognition: true,
         advanced_stats: true,
         priority_support: true,
@@ -44,18 +75,23 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
             'Адаптивный план под твою цель',
         ],
     },
+
+    /**
+     * PRO_YEARLY — годовой тариф (основной продающий)
+     * Всегда должен выглядеть самым выгодным
+     */
     {
         code: 'PRO_YEARLY',
         display_name: 'PRO Год',
         price: 2990,
+        old_price: 4990,                // для отображения выгоды
         duration_days: 365,
         daily_photo_limit: null,
         history_days: -1,
         ai_recognition: true,
         advanced_stats: true,
         priority_support: true,
-        is_popular: true,
-        old_price: 4990,
+        is_popular: true,               // UI-бейдж "популярный"
         features: [
             'Все функции PRO-доступа',
             'Бонус: Стратегия с тренером',

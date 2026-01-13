@@ -1,5 +1,4 @@
 // billing/components/SubscriptionHeader.tsx
-import React from 'react';
 
 interface SubscriptionHeaderProps {
     topStatusText: string;
@@ -7,11 +6,11 @@ interface SubscriptionHeaderProps {
     headerSubtitle: string;
 }
 
-export const SubscriptionHeader: React.FC<SubscriptionHeaderProps> = ({
+export function SubscriptionHeader({
     topStatusText,
     headerTitle,
     headerSubtitle,
-}) => {
+}: SubscriptionHeaderProps) {
     return (
         <div className="flex flex-col items-center text-center gap-2">
             <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-100 text-slate-600 border border-slate-200">
@@ -27,4 +26,4 @@ export const SubscriptionHeader: React.FC<SubscriptionHeaderProps> = ({
             </p>
         </div>
     );
-};
+}
