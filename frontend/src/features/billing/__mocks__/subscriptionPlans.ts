@@ -23,9 +23,11 @@
 
 import type { SubscriptionPlan } from '../../../types/billing';
 
-// Защита от случайного использования в production
+// Защита от случайного импорта в PROD: не ломаем приложение, но сигналим в консоль.
+// В идеале мок не должен попадать в prod-bundle вообще (это обеспечим dynamic import ниже).
 if (import.meta.env.PROD) {
-    throw new Error('mockSubscriptionPlans cannot be used in production build');
+    // eslint-disable-next-line no-console
+    console.warn('mockSubscriptionPlans was imported in PROD (should not happen)');
 }
 
 /**
