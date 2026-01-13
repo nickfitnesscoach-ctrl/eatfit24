@@ -3,45 +3,84 @@ import React from 'react';
 import { Zap, Calculator, Calendar, Gift, FileCheck, Target } from 'lucide-react';
 
 /**
- * Remove emoji / replacement chars / zero-width chars.
- * Keeps Cyrillic and useful symbols intact.
+ * Очищает текст фичи от визуального мусора:
+ * - ведущих эмодзи (🔥 ⚡ 🎁 и т.п.)
+ * - replacement characters
+ * - zero-width символов и variation selectors
+ *
+ * ВАЖНО:
+ * - эмодзи убираем только в начале строки,
+ *   чтобы не ломать осмысленный текст дальше.
  */
 export function cleanFeatureText(input: string): string {
     if (!input) return '';
 
     return input
-        .replace(/^\p{Extended_Pictographic}+\s*/u, '') // leading emoji
-        .replace(/\uFFFD/g, '') // replacement char
-        .replace(/[\u200B-\u200D\uFE0E\uFE0F]/g, '') // zero-width + variation selectors
+        // ведущие эмодзи (если среда поддерживает Unicode property escapes)
+        .replace(/^\p{Extended_Pictographic}+\s*/u, '')
+        // replacement character (битые символы)
+        .replace(/\uFFFD/g, '')
+        // zero-width + variation selectors
+        .replace(/[\u200B-\u200D\uFE0E\uFE0F]/g, '')
         .trim();
 }
 
 /**
- * Returns a consistent icon by feature semantics (not by emojis).
+ * Правила соответствия "смысл → иконка".
+ * Порядок важен: более специфичные правила должны идти выше.
+ */
+const FEATURE_ICON_RULES: Array<{
+    keywords: string[];
+    icon: React.ReactNode;
+}> = [
+    {
+        // Подарки, бонусы
+        keywords: ['подар', 'бонус', 'в подарок'],
+        icon: <Gift className="w-5 h-5" />,
+    },
+    {
+        // Аудит, проверки, разборы
+        keywords: ['аудит', 'провер', 'разбор'],
+        icon: <FileCheck className="w-5 h-5" />,
+    },
+    {
+        // Цели, планы, стратегии
+        keywords: ['цель', 'план', 'стратег'],
+        icon: <Target className="w-5 h-5" />,
+    },
+    {
+        // История, периоды, дни/недели
+        keywords: ['истори', 'дней', 'дня', 'недел'],
+        icon: <Calendar className="w-5 h-5" />,
+    },
+    {
+        // КБЖУ, калории, расчёты
+        keywords: ['кбжу', 'калор', 'расчёт', 'расчет', 'подсчет'],
+        icon: <Calculator className="w-5 h-5" />,
+    },
+    {
+        // AI, лимиты, распознавание
+        keywords: ['ai', 'нейро', 'распозна', 'лимит', 'безлимит'],
+        icon: <Zap className="w-5 h-5" />,
+    },
+];
+
+/**
+ * Возвращает иконку по СМЫСЛУ текста фичи.
+ *
+ * ВАЖНО:
+ * - мы не полагаемся на эмодзи
+ * - мы не парсим формат
+ * - только семантика
  */
 export function getPlanFeatureIcon(cleanText: string): React.ReactNode | null {
     const t = (cleanText || '').toLowerCase();
+    if (!t) return null;
 
-    // Bonus / Gift
-    if (t.includes('подар') || t.includes('бонус') || t.includes('в подарок')) return <Gift className="w-5 h-5" />;
-
-    // Audit
-    if (t.includes('аудит') || t.includes('провер') || t.includes('разбор')) return <FileCheck className="w-5 h-5" />;
-
-    // Goal / Target
-    if (t.includes('цель') || t.includes('план') || t.includes('стратег')) return <Target className="w-5 h-5" />;
-
-    // History / Calendar
-    if (t.includes('истори') || t.includes('дней') || t.includes('дня') || t.includes('недел')) return <Calendar className="w-5 h-5" />;
-
-    // Calories / KBJU
-    if (t.includes('кбжу') || t.includes('калор') || t.includes('расчёт') || t.includes('расчет') || t.includes('подсчет')) {
-        return <Calculator className="w-5 h-5" />;
-    }
-
-    // AI / limits
-    if (t.includes('ai') || t.includes('нейро') || t.includes('распозна') || t.includes('лимит') || t.includes('безлимит')) {
-        return <Zap className="w-5 h-5" />;
+    for (const rule of FEATURE_ICON_RULES) {
+        if (rule.keywords.some((k) => t.includes(k))) {
+            return rule.icon;
+        }
     }
 
     return null;

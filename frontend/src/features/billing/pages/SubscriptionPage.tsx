@@ -1,5 +1,5 @@
 // billing/pages/SubscriptionPage.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import PlanCard from '../components/PlanCard';
@@ -19,9 +19,14 @@ const SubscriptionPage: React.FC = () => {
     const { isBrowserDebug } = useAuth();
     const { isReady, isTelegramWebApp: webAppDetected, isBrowserDebug: webAppBrowserDebug } = useTelegramWebApp();
 
+    // Данные тарифов (что можно купить)
     const { plans, loading: loadingPlans, error } = useSubscriptionPlans();
-    const subscriptionStatus = useSubscriptionStatus(billing.subscription);
 
+    // Текущий статус подписки (как это показать в UI)
+    const subscription = billing.subscription;
+    const subscriptionStatus = useSubscriptionStatus(subscription);
+
+    // Действия (купить / автопродление / привязка карты)
     const {
         loadingPlanCode,
         togglingAutoRenew,
@@ -34,6 +39,10 @@ const SubscriptionPage: React.FC = () => {
         webAppBrowserDebug,
     });
 
+    /**
+     * Гейт №1: ждём инициализацию Telegram WebApp SDK.
+     * Пока не готово — не строим экран, чтобы не было “миганий” и ложных статусов.
+     */
     if (!isReady) {
         return (
             <div className="flex items-center justify-center py-16">
@@ -42,7 +51,12 @@ const SubscriptionPage: React.FC = () => {
         );
     }
 
-    if (!webAppDetected && !isBrowserDebug && !webAppBrowserDebug) {
+    /**
+     * Гейт №2: приложение предназначено для запуска внутри Telegram.
+     * Исключение: режимы debug (они разрешают открывать в браузере для разработки).
+     */
+    const isAllowedOutsideTelegram = isBrowserDebug || webAppBrowserDebug;
+    if (!webAppDetected && !isAllowedOutsideTelegram) {
         return (
             <div className="flex items-center justify-center p-4 py-16">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-6 text-center max-w-md">
@@ -53,9 +67,51 @@ const SubscriptionPage: React.FC = () => {
         );
     }
 
+    /**
+     * Подготовим “общий контекст” для карточек один раз,
+     * чтобы в map() не собирать один и тот же объект снова и снова.
+     * Это не про “оптимизацию”, а про читаемость и меньше мест для ошибки.
+     */
+    const cardContext = useMemo(() => {
+        return {
+            subscription,
+            billing: {
+                subscription: billing.subscription,
+                billingMe: billing.billingMe,
+            },
+            isPro: subscriptionStatus.isPro,
+            isExpired: subscriptionStatus.isExpired,
+            expiresAt: subscription?.expires_at ?? null,
+            loadingPlanCode,
+            togglingAutoRenew,
+            handleSelectPlan,
+            handleToggleAutoRenew,
+            handleAddCard,
+            navigate,
+        };
+    }, [
+        subscription,
+        billing.subscription,
+        billing.billingMe,
+        subscriptionStatus.isPro,
+        subscriptionStatus.isExpired,
+        loadingPlanCode,
+        togglingAutoRenew,
+        handleSelectPlan,
+        handleToggleAutoRenew,
+        handleAddCard,
+        navigate,
+    ]);
+
+    /**
+     * Основной UI:
+     * - шапка статуса подписки
+     * - список тарифов (загрузка / ошибка / список)
+     * - юридический дисклеймер
+     */
     return (
         <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
-            <PageContainer withSafeTop={true} className="py-6 space-y-[var(--section-gap)]">
+            <PageContainer withSafeTop className="py-6 space-y-[var(--section-gap)]">
                 <div className="flex flex-col gap-5">
                     <SubscriptionHeader
                         topStatusText={subscriptionStatus.topStatusText}
@@ -65,33 +121,28 @@ const SubscriptionPage: React.FC = () => {
 
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {loadingPlans ? (
+                            {/* 1) Загрузка тарифов */}
+                            {loadingPlans && (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                                     <Loader2 className="animate-spin text-slate-400" size={28} />
                                     <p className="text-sm text-slate-400 font-medium">Загружаем тарифы...</p>
                                 </div>
-                            ) : error ? (
+                            )}
+
+                            {/* 2) Ошибка загрузки тарифов */}
+                            {!loadingPlans && error && (
                                 <div className="text-center p-6 bg-red-50 rounded-2xl border border-red-100">
                                     <p className="text-sm text-red-600 font-medium">{error}</p>
                                 </div>
-                            ) : (
+                            )}
+
+                            {/* 3) Успех: рисуем карточки тарифов */}
+                            {!loadingPlans &&
+                                !error &&
                                 plans.map((plan) => {
                                     const cardState = buildPlanCardState({
                                         plan,
-                                        subscription: billing.subscription,
-                                        billing: {
-                                            subscription: billing.subscription,
-                                            billingMe: billing.billingMe,
-                                        },
-                                        isPro: subscriptionStatus.isPro,
-                                        isExpired: subscriptionStatus.isExpired,
-                                        expiresAt: billing.subscription?.expires_at ?? null,
-                                        loadingPlanCode,
-                                        togglingAutoRenew,
-                                        handleSelectPlan,
-                                        handleToggleAutoRenew,
-                                        handleAddCard,
-                                        navigate,
+                                        ...cardContext,
                                     });
 
                                     return (
@@ -106,8 +157,7 @@ const SubscriptionPage: React.FC = () => {
                                             bottomContent={cardState.bottomContent}
                                         />
                                     );
-                                })
-                            )}
+                                })}
                         </div>
 
                         <div className="max-w-md mx-auto text-center text-[10px] text-slate-400 leading-tight uppercase tracking-wider opacity-60">

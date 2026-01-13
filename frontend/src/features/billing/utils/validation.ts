@@ -5,33 +5,54 @@
 
 import type { BillingPlanCode } from '../../../types/billing';
 import { IS_DEV } from '../../../config/env';
+// Если ты не хочешь зависимости от notify — просто удали импорт и блок showToast ниже
+import { showToast } from '../utils/notify';
 
 const VALID_PLAN_CODES: readonly BillingPlanCode[] = ['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'];
 
 /**
- * Type guard to check if a value is a valid BillingPlanCode
+ * Type guard: проверяем, что значение — один из разрешённых кодов тарифа.
+ * Зачем: API/LS могут вернуть мусор, а UI не должен падать из-за этого.
  */
 export function assertBillingPlanCode(value: unknown): value is BillingPlanCode {
     return typeof value === 'string' && VALID_PLAN_CODES.includes(value as BillingPlanCode);
 }
 
 /**
- * Validate plan code from API response
- * In DEV mode: shows alert for debugging
- * In PROD mode: silently falls back to FREE with console warning
+ * Валидируем plan_code, пришедший с сервера.
+ *
+ * Поведение:
+ * - если код известен → возвращаем как есть
+ * - если код неизвестен → возвращаем 'FREE' (fail-safe)
+ *
+ * DEV:
+ * - логируем максимально заметно (console.error)
+ * - опционально показываем уведомление через Telegram/Web fallback (НЕ блокирующее alert)
+ *
+ * PROD:
+ * - предупреждаем в консоли и спокойно продолжаем работу
  */
 export function validatePlanCode(planCode: unknown): BillingPlanCode {
     if (assertBillingPlanCode(planCode)) {
         return planCode;
     }
 
-    const message = `Unknown plan_code received from API: ${planCode}`;
+    const message = `Unknown plan_code received from API: ${String(planCode)}`;
 
     if (IS_DEV) {
+        // eslint-disable-next-line no-console
         console.error(`[Billing] ${message}`);
-        // Show alert to developer for immediate visibility
-        alert(`DEV Warning: ${message}`);
+
+        // В dev важно быстро увидеть проблему, но alert() блокирует поток и бесит.
+        // showToast использует Telegram showAlert (если есть) или browser alert (как fallback),
+        // но в dev это приемлемо. Если хочешь полностью без попапов — убери строку ниже.
+        try {
+            showToast(`DEV: ${message}`);
+        } catch {
+            // ignore (например, если утилита используется в окружении без window)
+        }
     } else {
+        // eslint-disable-next-line no-console
         console.warn(`[Billing] ${message}, falling back to FREE`);
     }
 
@@ -39,7 +60,8 @@ export function validatePlanCode(planCode: unknown): BillingPlanCode {
 }
 
 /**
- * Check if plan code represents a PRO subscription
+ * Быстрый смысловой хелпер:
+ * относится ли код к PRO-подписке.
  */
 export function isPlanCodePro(planCode: BillingPlanCode): boolean {
     return planCode === 'PRO_MONTHLY' || planCode === 'PRO_YEARLY';

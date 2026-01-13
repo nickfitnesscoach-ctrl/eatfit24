@@ -35,11 +35,71 @@ function ProPanelShell({ children }: { children: React.ReactNode }) {
     return <div className="space-y-3">{children}</div>;
 }
 
+/** Единая “плашка” с датой окончания доступа */
+function ProUntilPanel({ expiresAt }: { expiresAt: string | null }) {
+    return (
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 text-center">
+            <p className="text-[12px] sm:text-[13px] font-bold text-slate-100 uppercase tracking-wide">
+                Доступ до {formatDate(expiresAt)}
+            </p>
+        </div>
+    );
+}
+
+/** Универсальная кнопка управления подпиской */
+function ManageSubscriptionLink({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wide"
+        >
+            Управлять подпиской
+        </button>
+    );
+}
+
+/** Маленький статус-текст (оплата не настроена / автопродление активно / выключено) */
+function ProStatusLine({
+    variant,
+    children,
+    pulse,
+}: {
+    variant: 'amber' | 'emerald' | 'rose';
+    children: React.ReactNode;
+    pulse?: boolean;
+}) {
+    const color =
+        variant === 'amber'
+            ? 'text-amber-400'
+            : variant === 'emerald'
+              ? 'text-emerald-400'
+              : 'text-rose-400';
+
+    const dot =
+        variant === 'amber'
+            ? 'bg-amber-400/80'
+            : variant === 'emerald'
+              ? 'bg-emerald-400'
+              : 'bg-rose-400/80';
+
+    return (
+        <div className={`flex items-center justify-center gap-2 text-[11px] font-bold ${color} uppercase tracking-widest`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} ${pulse ? 'animate-pulse' : ''}`} />
+            <span>{children}</span>
+        </div>
+    );
+}
+
 const PLAN_CODES: PlanCode[] = ['FREE', 'PRO_MONTHLY', 'PRO_YEARLY'];
-function isPlanCode(v: any): v is PlanCode {
+function isPlanCode(v: unknown): v is PlanCode {
     return typeof v === 'string' && PLAN_CODES.includes(v as PlanCode);
 }
 
+/**
+ * Главная идея этой функции:
+ * Мы НЕ “рисуем карточку”, а принимаем решение, КАК её показывать пользователю.
+ * (какой текст, какие кнопки, что доступно сейчас)
+ */
 export const buildPlanCardState = ({
     plan,
     subscription,
@@ -54,37 +114,48 @@ export const buildPlanCardState = ({
     handleAddCard,
     navigate,
 }: BuildPlanCardStateParams): PlanCardState => {
+    // Базовые значения по умолчанию (ничего не выбрано, всё доступно)
     let isCurrent = false;
     let customButtonText: string | undefined;
     let disabled = false;
     let bottomContent: React.ReactNode | undefined;
 
+    // Если подписка ещё не загружена — не пытаемся “угадывать” состояние
     if (!subscription) {
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
-    const subscriptionIsProActive = subscription.plan === 'pro' && Boolean(subscription.is_active);
+    const isProActive = subscription.plan === 'pro' && Boolean(subscription.is_active);
 
-    // Detect exact plan code ONLY if backend provided it
+    /**
+     * В идеале backend должен отдавать точный plan_code (PRO_MONTHLY / PRO_YEARLY).
+     * Если не отдал — мы НЕ гадаем.
+     */
     const userPlanCode = isPlanCode(billing.billingMe?.plan_code) ? (billing.billingMe!.plan_code as PlanCode) : null;
 
-    // FREE card behavior
+    // ---------- Сценарий 1: карточка FREE ----------
     if (plan.code === 'FREE') {
-        if (subscriptionIsProActive) {
+        // Если сейчас активен PRO — Free остаётся “как базовый доступ”, но кликать нельзя
+        if (isProActive) {
             disabled = true;
             customButtonText = 'Базовый доступ';
-        } else if (subscription.plan === 'free') {
+            return { isCurrent, disabled, customButtonText, bottomContent };
+        }
+
+        // Если пользователь реально на free — показываем “текущий тариф”
+        if (subscription.plan === 'free') {
             isCurrent = true;
             disabled = true;
             customButtonText = 'Ваш текущий тариф';
         }
+
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
     const planCode = plan.code as PlanCode;
 
-    // If user has PRO active but plan_code is unknown -> do NOT guess monthly/yearly.
-    if (subscriptionIsProActive && !userPlanCode) {
+    // ---------- Сценарий 2: PRO активен, но точный plan_code неизвестен ----------
+    if (isProActive && !userPlanCode) {
         disabled = true;
         customButtonText = 'PRO активен';
 
@@ -94,18 +165,8 @@ export const buildPlanCardState = ({
 
         bottomContent = (
             <ProPanelShell>
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 text-center">
-                    <p className="text-[12px] sm:text-[13px] font-bold text-slate-100 uppercase tracking-wide">
-                        Доступ до {formatDate(expiresAt)}
-                    </p>
-                </div>
-
-                <button
-                    onClick={() => navigate('/settings')}
-                    className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wide"
-                >
-                    Управлять подпиской
-                </button>
+                <ProUntilPanel expiresAt={expiresAt} />
+                <ManageSubscriptionLink onClick={() => navigate('/settings')} />
 
                 {!hasCard ? (
                     <div className="text-[11px] text-center text-amber-400 font-bold uppercase tracking-widest">
@@ -126,7 +187,7 @@ export const buildPlanCardState = ({
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
-    // Active PRO on exact plan
+    // ---------- Сценарий 3: PRO активен и точный plan_code известен ----------
     if (userPlanCode && userPlanCode === planCode) {
         isCurrent = true;
 
@@ -136,34 +197,24 @@ export const buildPlanCardState = ({
 
         bottomContent = (
             <ProPanelShell>
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 text-center">
-                    <p className="text-[12px] sm:text-[13px] font-bold text-slate-100 uppercase tracking-wide">
-                        Доступ до {formatDate(expiresAt)}
-                    </p>
-                </div>
+                <ProUntilPanel expiresAt={expiresAt} />
 
                 {hasCard && autoRenew ? (
                     <>
-                        <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-emerald-400 uppercase tracking-widest">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>Автопродление активно</span>
-                        </div>
+                        <ProStatusLine variant="emerald" pulse>
+                            Автопродление активно
+                        </ProStatusLine>
+
                         <p className="text-[11px] text-center text-slate-500 font-medium tabular-nums">
                             Карта {paymentMethod?.card_mask || '•••• 0000'}
                         </p>
-                        <button
-                            onClick={() => navigate('/settings')}
-                            className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wide"
-                        >
-                            Управлять подпиской
-                        </button>
+
+                        <ManageSubscriptionLink onClick={() => navigate('/settings')} />
                     </>
                 ) : hasCard && !autoRenew ? (
                     <>
-                        <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-rose-400 uppercase tracking-widest">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400/80" />
-                            <span>Автопродление выключено</span>
-                        </div>
+                        <ProStatusLine variant="rose">Автопродление выключено</ProStatusLine>
+
                         <button
                             onClick={handleToggleAutoRenew}
                             disabled={togglingAutoRenew}
@@ -175,10 +226,8 @@ export const buildPlanCardState = ({
                     </>
                 ) : (
                     <>
-                        <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-amber-400 uppercase tracking-widest">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80" />
-                            <span>Оплата не настроена</span>
-                        </div>
+                        <ProStatusLine variant="amber">Оплата не настроена</ProStatusLine>
+
                         <button
                             onClick={handleAddCard}
                             disabled={togglingAutoRenew}
@@ -194,14 +243,14 @@ export const buildPlanCardState = ({
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
-    // User is PRO (active) but on a different plan -> disable other cards
+    // ---------- Сценарий 4: у пользователя уже активен PRO, но это другой план ----------
     if (isPro) {
         disabled = true;
         customButtonText = 'Доступно по подписке';
         return { isCurrent, disabled, customButtonText, bottomContent };
     }
 
-    // Expired PRO -> show restore CTA
+    // ---------- Сценарий 5: PRO истёк → предлагаем восстановить ----------
     if (isExpired) {
         bottomContent = (
             <ProPanelShell>
