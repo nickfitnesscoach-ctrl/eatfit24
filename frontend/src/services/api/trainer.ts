@@ -139,7 +139,7 @@ export const getClients = async (): Promise<ClientsResponse> => {
         );
 
         if (response.status === 403) {
-            log('User is not an admin, returning empty clients list');
+            log('[API] User is not admin, clients unavailable');
             return [];
         }
 

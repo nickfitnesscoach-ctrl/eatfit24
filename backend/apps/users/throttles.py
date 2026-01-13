@@ -25,5 +25,6 @@ class ProfileUpdateThrottle(UserRateThrottle):
     Limits: 30 updates per hour per authenticated user.
     Allows frequent legitimate updates while preventing abuse.
     """
-    rate = '30/hour'
-    scope = 'profile_update'
+
+    rate = "30/hour"
+    scope = "profile_update"

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -23,9 +24,6 @@ from .serializers import ProfileSerializer, UserSerializer
 from .throttles import ProfileUpdateThrottle
 
 logger = logging.getLogger(__name__)
-
-
-from django.conf import settings  # Added import
 
 
 @extend_schema(tags=["Profile"])
