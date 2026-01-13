@@ -708,6 +708,26 @@ docker compose up -d --force-recreate
 
 # Проверьте
 docker compose logs backend | grep "\[STARTUP\]"
+
+### Applying .env.local Changes
+
+⚠️ Docker Compose does NOT reload `env_file` variables on `restart`.
+
+#### ❌ This will NOT apply env changes
+```bash
+docker compose restart backend
+```
+
+#### ✅ Correct way
+```bash
+docker compose -f compose.yml -f compose.dev.yml up -d --force-recreate backend
+```
+
+#### Verification
+```bash
+docker compose -f compose.yml -f compose.dev.yml exec backend env | grep TELEGRAM_ADMINS
+```
+
 ```
 
 ---

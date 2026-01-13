@@ -14,7 +14,7 @@ EatFit24 is a comprehensive ecosystem for nutrition tracking and fitness managem
 | Key SSOT | Description |
 |----------|-------------|
 | **[Architecture](docs/ARCHITECTURE.md)** | System design, service interaction, and data flows. |
-| **[Environment](docs/ENV.md)** | Configuration contract, .env.local vs .env.prod. |
+| **[Environment](docs/ENV_SSOT.md)** | Configuration contract, .env.local vs .env.prod. |
 | **[Deployment](docs/DEPLOY.md)** | Quick start, production release, and ops runbook. |
 | **[Billing](docs/BILLING.md)** | Payments, subscriptions, and recurring logic. |
 | **[AI Proxy](docs/AI_PROXY.md)** | AI recognition contracts and normalization. |
@@ -30,9 +30,21 @@ cp .env.example .env.local
 ```
 
 ### 2. Launch (Development)
+
+### Start backend (DEV)
 ```bash
-docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
+docker compose -f compose.yml -f compose.dev.yml up -d --force-recreate backend
 ```
+
+⚠️ Note
+If you change .env.local, a simple docker compose restart is NOT enough.
+Docker does not reload env_file values on restart.
+
+Always use:
+```bash
+docker compose -f compose.yml -f compose.dev.yml up -d --force-recreate backend
+```
+
 
 ### 3. Initialize
 ```bash

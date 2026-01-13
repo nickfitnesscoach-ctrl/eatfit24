@@ -15,19 +15,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Quick Reference
 
-### Development Startup
+## Development Startup (DEV)
+
+⚠️ IMPORTANT:  
+`docker compose restart` **НЕ перечитывает** изменения в `.env.local`.  
+Для применения изменений environment variables **ОБЯЗАТЕЛЬНО** использовать `--force-recreate`.
+
+### Start / Update backend with fresh env
 ```bash
-# 1. Copy dev environment
-cp .env.local .env  # OR ensure .env has APP_ENV=dev
-
-# 2. Start all services
-docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
-
-# 3. Check logs
-docker compose -f compose.yml -f compose.dev.yml logs -f backend
-
-# 4. For Telegram Mini App: Start Cloudflare tunnel (see "Local Development with Telegram Mini App" below)
+docker compose -f compose.yml -f compose.dev.yml up -d --force-recreate backend
 ```
+
+### Full dev stack (first run or after env changes)
+```bash
+docker compose -f compose.yml -f compose.dev.yml up -d --build
+```
+
+### Verification (mandatory if env was changed)
+```bash
+docker compose -f compose.yml -f compose.dev.yml exec backend env | grep TELEGRAM_ADMINS
+```
+
+### Telegram Mini App Tunnel
+
 
 ### Production Deployment
 ```bash
@@ -143,7 +153,7 @@ docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --b
 **Development**:
 ```bash
 # Use compose.yml + compose.dev.yml with .env.local
-docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build
+docker compose -f compose.yml -f compose.dev.yml --env-file .env.local up -d --build --force-recreate
 docker compose -f compose.yml -f compose.dev.yml ps
 docker compose -f compose.yml -f compose.dev.yml logs -f backend
 ```
