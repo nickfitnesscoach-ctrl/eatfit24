@@ -11,15 +11,20 @@ Delivery: Telegram message to TELEGRAM_ADMINS
 from __future__ import annotations
 
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 
 from celery import shared_task
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.billing.models import WebhookLog
 
 logger = logging.getLogger(__name__)
+
+# Cache keys for health monitoring
+CACHE_KEY_LAST_SUCCESS = "billing:weekly_digest:last_success"
+CACHE_KEY_HEALTH_ALERTED = "billing:weekly_digest:health_alerted"
 
 
 def _send_telegram_alert(message: str) -> dict:
@@ -218,6 +223,9 @@ def send_weekly_billing_digest(self):
         - Logs errors instead of raising exceptions
         - Limited retries (max 3) to avoid infinite loops
     """
+    start_time = timezone.now()
+    task_id = self.request.id
+
     try:
         # Calculate period (last 7 days)
         end_date = timezone.now()
@@ -228,9 +236,10 @@ def send_weekly_billing_digest(self):
         period_end_str = end_date.strftime("%Y-%m-%d")
 
         logger.info(
-            "[WEEKLY_DIGEST] Generating digest for period %s → %s",
+            "[WEEKLY_DIGEST] START period=%s → %s task_id=%s",
             period_start_str,
             period_end_str,
+            task_id,
         )
 
         # Query webhook events in period
@@ -275,6 +284,9 @@ def send_weekly_billing_digest(self):
         delivery_result = _send_telegram_alert(message)
 
         if delivery_result["success"]:
+            # Cache last successful delivery timestamp (ISO format for reliable serialization)
+            cache.set(CACHE_KEY_LAST_SUCCESS, timezone.now().isoformat(), timeout=None)
+
             # Log successful delivery with details
             deliveries = delivery_result.get("deliveries", [])
             delivery_summary = ", ".join([
@@ -303,6 +315,19 @@ def send_weekly_billing_digest(self):
                 error_summary,
             )
 
+        # Calculate duration
+        duration_ms = int((timezone.now() - start_time).total_seconds() * 1000)
+
+        # Log COMPLETE with duration and task_id
+        logger.info(
+            "[WEEKLY_DIGEST] COMPLETE period=%s → %s duration_ms=%d success=%s task_id=%s",
+            period_start_str,
+            period_end_str,
+            duration_ms,
+            delivery_result["success"],
+            task_id,
+        )
+
         return {
             "success": delivery_result["success"],
             "period": f"{period_start_str} → {period_end_str}",
@@ -313,7 +338,148 @@ def send_weekly_billing_digest(self):
         }
 
     except Exception as exc:
-        logger.error("[WEEKLY_DIGEST] Error generating digest: %s", exc, exc_info=True)
+        # Calculate duration even on error
+        duration_ms = int((timezone.now() - start_time).total_seconds() * 1000)
+
+        logger.error(
+            "[WEEKLY_DIGEST] Error generating digest: %s | duration_ms=%d task_id=%s",
+            exc,
+            duration_ms,
+            task_id,
+            exc_info=True,
+        )
         # Do NOT raise exception to avoid creating failed webhook
         # Just log and return failure
         return {"success": False, "error": str(exc)}
+
+
+@shared_task(queue="billing", bind=True)
+def check_weekly_digest_health(self):
+    """
+    Health check for weekly digest task.
+
+    Alerts if weekly digest hasn't run successfully in >8 days.
+    Runs daily at 12:00 MSK (09:00 UTC) via Celery Beat.
+
+    Anti-spam: Only sends one alert per 24 hours to avoid notification fatigue.
+
+    Purpose: Detect silent degradation (Beat scheduler failure, queue routing issues,
+    persistent delivery failures).
+    """
+    task_id = self.request.id
+
+    logger.info("[WEEKLY_DIGEST_HEALTH] START health_check task_id=%s", task_id)
+
+    try:
+        # Get last successful delivery timestamp
+        last_success_iso = cache.get(CACHE_KEY_LAST_SUCCESS)
+
+        if not last_success_iso:
+            # No last_success timestamp found
+            # This is expected on fresh deployment before first digest runs
+            logger.warning(
+                "[WEEKLY_DIGEST_HEALTH] No last_success timestamp found (expected on fresh deployment) task_id=%s",
+                task_id,
+            )
+            return {"status": "no_baseline", "message": "No last_success timestamp (fresh deployment)"}
+
+        # Parse ISO timestamp
+        last_success = datetime.fromisoformat(last_success_iso)
+        now = timezone.now()
+
+        # Calculate days since last success
+        days_since = (now - last_success).days
+
+        logger.info(
+            "[WEEKLY_DIGEST_HEALTH] last_success=%s days_since=%d task_id=%s",
+            last_success_iso,
+            days_since,
+            task_id,
+        )
+
+        # Check if degradation detected (>8 days without success)
+        if days_since > 8:
+            # Check anti-spam: have we already alerted in last 24h?
+            already_alerted = cache.get(CACHE_KEY_HEALTH_ALERTED)
+
+            if already_alerted:
+                logger.info(
+                    "[WEEKLY_DIGEST_HEALTH] Degradation detected but already alerted (anti-spam active) days_since=%d task_id=%s",
+                    days_since,
+                    task_id,
+                )
+                return {
+                    "status": "degradation_detected",
+                    "days_since": days_since,
+                    "alerted": False,
+                    "reason": "anti-spam (already alerted in last 24h)",
+                }
+
+            # Send alert
+            message = (
+                f"⚠️ <b>WEEKLY DIGEST DEGRADATION</b>\n"
+                f"Последний успешный digest: {days_since} дней назад\n"
+                f"Last success: {last_success.strftime('%Y-%m-%d %H:%M UTC')}\n"
+                f"Expected: еженедельно (каждый понедельник 10:00 MSK)\n\n"
+                f"<b>Проверить:</b>\n"
+                f"• Celery Beat schedule\n"
+                f"• Worker health (billing queue)\n"
+                f"• Telegram delivery errors in logs"
+            )
+
+            alert_result = _send_telegram_alert(message)
+
+            if alert_result["success"]:
+                # Set anti-spam flag (24 hour TTL)
+                cache.set(CACHE_KEY_HEALTH_ALERTED, True, timeout=86400)  # 24 hours
+
+                logger.error(
+                    "[WEEKLY_DIGEST_HEALTH] DEGRADATION ALERT SENT days_since=%d last_success=%s task_id=%s",
+                    days_since,
+                    last_success_iso,
+                    task_id,
+                )
+
+                return {
+                    "status": "degradation_detected",
+                    "days_since": days_since,
+                    "alerted": True,
+                    "deliveries": alert_result.get("deliveries", []),
+                }
+            else:
+                logger.error(
+                    "[WEEKLY_DIGEST_HEALTH] Failed to send degradation alert days_since=%d errors=%s task_id=%s",
+                    days_since,
+                    alert_result.get("errors", []),
+                    task_id,
+                )
+
+                return {
+                    "status": "degradation_detected",
+                    "days_since": days_since,
+                    "alerted": False,
+                    "reason": "alert delivery failed",
+                    "errors": alert_result.get("errors", []),
+                }
+
+        # No degradation detected - healthy state
+        logger.info(
+            "[WEEKLY_DIGEST_HEALTH] Healthy state days_since=%d task_id=%s",
+            days_since,
+            task_id,
+        )
+
+        return {
+            "status": "healthy",
+            "days_since": days_since,
+            "last_success": last_success_iso,
+        }
+
+    except Exception as exc:
+        logger.error(
+            "[WEEKLY_DIGEST_HEALTH] Error in health check: %s task_id=%s",
+            exc,
+            task_id,
+            exc_info=True,
+        )
+        return {"status": "error", "error": str(exc)}

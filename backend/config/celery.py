@@ -96,6 +96,11 @@ app.conf.beat_schedule = {
         "task": "apps.billing.tasks_digest.send_weekly_billing_digest",
         "schedule": crontab(hour=7, minute=0, day_of_week=1),  # Пн 10:00 MSK = 07:00 UTC
     },
+    # P4-DIG-02: Weekly digest health check (silent degradation guard)
+    "billing-digest-health-check": {
+        "task": "apps.billing.tasks_digest.check_weekly_digest_health",
+        "schedule": crontab(hour=9, minute=0),  # Daily 12:00 MSK = 09:00 UTC
+    },
 }
 
 

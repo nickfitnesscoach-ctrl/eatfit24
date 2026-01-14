@@ -13,13 +13,17 @@ from datetime import timedelta
 from unittest.mock import patch
 import uuid
 
+from django.core.cache import cache
 from django.utils import timezone
 import pytest
 
 from apps.billing.models import WebhookLog
 from apps.billing.tasks_digest import (
+    CACHE_KEY_HEALTH_ALERTED,
+    CACHE_KEY_LAST_SUCCESS,
     _format_weekly_digest,
     _group_errors_by_signature,
+    check_weekly_digest_health,
     send_weekly_billing_digest,
 )
 
@@ -299,7 +303,11 @@ class TestWeeklyBillingDigest:
             - Sends to Telegram
             - Returns success status
         """
-        mock_send_alert.return_value = True
+        mock_send_alert.return_value = {
+            "success": True,
+            "deliveries": [{"chat_id": 123, "message_id": 456, "parse_mode": "HTML"}],
+            "errors": [],
+        }
 
         now = timezone.now()
 
@@ -352,7 +360,11 @@ class TestWeeklyBillingDigest:
             - Sends message with "no events" notice
             - Returns success status
         """
-        mock_send_alert.return_value = True
+        mock_send_alert.return_value = {
+            "success": True,
+            "deliveries": [{"chat_id": 123, "message_id": 456, "parse_mode": "HTML"}],
+            "errors": [],
+        }
 
         # No events created
 
@@ -382,7 +394,11 @@ class TestWeeklyBillingDigest:
             - Returns success=False
             - Does NOT raise exception (safety requirement)
         """
-        mock_send_alert.return_value = False
+        mock_send_alert.return_value = {
+            "success": False,
+            "deliveries": [],
+            "errors": [{"chat_id": 123, "error": "Telegram API timeout"}],
+        }
 
         now = timezone.now()
         WebhookLog.objects.create(
@@ -402,4 +418,215 @@ class TestWeeklyBillingDigest:
         assert result["total_events"] == 1
 
         # Verify Telegram alert was attempted
+        mock_send_alert.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestWeeklyDigestHealthCheck:
+    """Test suite for weekly digest health check functionality."""
+
+    def setup_method(self):
+        """Clear cache before each test."""
+        cache.clear()
+
+    def test_no_baseline_fresh_deployment(self):
+        """
+        Test case: Health check on fresh deployment (no last_success timestamp).
+
+        Expected behavior:
+            - Returns status="no_baseline"
+            - Logs warning (not error)
+            - Does NOT send alert
+        """
+        # No last_success timestamp in cache
+
+        # Run health check
+        result = check_weekly_digest_health()
+
+        # Verify result
+        assert result["status"] == "no_baseline"
+        assert "fresh deployment" in result["message"].lower()
+
+    def test_healthy_state_recent_success(self):
+        """
+        Test case: Health check with recent successful digest (3 days ago).
+
+        Expected behavior:
+            - Returns status="healthy"
+            - Includes days_since and last_success timestamp
+            - Does NOT send alert
+        """
+        # Set last_success to 3 days ago
+        last_success = timezone.now() - timedelta(days=3)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # Run health check
+        result = check_weekly_digest_health()
+
+        # Verify result
+        assert result["status"] == "healthy"
+        assert result["days_since"] == 3
+        assert result["last_success"] == last_success.isoformat()
+
+    @patch("apps.billing.tasks_digest._send_telegram_alert")
+    def test_degradation_detected_sends_alert(self, mock_send_alert):
+        """
+        Test case: Health check detects degradation (9 days without success).
+
+        Expected behavior:
+            - Returns status="degradation_detected"
+            - Sends Telegram alert with degradation details
+            - Sets anti-spam cache flag
+            - Returns alerted=True
+        """
+        mock_send_alert.return_value = {
+            "success": True,
+            "deliveries": [{"chat_id": 123, "message_id": 456, "parse_mode": "HTML"}],
+            "errors": [],
+        }
+
+        # Set last_success to 9 days ago (triggers >8 days threshold)
+        last_success = timezone.now() - timedelta(days=9)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # Run health check
+        result = check_weekly_digest_health()
+
+        # Verify result
+        assert result["status"] == "degradation_detected"
+        assert result["days_since"] == 9
+        assert result["alerted"] is True
+        assert len(result["deliveries"]) == 1
+
+        # Verify alert was sent
+        mock_send_alert.assert_called_once()
+        message = mock_send_alert.call_args[0][0]
+        assert "WEEKLY DIGEST DEGRADATION" in message
+        assert "9 дней назад" in message
+        assert "Celery Beat schedule" in message
+
+        # Verify anti-spam flag was set
+        assert cache.get(CACHE_KEY_HEALTH_ALERTED) is True
+
+    @patch("apps.billing.tasks_digest._send_telegram_alert")
+    def test_degradation_anti_spam_prevents_duplicate_alert(self, mock_send_alert):
+        """
+        Test case: Anti-spam prevents duplicate alerts within 24h.
+
+        Expected behavior:
+            - First check: sends alert and sets anti-spam flag
+            - Second check (within 24h): does NOT send alert
+            - Returns alerted=False with reason="anti-spam"
+        """
+        mock_send_alert.return_value = {
+            "success": True,
+            "deliveries": [{"chat_id": 123, "message_id": 456, "parse_mode": "HTML"}],
+            "errors": [],
+        }
+
+        # Set last_success to 9 days ago
+        last_success = timezone.now() - timedelta(days=9)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # First health check - should send alert
+        result1 = check_weekly_digest_health()
+        assert result1["alerted"] is True
+        assert mock_send_alert.call_count == 1
+
+        # Second health check (within 24h) - should NOT send alert
+        result2 = check_weekly_digest_health()
+        assert result2["status"] == "degradation_detected"
+        assert result2["days_since"] == 9
+        assert result2["alerted"] is False
+        assert "anti-spam" in result2["reason"]
+
+        # Verify alert was NOT sent again
+        assert mock_send_alert.call_count == 1  # Still only 1 call
+
+    @patch("apps.billing.tasks_digest._send_telegram_alert")
+    def test_degradation_alert_delivery_failure(self, mock_send_alert):
+        """
+        Test case: Health check handles Telegram delivery failure gracefully.
+
+        Expected behavior:
+            - Detects degradation
+            - Attempts to send alert
+            - Alert delivery fails
+            - Returns alerted=False with reason="alert delivery failed"
+            - Includes error details
+            - Does NOT raise exception
+        """
+        mock_send_alert.return_value = {
+            "success": False,
+            "deliveries": [],
+            "errors": [{"chat_id": 123, "error": "HTTP 500: Internal Server Error"}],
+        }
+
+        # Set last_success to 9 days ago
+        last_success = timezone.now() - timedelta(days=9)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # Run health check (should not raise exception)
+        result = check_weekly_digest_health()
+
+        # Verify result
+        assert result["status"] == "degradation_detected"
+        assert result["days_since"] == 9
+        assert result["alerted"] is False
+        assert result["reason"] == "alert delivery failed"
+        assert len(result["errors"]) == 1
+        assert "HTTP 500" in result["errors"][0]["error"]
+
+        # Verify alert was attempted
+        mock_send_alert.assert_called_once()
+
+    def test_threshold_boundary_8_days_no_alert(self):
+        """
+        Test case: Exactly 8 days since last success (boundary case).
+
+        Expected behavior:
+            - 8 days is NOT > 8 days threshold
+            - Returns status="healthy"
+            - Does NOT send alert
+        """
+        # Set last_success to exactly 8 days ago
+        last_success = timezone.now() - timedelta(days=8)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # Run health check
+        result = check_weekly_digest_health()
+
+        # Verify result - 8 days is still healthy (threshold is >8)
+        assert result["status"] == "healthy"
+        assert result["days_since"] == 8
+
+    @patch("apps.billing.tasks_digest._send_telegram_alert")
+    def test_threshold_boundary_9_days_triggers_alert(self, mock_send_alert):
+        """
+        Test case: Exactly 9 days since last success (just over threshold).
+
+        Expected behavior:
+            - 9 days IS > 8 days threshold
+            - Returns status="degradation_detected"
+            - Sends alert
+        """
+        mock_send_alert.return_value = {
+            "success": True,
+            "deliveries": [{"chat_id": 123, "message_id": 456, "parse_mode": "HTML"}],
+            "errors": [],
+        }
+
+        # Set last_success to exactly 9 days ago
+        last_success = timezone.now() - timedelta(days=9)
+        cache.set(CACHE_KEY_LAST_SUCCESS, last_success.isoformat(), timeout=None)
+
+        # Run health check
+        result = check_weekly_digest_health()
+
+        # Verify result
+        assert result["status"] == "degradation_detected"
+        assert result["days_since"] == 9
+        assert result["alerted"] is True
+
+        # Verify alert was sent
         mock_send_alert.assert_called_once()
