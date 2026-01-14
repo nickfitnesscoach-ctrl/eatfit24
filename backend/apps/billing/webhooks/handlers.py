@@ -20,9 +20,9 @@ from typing import Any, Dict, Optional
 from django.db import transaction
 from django.utils import timezone
 
-from apps.billing.models import Payment, Refund, SubscriptionPlan
-from apps.billing.services import activate_or_extend_subscription, invalidate_user_plan_cache
+from apps.billing.models import Payment, Refund, Subscription, SubscriptionPlan
 from apps.billing.notifications import send_pro_subscription_notification
+from apps.billing.services import activate_or_extend_subscription, invalidate_user_plan_cache
 
 logger = logging.getLogger(__name__)
 
@@ -254,11 +254,10 @@ def _handle_payment_canceled(payload: Dict[str, Any], *, trace_id: str = None) -
         raise ValueError("payment.canceled payload has no object.id")
 
     with transaction.atomic():
-        payment = (
-            Payment.objects.select_for_update()
-            .select_related("subscription")
-            .get(yookassa_payment_id=yk_payment_id)
-        )
+        # IMPORTANT: do NOT select_related("subscription") here.
+        # subscription is nullable FK -> LEFT OUTER JOIN -> PostgreSQL forbids FOR UPDATE on nullable side.
+        # We access subscription via lazy loading (payment.subscription) which is safe.
+        payment = Payment.objects.select_for_update().get(yookassa_payment_id=yk_payment_id)
 
         if payment.status in {"SUCCEEDED", "REFUNDED"}:
             logger.info(
