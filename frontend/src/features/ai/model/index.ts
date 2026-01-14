@@ -22,5 +22,7 @@ export {
     AI_LIMITS,
     NON_RETRYABLE_ERROR_CODES,
     getAiErrorMessage,
+    isRetryableError,
+    getErrorActionHint,
 } from './constants';
 export type { AiErrorCode } from './constants';

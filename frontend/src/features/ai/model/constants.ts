@@ -173,3 +173,53 @@ export const AI_LIMITS = {
     MAX_PHOTOS_PER_UPLOAD: 5,
     // Note: MAX_PHOTO_SIZE_* removed - preprocessing handles size reduction automatically
 } as const;
+
+// ============================================================
+// Retry Logic Helpers
+// ============================================================
+
+/**
+ * Error codes that allow retry (transient errors)
+ */
+const RETRYABLE_ERROR_CODES = new Set<string>([
+    AI_ERROR_CODES.UPSTREAM_TIMEOUT,
+    AI_ERROR_CODES.UPSTREAM_ERROR,
+    AI_ERROR_CODES.RATE_LIMIT,
+    AI_ERROR_CODES.AI_TIMEOUT,
+    AI_ERROR_CODES.AI_SERVER_ERROR,
+    AI_ERROR_CODES.NETWORK_ERROR,
+    AI_ERROR_CODES.TASK_TIMEOUT,
+    AI_ERROR_CODES.INTERNAL_ERROR,
+]);
+
+/**
+ * Check if error code allows retry
+ */
+export function isRetryableError(errorCode: string | undefined): boolean {
+    if (!errorCode) return true; // Default: allow retry for unknown errors
+    return RETRYABLE_ERROR_CODES.has(errorCode);
+}
+
+/**
+ * Get action hint for non-retryable errors
+ */
+export function getErrorActionHint(errorCode: string | undefined): string | null {
+    if (!errorCode) return null;
+
+    switch (errorCode) {
+        case AI_ERROR_CODES.IMAGE_TOO_LARGE:
+            return 'Сделайте фото ближе или выберите другое изображение';
+        case AI_ERROR_CODES.INVALID_IMAGE:
+        case AI_ERROR_CODES.UNSUPPORTED_FORMAT:
+        case AI_ERROR_CODES.PREPROCESS_DECODE_FAILED:
+        case AI_ERROR_CODES.PREPROCESS_INVALID_IMAGE:
+            return 'Попробуйте сделать скриншот или выбрать другое фото';
+        case AI_ERROR_CODES.DAILY_LIMIT_REACHED:
+        case AI_ERROR_CODES.THROTTLED:
+            return 'Оформите PRO для безлимитных запросов';
+        case AI_ERROR_CODES.EMPTY_RESULT:
+            return 'Сфотографируйте еду крупнее и ближе';
+        default:
+            return null;
+    }
+}

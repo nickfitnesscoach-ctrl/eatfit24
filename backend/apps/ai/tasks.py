@@ -103,9 +103,21 @@ def _update_meal_photo_failed(meal_photo_id: int | None, error_code: str, error_
             # Only update if not already in terminal state
             if photo.status not in ("SUCCESS", "FAILED", "CANCELLED"):
                 photo.status = "CANCELLED" if error_code == "CANCELLED" else "FAILED"
+                photo.error_code = error_code  # P1.5: Store structured code
                 photo.error_message = error_message
                 photo.recognized_data = {"error": error_code, "error_message": error_message}
-                photo.save(update_fields=["status", "error_message", "recognized_data"])
+                photo.save(
+                    update_fields=["status", "error_code", "error_message", "recognized_data"]
+                )
+
+                # P1.5: Structured logging for observability (grep-friendly)
+                logger.warning(
+                    "[AI:FAILED] photo_id=%s user_id=%s error_code=%s meal_id=%s",
+                    meal_photo_id,
+                    photo.meal.user_id if photo.meal else None,
+                    error_code,
+                    photo.meal_id,
+                )
 
             # Always check if meal should be finalized
             finalize_meal_if_complete(photo.meal)
