@@ -23,7 +23,7 @@ import { api } from '../../../services/api';
 interface UseFoodBatchAnalysisResult {
     isProcessing: boolean;
     photoQueue: PhotoQueueItem[];
-    startBatch: (files: FileWithComment[], context: { date: string; mealType: string }) => Promise<void>;
+    startBatch: (files: FileWithComment[], context: { date: string; mealType: string; mealId?: number; mealPhotoId?: number }) => Promise<void>;
     /** Mark single photo for retry (does NOT auto-start processing) */
     retryPhoto: (id: string) => void;
     /** Mark multiple photos for retry and start processing */
@@ -261,14 +261,14 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
     );
 
     const startBatch = useCallback(
-        async (files: FileWithComment[], context: { date: string; mealType: string }) => {
+        async (files: FileWithComment[], context: { date: string; mealType: string; mealId?: number; mealPhotoId?: number }) => {
             if (processingRef.current) return;
 
             // Save context for processing
             contextRef.current = context;
 
-            // Reset meal_id for new batch (multi-photo grouping)
-            batchMealIdRef.current = undefined;
+            // Reset or restore meal_id for new batch
+            batchMealIdRef.current = context.mealId;
 
             // new run
             cancelledRef.current = false;
@@ -286,13 +286,16 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
                 const previewUrl = f.previewUrl || URL.createObjectURL(f.file);
                 ownedUrlsRef.current.add(previewUrl);
 
-                return {
-                    id: crypto.randomUUID(),
+                const item: PhotoQueueItem = {
+                    id: Math.random().toString(36).substring(7),
                     file: f.file,
                     comment: f.comment,
                     previewUrl,
                     status: 'pending' as PhotoUploadStatus,
+                    mealId: context.mealId,
+                    mealPhotoId: context.mealPhotoId,
                 };
+                return item;
             });
 
             setQueueSync(() => initial);

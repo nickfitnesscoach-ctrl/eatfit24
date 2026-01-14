@@ -118,6 +118,13 @@ class MealSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     photo_count = serializers.SerializerMethodField()
 
+    # P0: Derived state for frontend UI (meal card status)
+    has_success = serializers.SerializerMethodField()
+    is_processing = serializers.SerializerMethodField()
+    latest_photo_status = serializers.SerializerMethodField()
+    photos_count = serializers.SerializerMethodField()
+    latest_failed_photo_id = serializers.SerializerMethodField()
+
     class Meta:
         model = Meal
         fields = [
@@ -133,6 +140,12 @@ class MealSerializer(serializers.ModelSerializer):
             "total",
             "photo_url",
             "photo_count",
+            # P0: Derived state fields
+            "has_success",
+            "is_processing",
+            "latest_photo_status",
+            "photos_count",
+            "latest_failed_photo_id",
         ]
         read_only_fields = ["id", "created_at", "status", "status_display"]
 
@@ -173,6 +186,32 @@ class MealSerializer(serializers.ModelSerializer):
     def get_photo_count(self, obj):
         """Return count of successful photos for this meal."""
         return obj.photos.filter(status="SUCCESS").count()
+
+    # ============================================================
+    # P0: Derived state methods for frontend UI
+    # ============================================================
+
+    def get_has_success(self, obj) -> bool:
+        """Any photo with SUCCESS status."""
+        return obj.photos.filter(status="SUCCESS").exists()
+
+    def get_is_processing(self, obj) -> bool:
+        """Any photo with PENDING or PROCESSING status."""
+        return obj.photos.filter(status__in=["PENDING", "PROCESSING"]).exists()
+
+    def get_latest_photo_status(self, obj) -> str | None:
+        """Status of the most recent photo."""
+        latest = obj.photos.order_by("-created_at").first()
+        return latest.status if latest else None
+
+    def get_photos_count(self, obj) -> int:
+        """Total number of photos (all statuses)."""
+        return obj.photos.count()
+
+    def get_latest_failed_photo_id(self, obj) -> int | None:
+        """ID of the most recent FAILED photo (for retry)."""
+        latest_failed = obj.photos.filter(status="FAILED").order_by("-created_at").first()
+        return latest_failed.id if latest_failed else None
 
     def validate_date(self, value):
         """Validate that date is not in the future."""

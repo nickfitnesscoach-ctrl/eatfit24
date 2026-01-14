@@ -14,7 +14,7 @@ interface AIProcessingContextType {
     allDone: boolean;
 
     // Actions
-    startBatch: (files: FileWithComment[], context: { date: string; mealType: string }) => Promise<void>;
+    startBatch: (files: FileWithComment[], context: { date: string; mealType: string; mealId?: number; mealPhotoId?: number }) => Promise<void>;
     retryPhoto: (id: string) => void;
     retrySelected: (ids: string[]) => void;
     removePhoto: (id: string) => void;
@@ -67,7 +67,7 @@ export const AIProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [photoQueue]);
 
     // Enhanced actions
-    const startBatch = useCallback(async (files: FileWithComment[], context: { date: string; mealType: string }) => {
+    const startBatch = useCallback(async (files: FileWithComment[], context: { date: string; mealType: string; mealId?: number; mealPhotoId?: number }) => {
         // Reset results view when starting new batch
         setShowResults(false);
         await hookStartBatch(files, context);

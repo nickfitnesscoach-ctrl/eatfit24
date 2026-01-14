@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api, MealAnalysis, MealPhoto } from '../services/api';
 import PageHeader from '../components/PageHeader';
-import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2, AlertCircle, Loader2 } from 'lucide-react';
+import { Flame, Drumstick, Droplets, Wheat, Trash2, Edit2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { SkeletonMealDetails } from '../components/Skeleton';
 import { useToast } from '../contexts/ToastContext';
 import { DeleteMealModal } from '../components/meal/DeleteMealModal';
@@ -253,13 +253,27 @@ const MealDetailsPage: React.FC = () => {
                 const failedCount = data.photos?.filter(p => p.status === 'FAILED' || p.status === 'CANCELLED').length || 0;
                 if (failedCount === 0) return null;
                 return (
-                    <PageContainer className="mt-4">
+                    <PageContainer className="mt-4 space-y-3">
                         <div className="bg-yellow-50 border border-yellow-200 rounded-[var(--radius-card)] p-[var(--card-p)] flex items-start gap-2 shadow-sm">
                             <AlertCircle size={16} className="text-yellow-600 mt-0.5 shrink-0" />
                             <p className="text-sm text-yellow-800">
                                 {failedCount === 1 ? 'Одно из фото не удалось обработать' : `${failedCount} фото не удалось обработать`}
                             </p>
                         </div>
+                        <button
+                            onClick={() => navigate('/log', {
+                                state: {
+                                    retryMealId: data.id,
+                                    retryMealPhotoId: data.photos?.find(p => p.status === 'FAILED')?.id,
+                                    mealType: data.meal_type,
+                                    selectedDate: data.date
+                                }
+                            })}
+                            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 text-white font-bold rounded-[var(--radius-card)] shadow-md active:scale-[0.98] transition-all"
+                        >
+                            <RefreshCw size={18} />
+                            Повторить распознавание
+                        </button>
                     </PageContainer>
                 );
             })()}

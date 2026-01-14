@@ -84,6 +84,8 @@ export type MealStatus = 'DRAFT' | 'PROCESSING' | 'COMPLETE';
 
 export interface MealAnalysis {
     id: number;
+    meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+    date: string;
     photo_url: string | null;
     label: string;
     recognized_items: RecognizedItemAnalysis[];

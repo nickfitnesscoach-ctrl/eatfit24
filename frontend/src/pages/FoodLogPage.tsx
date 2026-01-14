@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Check, X, Send, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { MEAL_TYPE_LABELS } from '../constants/meals';
 import { useBilling } from '../contexts/BillingContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelegramWebApp } from '../hooks/useTelegramWebApp';
@@ -34,10 +35,15 @@ const FoodLogPage: React.FC = () => {
     };
 
     const [selectedDate, setSelectedDate] = useState<Date>(getInitialDate());
-    const [mealType, setMealType] = useState<string>('breakfast');
+    const [mealType, setMealType] = useState<string>((location.state as any)?.mealType || 'breakfast');
     const [selectedFiles, setSelectedFiles] = useState<FileWithComment[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // P0: Retry context from location state
+    const retryMealId = (location.state as any)?.retryMealId;
+    const retryMealPhotoId = (location.state as any)?.retryMealPhotoId;
+    const isIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     const {
         photoQueue,
@@ -140,7 +146,9 @@ const FoodLogPage: React.FC = () => {
 
         startBatch(selectedFiles, {
             date: selectedDate.toISOString().split('T')[0],
-            mealType: mealType
+            mealType: mealType,
+            mealId: retryMealId,
+            mealPhotoId: retryMealPhotoId
         });
 
         setSelectedFiles([]);
@@ -185,7 +193,10 @@ const FoodLogPage: React.FC = () => {
 
     return (
         <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
-            <PageHeader title="Добавить еду" fallbackRoute="/" />
+            <PageHeader
+                title={retryMealId ? `Повтор: ${MEAL_TYPE_LABELS[mealType] || mealType}` : 'Добавить еду'}
+                fallbackRoute="/"
+            />
             <PageContainer className="py-6 space-y-[var(--section-gap)]">
                 {/* Date & Meal Type Selection Card */}
                 <div className="bg-white rounded-[var(--radius-card)] shadow-sm p-[var(--card-p)] border border-gray-100">
@@ -302,8 +313,10 @@ const FoodLogPage: React.FC = () => {
                         <div className="bg-blue-50 border border-blue-200 rounded-[var(--radius-card)] p-[var(--card-p)]">
                             <p className="text-blue-800 text-sm text-center">
                                 {isDesktop
-                                    ? '💡 Загрузите фото еды с хорошим освещением для точного распознавания'
-                                    : '💡 Для лучшего результата сфотографируйте еду сверху при хорошем освещении'}
+                                    ? '💡 Загрузите фото еды с хорошем освещением для точного распознавания'
+                                    : isIphone
+                                        ? '💡 Сфотографируйте еду сверху при хорошем освещении'
+                                        : '💡 Загрузите фото из галереи или сфотографируйте еду'}
                             </p>
                         </div>
 

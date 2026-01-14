@@ -1,5 +1,6 @@
 import React from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Meal } from '../../types/meal';
 import { MEAL_TYPE_LABELS } from '../../constants/meals';
 import { MealPhotoStrip } from '../meal/MealPhotoGallery';
@@ -13,6 +14,8 @@ export const MealsList: React.FC<MealsListProps> = ({
     meals,
     onOpenMeal,
 }) => {
+    const navigate = useNavigate();
+
     return (
         <div className="bg-white rounded-[var(--radius-card)] p-[var(--card-p)] shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-[var(--card-p)]">
@@ -33,8 +36,34 @@ export const MealsList: React.FC<MealsListProps> = ({
                         const mealCalories = items.reduce((sum, item) =>
                             sum + (parseFloat(String(item.calories)) || 0), 0) || 0;
 
-                        // Show spinner based on meal.status only (not individual photo statuses)
-                        const isProcessing = meal.status === 'PROCESSING';
+                        // P0: Derived state logic (with fallback for old backend versions)
+                        const photosCount = meal.photos_count ?? meal.photos?.length ?? 0;
+
+                        const hasSuccess =
+                            meal.has_success ??
+                            meal.photos?.some(p => p.status === 'SUCCESS') ??
+                            (items.length > 0);
+
+                        const isProcessing =
+                            meal.is_processing ??
+                            meal.photos?.some(p => p.status === 'PENDING' || p.status === 'PROCESSING') ??
+                            (meal.status === 'PROCESSING');
+
+                        // allFailed = есть фото, но нет успеха и ничего не обрабатывается
+                        const allFailed = photosCount > 0 && !hasSuccess && !isProcessing;
+
+                        const handleRetry = (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            // Navigate to log page with retry context
+                            navigate('/log', {
+                                state: {
+                                    retryMealId: meal.id,
+                                    retryMealPhotoId: meal.latest_failed_photo_id ?? undefined,
+                                    selectedDate: meal.date,
+                                    mealType: meal.meal_type
+                                }
+                            });
+                        };
 
                         return (
                             <div
@@ -60,24 +89,45 @@ export const MealsList: React.FC<MealsListProps> = ({
                                             {isProcessing && (
                                                 <Loader2 size={14} className="animate-spin text-blue-500 shrink-0" />
                                             )}
+                                            {allFailed && (
+                                                <AlertCircle size={14} className="text-red-500 shrink-0" />
+                                            )}
                                         </div>
-                                        <div className="text-sm text-gray-500 truncate mt-0.5">
-                                            {isProcessing ? 'Обработка...' : `${items.length} ${items.length === 1 ? 'блюдо' : 'блюд'}`}
+                                        <div className={`text-sm truncate mt-0.5 ${allFailed ? 'text-red-500' : 'text-gray-500'}`}>
+                                            {isProcessing
+                                                ? 'Обработка...'
+                                                : allFailed
+                                                    ? 'Ошибка распознавания'
+                                                    : `${items.length} ${items.length === 1 ? 'блюдо' : 'блюд'}`}
                                         </div>
                                     </div>
 
-                                    {/* 3. Kcal (Fixed) */}
-                                    <div className="w-[84px] min-w-[84px] text-right whitespace-nowrap tabular-nums">
-                                        <span className="font-bold text-orange-600">
-                                            {Math.round(mealCalories)}
-                                        </span>
-                                        <span className="text-xs text-orange-400 font-medium ml-1">ккал</span>
+                                    {/* 3. Kcal or Retry Button (Fixed) */}
+                                    <div className="w-[84px] min-w-[84px] text-right whitespace-nowrap">
+                                        {allFailed ? (
+                                            <button
+                                                onClick={handleRetry}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors active:scale-95"
+                                            >
+                                                <RefreshCw size={12} />
+                                                Повторить
+                                            </button>
+                                        ) : (
+                                            <div className="tabular-nums">
+                                                <span className="font-bold text-orange-600">
+                                                    {Math.round(mealCalories)}
+                                                </span>
+                                                <span className="text-xs text-orange-400 font-medium ml-1">ккал</span>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* 4. Chevron (Fixed) */}
-                                    <div className="w-6 min-w-6 flex justify-end">
-                                        <ChevronRight size={18} className="text-gray-400" />
-                                    </div>
+                                    {/* 4. Chevron (Fixed) - only show if not allFailed */}
+                                    {!allFailed && (
+                                        <div className="w-6 min-w-6 flex justify-end">
+                                            <ChevronRight size={18} className="text-gray-400" />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );

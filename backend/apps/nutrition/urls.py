@@ -16,24 +16,26 @@ Goals endpoints (internal):
 """
 
 from django.urls import path
+
 from . import views
 
 app_name = "nutrition"
 
 urlpatterns = [
     # Meals (public API per REST docs)
-    path('meals/', views.MealListCreateView.as_view(), name='meal-list'),
-    path('meals/<int:pk>/', views.MealDetailView.as_view(), name='meal-detail'),
-
+    path("meals/", views.MealListCreateView.as_view(), name="meal-list"),
+    path("meals/<int:pk>/", views.MealDetailView.as_view(), name="meal-detail"),
     # Food items (nested under meals per REST docs)
-    path('meals/<int:meal_id>/items/', views.FoodItemCreateView.as_view(), name='food-item-create'),
-    path('meals/<int:meal_id>/items/<int:pk>/', views.FoodItemDetailView.as_view(), name='food-item-detail'),
-
+    path("meals/<int:meal_id>/items/", views.FoodItemCreateView.as_view(), name="food-item-create"),
+    path(
+        "meals/<int:meal_id>/items/<int:pk>/",
+        views.FoodItemDetailView.as_view(),
+        name="food-item-detail",
+    ),
     # Daily goals (internal endpoints, documented in REST docs Section 4)
-    path('goals/', views.DailyGoalView.as_view(), name='daily-goal'),
-    path('goals/calculate/', views.CalculateGoalsView.as_view(), name='calculate-goals'),
-    path('goals/set-auto/', views.SetAutoGoalView.as_view(), name='set-auto-goal'),
-
+    path("goals/", views.DailyGoalView.as_view(), name="daily-goal"),
+    path("goals/calculate/", views.CalculateGoalsView.as_view(), name="calculate-goals"),
+    path("goals/set-auto/", views.SetAutoGoalView.as_view(), name="set-auto-goal"),
     # Statistics
-    path('stats/weekly/', views.WeeklyStatsView.as_view(), name='weekly-stats'),
+    path("stats/weekly/", views.WeeklyStatsView.as_view(), name="weekly-stats"),
 ]

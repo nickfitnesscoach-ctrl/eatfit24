@@ -38,4 +38,11 @@ export interface Meal {
     photos?: MealPhoto[]; // Multi-photo support
     photo_url?: string | null; // First photo URL (backward compatibility)
     photo_count?: number; // Number of successful photos
+
+    // P0: Derived state from backend (for meal card status)
+    has_success?: boolean;
+    is_processing?: boolean;
+    latest_photo_status?: MealPhotoStatus | null;
+    photos_count?: number; // Total photos (all statuses)
+    latest_failed_photo_id?: number | null; // For retry
 }

@@ -4,27 +4,27 @@ Views for nutrition app - meals, food items, daily goals.
 REST API documentation compliant implementation.
 """
 
+from datetime import datetime
 import logging
 
-from datetime import datetime
+from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, status, views
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
-from drf_spectacular.types import OpenApiTypes
-from django.shortcuts import get_object_or_404
 
-from .models import Meal, FoodItem, DailyGoal
+from .models import DailyGoal, FoodItem, Meal
 from .serializers import (
-    MealSerializer,
-    MealCreateSerializer,
-    FoodItemSerializer,
+    CalculateGoalsSerializer,
     DailyGoalSerializer,
     DailyStatsSerializer,
-    CalculateGoalsSerializer,
+    FoodItemSerializer,
+    MealCreateSerializer,
+    MealSerializer,
 )
-from .services import get_daily_stats, get_weekly_stats, create_auto_goal
+from .services import create_auto_goal, get_daily_stats, get_weekly_stats
 
 logger = logging.getLogger(__name__)
 
@@ -518,8 +518,6 @@ class WeeklyStatsView(views.APIView):
         },
     )
     def get(self, request):
-        from datetime import datetime, timedelta
-
         start_date_str = request.query_params.get("start_date")
         if not start_date_str:
             return Response(

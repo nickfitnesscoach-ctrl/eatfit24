@@ -623,6 +623,25 @@ Located in `.github/workflows/backend.yml`:
 
 **Status**: All gates must pass before merge to `main`.
 
+## Infrastructure & Operations
+
+### Automated Maintenance
+
+**Active cron jobs** (configured on production server):
+- Health monitoring: Every 5 minutes
+- Docker cleanup: Weekly (Sundays 3 AM MSK)
+- Disk monitoring: Daily (9 AM MSK)
+- Media baseline tracking: Monthly (1st day, 9:05 AM MSK)
+
+**Current baselines** (as of 2026-01-14):
+- Disk usage: 22% (11GB/50GB)
+- Media storage: 47MB
+- Docker images: 1.3GB (10 active)
+
+**Operations documentation:**
+- [OPS_RUNBOOK.md](docs/OPS_RUNBOOK.md) — Alert response, triggers, capacity planning
+- [FINAL_CLEANUP_REPORT.md](FINAL_CLEANUP_REPORT.md) — Initial cleanup (2026-01-14, freed 26GB)
+
 ## Future Improvements (Non-Urgent)
 
 These improvements can be implemented later to further harden the deployment pipeline. Current system is stable and operational.
