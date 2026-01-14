@@ -22,12 +22,27 @@ from apps.billing.models import WebhookLog
 logger = logging.getLogger(__name__)
 
 
-def _send_telegram_alert(message: str) -> bool:
+def _send_telegram_alert(message: str) -> dict:
     """
     Send alert to Telegram admins.
 
     Uses HTTP API directly to avoid dependency on bot module.
     Reuses the same implementation as alert_failed_webhooks task.
+
+    Returns:
+        dict with keys:
+            - success: bool (True if at least one admin received the message)
+            - deliveries: list[dict] (one per admin, with chat_id, message_id, parse_mode)
+            - errors: list[dict] (one per failed delivery, with chat_id, error)
+
+    Example successful return:
+        {
+            "success": True,
+            "deliveries": [
+                {"chat_id": 123456, "message_id": 789, "parse_mode": "HTML"}
+            ],
+            "errors": []
+        }
     """
     from django.conf import settings
     import requests
@@ -37,13 +52,15 @@ def _send_telegram_alert(message: str) -> bool:
 
     if not bot_token or not admin_ids:
         logger.warning("[WEEKLY_DIGEST] bot_token or admin_ids not configured")
-        return False
+        return {"success": False, "deliveries": [], "errors": [{"error": "bot_token or admin_ids not configured"}]}
 
     # TELEGRAM_ADMINS can be a string with IDs separated by commas or set/list
     if isinstance(admin_ids, str):
         admin_ids = [x.strip() for x in admin_ids.split(",") if x.strip()]
 
-    success = False
+    deliveries = []
+    errors = []
+
     for admin_id in admin_ids:
         try:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -57,13 +74,32 @@ def _send_telegram_alert(message: str) -> bool:
                 timeout=10,
             )
             if resp.status_code == 200:
-                success = True
+                # Extract message_id from response
+                result = resp.json().get("result", {})
+                message_id = result.get("message_id")
+                deliveries.append({
+                    "chat_id": admin_id,
+                    "message_id": message_id,
+                    "parse_mode": "HTML"
+                })
+                logger.info(
+                    "[WEEKLY_DIGEST] Delivered to chat_id=%s message_id=%s parse_mode=HTML",
+                    admin_id,
+                    message_id
+                )
             else:
-                logger.error("[WEEKLY_DIGEST] failed to send to %s: %s", admin_id, resp.text)
+                error_detail = resp.text[:200]  # Limit error message length
+                errors.append({"chat_id": admin_id, "error": f"HTTP {resp.status_code}: {error_detail}"})
+                logger.error("[WEEKLY_DIGEST] failed to send to %s: %s", admin_id, error_detail)
         except Exception as e:
+            errors.append({"chat_id": admin_id, "error": str(e)})
             logger.error("[WEEKLY_DIGEST] error sending to %s: %s", admin_id, e)
 
-    return success
+    return {
+        "success": len(deliveries) > 0,
+        "deliveries": deliveries,
+        "errors": errors
+    }
 
 
 def _group_errors_by_signature(failed_events) -> dict[str, int]:
@@ -236,28 +272,44 @@ def send_weekly_billing_digest(self):
         message = _format_weekly_digest(stats)
 
         # Send to admins
-        send_success = _send_telegram_alert(message)
+        delivery_result = _send_telegram_alert(message)
 
-        if send_success:
+        if delivery_result["success"]:
+            # Log successful delivery with details
+            deliveries = delivery_result.get("deliveries", [])
+            delivery_summary = ", ".join([
+                f"chat_id={d['chat_id']} message_id={d['message_id']}"
+                for d in deliveries
+            ])
             logger.info(
-                "[WEEKLY_DIGEST] Successfully sent digest for period %s → %s (total=%d, failed=%d)",
+                "[WEEKLY_DIGEST] Successfully sent digest for period %s → %s (total=%d, failed=%d) | Deliveries: %s",
                 period_start_str,
                 period_end_str,
                 total_events,
                 failed_count,
+                delivery_summary,
             )
         else:
+            # Log failure with error details
+            errors = delivery_result.get("errors", [])
+            error_summary = ", ".join([
+                f"chat_id={e.get('chat_id', 'N/A')} error={e.get('error', 'unknown')}"
+                for e in errors
+            ])
             logger.error(
-                "[WEEKLY_DIGEST] Failed to send digest to admins (period %s → %s)",
+                "[WEEKLY_DIGEST] Failed to send digest to admins (period %s → %s) | Errors: %s",
                 period_start_str,
                 period_end_str,
+                error_summary,
             )
 
         return {
-            "success": send_success,
+            "success": delivery_result["success"],
             "period": f"{period_start_str} → {period_end_str}",
             "total_events": total_events,
             "failed_count": failed_count,
+            "deliveries": delivery_result.get("deliveries", []),
+            "errors": delivery_result.get("errors", []),
         }
 
     except Exception as exc:
