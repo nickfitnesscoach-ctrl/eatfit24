@@ -31,6 +31,18 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Lazy Task Registration (for non-standard task modules)
+# =============================================================================
+# Explicitly register tasks from non-standard modules (not tasks.py)
+# Required because autodiscover_tasks() only finds tasks.py by default
+# Uses app.on_after_finalize to avoid AppRegistryNotReady errors
+@app.on_after_finalize.connect
+def register_additional_tasks(sender, **kwargs):
+    """Import tasks from non-standard modules after Celery is configured."""
+    from apps.billing import tasks_digest  # noqa: F401
+
+
+# =============================================================================
 # Queue Configuration (A5: Source of Truth)
 # =============================================================================
 # CRITICAL: Default queue must be explicitly set to avoid confusion.
