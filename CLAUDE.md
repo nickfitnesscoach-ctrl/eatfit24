@@ -322,6 +322,10 @@ Worker handles queues: `ai`, `billing`, `default`
 - `billing-alert-failed-webhooks` — every 15 minutes
 - `billing-cleanup-pending-payments` — hourly
 - `billing-process-due-renewals` — hourly
+- `billing-weekly-digest` — Monday 10:00 MSK
+- `billing-digest-health-check` — Daily 12:00 MSK
+
+**Note**: Crontab schedules are interpreted in `CELERY_TIMEZONE = "Europe/Moscow"`, so `crontab(hour=12)` means 12:00 MSK, not 12:00 UTC.
 
 After modifying `config/celery.py`, reset Beat:
 ```bash

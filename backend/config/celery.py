@@ -94,12 +94,12 @@ app.conf.beat_schedule = {
     # P2-DIG-01: Weekly billing digest
     "billing-weekly-digest": {
         "task": "apps.billing.tasks_digest.send_weekly_billing_digest",
-        "schedule": crontab(hour=7, minute=0, day_of_week=1),  # Пн 10:00 MSK = 07:00 UTC
+        "schedule": crontab(hour=10, minute=0, day_of_week=1),  # Mon 10:00 MSK (CELERY_TIMEZONE=Europe/Moscow)
     },
     # P4-DIG-02: Weekly digest health check (silent degradation guard)
     "billing-digest-health-check": {
         "task": "apps.billing.tasks_digest.check_weekly_digest_health",
-        "schedule": crontab(hour=9, minute=0),  # Daily 12:00 MSK = 09:00 UTC
+        "schedule": crontab(hour=12, minute=0),  # Daily 12:00 MSK (CELERY_TIMEZONE=Europe/Moscow)
     },
 }
 

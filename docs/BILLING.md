@@ -106,6 +106,65 @@ Every webhook is assigned a short `trace_id` (e.g., `[abc12345]`). This ID is pr
 - **Logs**: `docker logs -f eatfit24-celery-worker | grep "[BILLING]"`
 - **Stuck Payments**: `SELECT id, status FROM payments WHERE status='PENDING' AND created_at < NOW() - INTERVAL '1 hour';`
 
+### Weekly Digest & Health Monitoring
+
+**Purpose**: Automated weekly summaries of billing webhook health, sent to admin Telegram.
+
+#### Schedule
+- **Weekly Digest**: Monday 10:00 MSK (CELERY_TIMEZONE=Europe/Moscow)
+- **Health Check**: Daily 12:00 MSK (CELERY_TIMEZONE=Europe/Moscow)
+
+#### Cache Keys
+| Key | Purpose | TTL |
+|-----|---------|-----|
+| `billing:weekly_digest:last_success` | ISO timestamp of last successful digest delivery | None (persistent) |
+| `billing:weekly_digest:health_alerted` | Anti-spam flag for degradation alerts | 24 hours |
+
+**Storage format**: `last_success` is stored as ISO string (e.g., `"2026-01-14T12:00:00+03:00"`) for reliable cache serialization.
+
+#### Manual Health Check
+```bash
+# Verify health check task is callable
+docker exec eatfit24-backend-1 python manage.py shell -c "
+from apps.billing.tasks_digest import check_weekly_digest_health
+result = check_weekly_digest_health()
+print('Status:', result['status'])
+print('Result:', result)
+"
+
+# Check cached last_success timestamp
+docker exec eatfit24-backend-1 python manage.py shell -c "
+from django.core.cache import cache
+from apps.billing.tasks_digest import CACHE_KEY_LAST_SUCCESS
+print('Last success:', cache.get(CACHE_KEY_LAST_SUCCESS))
+"
+```
+
+#### Health Check States
+| Status | Meaning | Action Required |
+|--------|---------|-----------------|
+| `no_baseline` | No last_success timestamp (fresh deployment) | Normal on first deploy, wait for first digest |
+| `healthy` | Last success within 8 days | None |
+| `degradation_detected` | >8 days since last success | Check Celery Beat logs, worker health, Telegram delivery errors |
+
+#### Anti-Spam Behavior
+- First degradation detection: Alert sent to admins
+- Subsequent checks within 24h: Alert suppressed (anti-spam active)
+- After 24h: If still degraded, new alert sent
+
+#### Troubleshooting
+```bash
+# Check Beat schedule includes health check
+docker logs eatfit24-celery-beat-1 --tail 100 | grep "billing-digest-health-check"
+
+# Check for recent digest executions
+docker logs eatfit24-celery-worker-1 --tail 500 | grep "\[WEEKLY_DIGEST\]"
+
+# Verify START/COMPLETE logs with duration
+docker logs eatfit24-celery-worker-1 --tail 100 | grep "COMPLETE"
+# Expected: [WEEKLY_DIGEST] COMPLETE period=... duration_ms=... success=... task_id=...
+```
+
 ---
 
 ## 7. Environment Variables
