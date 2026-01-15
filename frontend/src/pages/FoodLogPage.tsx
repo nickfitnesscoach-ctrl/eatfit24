@@ -195,18 +195,37 @@ const FoodLogPage: React.FC = () => {
     };
 
     const handleCloseResults = () => {
-        // DEBUG: Stay on page, don't cleanup - for repeated testing
-        if (IS_DEBUG) {
-            userClosedResultsRef.current = true; // Prevent auto-reopen
-            closeResults();
-            return;
-        }
-        cleanup();
-        closeResults();
+        // P3: "Done" logic
+        // 1. Check if there are ANY successes in the queue
+        const hasAnySuccess = photoQueue.some(p => p.status === 'success');
         const dateStr = selectedDate.toISOString().split('T')[0];
-        setTimeout(() => {
-            navigate(`/?date=${dateStr}&refresh=1`);
-        }, 0);
+
+        if (IS_DEBUG) {
+            console.log('[FoodLogPage] handleCloseResults (Done):', { hasAnySuccess, queueLen: photoQueue.length });
+        }
+
+        if (hasAnySuccess) {
+            // Case A: Partial or Full Success -> "Save" semantics
+            // 1. Explicitly trigger diary refresh via URL (ClientDashboard listens to this)
+            // 2. ONLY THEN perform cleanup (which is now safe and won't delete the meal)
+
+            // We navigate with replace to avoid history stack issues, and set refresh=1
+            navigate(`/?date=${dateStr}&refresh=1`, { replace: true });
+
+            // Since we are navigating away, we can call cleanup. 
+            // In a strict sense, we might want to wait for "refresh" confirmation, 
+            // but the navigation unmounts this page anyway or switches focus. 
+            // The critical part is that cleanup() DOES NOT DELETE the meal now.
+            cleanup();
+            closeResults();
+        } else {
+            // Case B: No successes (cancelled, error, or empty) -> "Discard" semantics
+            // 1. Cleanup first (this WILL delete the orphan meal if it exists)
+            cleanup();
+            closeResults();
+            // Just go back to diary without forced refresh (or with, doesn't matter much, but cleaner without)
+            navigate(`/?date=${dateStr}`, { replace: true });
+        }
     };
 
     const handleBackToCamera = () => {

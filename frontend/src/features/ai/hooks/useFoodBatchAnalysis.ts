@@ -542,19 +542,33 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         abortRef.current?.abort();
         abortRef.current = null;
 
-        // Collect taskIds to cancel on backend and mealIds to delete
+        // Collect taskIds to cancel on backend
         const taskIdsToCancel: string[] = [];
-        const mealIdsToDelete: number[] = [];
         queueRef.current.forEach((p) => {
             // P1.2: Cancel tasks that are in-flight using unified helper
             if (p.taskId && isInFlightStatus(p.status)) {
                 taskIdsToCancel.push(p.taskId);
             }
-            // Also try to delete meals (best effort) for non-terminal items
-            if (p.mealId && isInFlightStatus(p.status)) {
-                mealIdsToDelete.push(p.mealId);
-            }
         });
+
+        // P2: Conditional Meal Deletion
+        // Only delete the meal if there are NO successful items in the batch.
+        // If there's at least one success, we must preserve the meal.
+        const hasAnySuccess = queueRef.current.some(p => p.status === 'success');
+        const mealIdToDelete = batchMealIdRef.current; // Use ref as absolute source of truth for the batch meal
+
+        if (mealIdToDelete) {
+            if (!hasAnySuccess) {
+                console.log('[cancelBatch] No successes found, DELETING orphan meal:', mealIdToDelete);
+                api.deleteMeal(mealIdToDelete).catch((err) => {
+                    console.warn('[cancelBatch] Failed to delete meal', mealIdToDelete, err);
+                });
+                // Also clear the ref since the meal is gone
+                batchMealIdRef.current = undefined;
+            } else {
+                console.log(`[cancelBatch] Partial success detected (${queueRef.current.filter(p => p.status === 'success').length} items). SKIPPING deleteMeal for:`, mealIdToDelete);
+            }
+        }
 
         setQueueSync((prev) =>
             prev.map((p) => {
@@ -575,13 +589,6 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             void cancelAiTask(taskId);
         });
 
-        // Delete orphan meals from server (fire-and-forget, best effort)
-        mealIdsToDelete.forEach((mealId) => {
-            api.deleteMeal(mealId).catch((err) => {
-                console.warn('[cancelBatch] Failed to delete meal', mealId, err);
-            });
-        });
-
         processingRef.current = false;
         if (isMountedRef.current) setIsProcessing(false);
     }, [setQueueSync]);
@@ -594,7 +601,7 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         // Collect taskIds to cancel on backend (in-flight only)
         const taskIdsToCancel: string[] = [];
         queueRef.current.forEach((p) => {
-            if (p.taskId && !['success', 'error'].includes(p.status)) {
+            if (p.taskId && !isTerminalStatus(p.status)) { // Use unified helper
                 taskIdsToCancel.push(p.taskId);
             }
         });
@@ -603,6 +610,21 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         taskIdsToCancel.forEach((taskId) => {
             void cancelAiTask(taskId);
         });
+
+        // P2: Conditional Meal Deletion for cleanup
+        // Similar to cancelBatch, only delete if no successes.
+        const hasAnySuccess = queueRef.current.some(p => p.status === 'success');
+        const mealIdToDelete = batchMealIdRef.current;
+
+        if (mealIdToDelete && !hasAnySuccess) {
+            console.log('[cleanup] No successes found, cleaning up orphan meal:', mealIdToDelete);
+            api.deleteMeal(mealIdToDelete).catch((err) => {
+                console.warn('[cleanup] Failed to delete meal', mealIdToDelete, err);
+            });
+            batchMealIdRef.current = undefined;
+        } else if (mealIdToDelete && hasAnySuccess) {
+            console.log('[cleanup] Successes exist, preserving meal:', mealIdToDelete);
+        }
 
         processingRef.current = false;
         if (isMountedRef.current) setIsProcessing(false);
