@@ -23,9 +23,9 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
 
     const totalCount = photoQueue.length;
     const successCount = photoQueue.filter((p) => p.status === 'success').length;
-    // Retryable = all errors EXCEPT non-retryable codes (e.g., daily limit)
+    // Retryable = all errors EXCEPT non-retryable codes + all cancelled
     const retryableCount = photoQueue.filter(
-        (p) => p.status === 'error' && !NON_RETRYABLE_ERROR_CODES.has(p.errorCode || '')
+        (p) => (p.status === 'error' && !NON_RETRYABLE_ERROR_CODES.has(p.errorCode || '')) || p.status === 'cancelled'
     ).length;
 
     return (
@@ -51,7 +51,7 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                 <div className="overflow-y-auto p-4 space-y-4 flex-1">
                     {photoQueue.map((item) => {
                         const isOk = item.status === 'success' && !!item.result;
-                        const isCancelled = item.status === 'error' && item.errorCode === AI_ERROR_CODES.CANCELLED;
+                        const isCancelled = item.status === 'cancelled' || (item.status === 'error' && item.errorCode === AI_ERROR_CODES.CANCELLED);
 
                         return (
                             <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100 relative">
@@ -86,8 +86,10 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                                             <h3 className={`font-bold ${isCancelled ? 'text-gray-500' : 'text-red-600'}`}>
                                                 {isCancelled ? 'Отменено' : 'Ошибка загрузки'}
                                             </h3>
-                                            <p className="text-sm text-gray-500 mt-1 truncate">{item.error || 'Ошибка распознавания'}</p>
-                                            {/* Единственная кнопка: toggle выбора (только для retryable ошибок) */}
+                                            <p className="text-sm text-gray-500 mt-1 truncate">
+                                                {isCancelled ? 'Анализ был остановлен' : (item.error || 'Ошибка распознавания')}
+                                            </p>
+                                            {/* Единственная кнопка: toggle выбора (только для retryable ошибок + cancelled) */}
                                             {!NON_RETRYABLE_ERROR_CODES.has(item.errorCode || '') && (
                                                 <div className="mt-2">
                                                     <button
@@ -133,11 +135,12 @@ export const BatchResultsModal: React.FC<BatchResultsModalProps> = ({
                     {/* Режим B: показываем глобальную кнопку "Повторить выбранные" */}
                     {selectedForRetry.size > 0 && (
                         <button
+                            disabled={selectedForRetry.size === 0}
                             onClick={() => {
                                 onRetrySelected(Array.from(selectedForRetry));
                                 setSelectedForRetry(new Set());
                             }}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center gap-2 shadow-lg"
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl transition-all min-h-[48px] flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <RefreshCcw size={18} />
                             Повторить выбранные ({selectedForRetry.size})

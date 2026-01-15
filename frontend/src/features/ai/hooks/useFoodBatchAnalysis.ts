@@ -90,6 +90,8 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
     const abortRef = useRef<AbortController | null>(null);
     const processingRef = useRef(false);
     const cancelledRef = useRef(false);
+    // P1.2: runId to invalidate stale promises from cancelled/restarted batches
+    const runIdRef = useRef(0);
 
     const ownedUrlsRef = useRef<Set<string>>(new Set());
 
@@ -325,11 +327,17 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
     const getNextPending = useCallback(() => queueRef.current.find((p) => p.status === 'pending') || null, []);
 
     const processQueue = useCallback(
-        async (controller: AbortController) => {
-            while (!controller.signal.aborted && !cancelledRef.current) {
+        async (controller: AbortController, runId: number) => {
+            // P1.2: Check both abort and runId for stale batch detection
+            while (!controller.signal.aborted && !cancelledRef.current && runId === runIdRef.current) {
                 const next = getNextPending();
                 if (!next) break;
                 await processOne(next, controller);
+                // P1.2: Check again after async operation in case batch was cancelled/restarted
+                if (runId !== runIdRef.current) {
+                    console.log('[processQueue] Stale runId detected, stopping processing');
+                    break;
+                }
             }
         },
         [getNextPending, processOne]
@@ -347,6 +355,9 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
 
             // new run
             cancelledRef.current = false;
+            // P1.2: Increment runId to invalidate any stale promises from previous batch
+            runIdRef.current += 1;
+            const currentRunId = runIdRef.current;
             processingRef.current = true;
             setIsProcessing(true);
 
@@ -379,7 +390,7 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             await new Promise(resolve => setTimeout(resolve, 50));
 
             try {
-                await processQueue(controller);
+                await processQueue(controller, currentRunId);
             } finally {
                 abortRef.current = null;
                 processingRef.current = false;
@@ -392,8 +403,8 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
     const retryPhoto = useCallback(
         (id: string) => {
             const photo = queueRef.current.find((p) => p.id === id);
-            // Only error status is retryable
-            if (!photo || photo.status !== 'error') return;
+            // Only error or cancelled status is retryable
+            if (!photo || (photo.status !== 'error' && photo.status !== 'cancelled')) return;
             // Block non-retryable error codes (e.g., daily limit)
             if (photo.errorCode && NON_RETRYABLE_ERROR_CODES.has(photo.errorCode)) return;
 
@@ -401,7 +412,8 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             // IMPORTANT: Keep mealId and mealPhotoId for retry (prevents duplicate MealPhoto)
             setQueueSync((prev) =>
                 prev.map((p) =>
-                    p.id === id
+                    // Allow retry for error OR cancelled
+                    p.id === id && (p.status === 'error' || p.status === 'cancelled')
                         ? { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined }
                         : p
                 )
@@ -416,30 +428,71 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
             if (ids.length === 0) return;
             if (processingRef.current) return;
 
-            // Mark all selected as pending
-            // IMPORTANT: Keep mealId and mealPhotoId for retry (prevents duplicate MealPhoto)
+            // Mark all selected as pending with FULL RESET
+            // P1.3: Reset all result fields but KEEP mealId/mealPhotoId for consistency
             const validIds = new Set(ids);
+
             setQueueSync((prev) =>
                 prev.map((p) => {
                     if (!validIds.has(p.id)) return p;
-                    if (p.status !== 'error') return p;
+
+                    // Allow retry for error AND cancelled
+                    if (p.status !== 'error' && p.status !== 'cancelled') return p;
+
+                    // Block non-retryable error codes
                     if (p.errorCode && NON_RETRYABLE_ERROR_CODES.has(p.errorCode)) return p;
-                    return { ...p, status: 'pending' as PhotoUploadStatus, errorCode: undefined, error: undefined, result: undefined, taskId: undefined };
+
+                    return {
+                        ...p,
+                        status: 'pending' as PhotoUploadStatus,
+                        // Clear ALL result/error fields
+                        errorCode: undefined,
+                        error: undefined,
+                        result: undefined,
+                        taskId: undefined,
+                        // Clear any previous recognition data
+                        // (TS might not complain if strict, but good to be explicit for runtime)
+                    };
                 })
             );
+
+            // Determine if we have an existing meal_id from any SUCCESS item
+            // P1.4: Strict Meal ID reuse
+            // If there's already a success item, we MUST use its meal_id for the retries
+            const existingSuccessItem = queueRef.current.find(p => p.status === 'success' && p.mealId);
+            if (existingSuccessItem?.mealId) {
+                console.log('[useFoodBatchAnalysis] Retry: Found existing mealId from success item:', existingSuccessItem.mealId);
+                batchMealIdRef.current = existingSuccessItem.mealId;
+            } else {
+                console.log('[useFoodBatchAnalysis] Retry: No existing success mealId, will generate new if needed');
+                // Don't clear batchMealIdRef.current here if it remembers context, 
+                // but strictly speaking for a new "attempt" if all failed, we might want to start fresh 
+                // OR keep the one from context. 
+                // Current logic: recognizeFood uses item.mealId ?? batchMealIdRef.current.
+            }
 
             // Start processing
             cancelledRef.current = false;
             processingRef.current = true;
             setIsProcessing(true);
 
+            // P1.2: New run for retry -> Increment runId
+            runIdRef.current += 1;
+            const retryRunId = runIdRef.current;
+
+            // New AbortController
             const controller = new AbortController();
             abortRef.current = controller;
 
-            processQueue(controller).finally(() => {
-                abortRef.current = null;
-                processingRef.current = false;
-                if (isMountedRef.current) setIsProcessing(false);
+            console.log(`[useFoodBatchAnalysis] Starting RETRY run #${retryRunId} for ${ids.length} items`);
+
+            processQueue(controller, retryRunId).finally(() => {
+                // Only unset if we are still the active run
+                if (runIdRef.current === retryRunId) {
+                    abortRef.current = null;
+                    processingRef.current = false;
+                    if (isMountedRef.current) setIsProcessing(false);
+                }
             });
         },
         [processQueue, setQueueSync]
@@ -452,13 +505,16 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         if (!hasPending) return;
 
         cancelledRef.current = false;
+        // P1.2: New run for manual start
+        runIdRef.current += 1;
+        const manualRunId = runIdRef.current;
         processingRef.current = true;
         setIsProcessing(true);
 
         const controller = new AbortController();
         abortRef.current = controller;
 
-        processQueue(controller).finally(() => {
+        processQueue(controller, manualRunId).finally(() => {
             abortRef.current = null;
             processingRef.current = false;
             if (isMountedRef.current) setIsProcessing(false);
