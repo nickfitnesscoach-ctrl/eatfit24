@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useFoodBatchAnalysis } from '../hooks/useFoodBatchAnalysis';
 import type { PhotoQueueItem, FileWithComment } from '../model';
+import { IS_DEBUG } from '../../../shared/config/debug';
 
 interface AIProcessingContextType {
     // State
@@ -29,6 +30,18 @@ interface AIProcessingContextType {
 const AIProcessingContext = createContext<AIProcessingContextType | null>(null);
 
 export const AIProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    // P0 DEBUG: Unique provider ID to detect duplicate providers
+    const providerIdRef = useRef(Math.random().toString(16).slice(2, 8));
+
+    // P0 DEBUG: Log mount/unmount to detect Provider remounting during processing
+    useEffect(() => {
+        console.log('[AIProcessingProvider] MOUNT id=', providerIdRef.current);
+        return () => console.log('[AIProcessingProvider] UNMOUNT id=', providerIdRef.current);
+    }, []);
+
+    // P0 DEBUG: Log every render to detect parallel providers
+    console.log('[AIProcessingProvider] RENDER id=', providerIdRef.current);
+
     // Lift local state that needs to persist across navigation
     const [showResults, setShowResults] = useState(false);
 
@@ -50,6 +63,17 @@ export const AIProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ 
             window.dispatchEvent(new CustomEvent('ai:daily-limit-reached'));
         }
     });
+
+    // Debug: log photoQueue changes
+    useEffect(() => {
+        if (IS_DEBUG) {
+            console.log('[AIProcessingContext] photoQueue changed:', {
+                length: photoQueue.length,
+                statuses: photoQueue.map(p => p.status).join(', '),
+                isProcessing,
+            });
+        }
+    }, [photoQueue, isProcessing]);
 
     // Derived state
     const hasActiveQueue = photoQueue.length > 0;

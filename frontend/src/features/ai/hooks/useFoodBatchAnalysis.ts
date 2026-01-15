@@ -35,6 +35,22 @@ interface UseFoodBatchAnalysisResult {
     cleanup: () => void;
 }
 
+// ============================================================
+// P1.2: Unified Status Helpers
+// ============================================================
+
+/** Status that means processing is still active */
+export const isInFlightStatus = (s: PhotoUploadStatus): boolean =>
+    s === 'pending' || s === 'compressing' || s === 'uploading' || s === 'processing';
+
+/** Terminal state - no more changes expected */
+export const isTerminalStatus = (s: PhotoUploadStatus): boolean =>
+    s === 'success' || s === 'error' || s === 'cancelled';
+
+/** Result worth showing to user (success or error, not cancelled) */
+export const isResultStatus = (s: PhotoUploadStatus): boolean =>
+    s === 'success' || s === 'error';
+
 const isAbortError = (err: any) => err?.name === 'AbortError' || err?.code === 'ERR_CANCELED';
 
 const abortableSleep = (ms: number, signal: AbortSignal) =>
@@ -78,21 +94,47 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
     const ownedUrlsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
+        // P0 FIX: Must set true on mount (StrictMode does mount→unmount→mount)
+        isMountedRef.current = true;
         return () => {
             isMountedRef.current = false;
         };
     }, []);
 
     const setQueueSync = useCallback((updater: (prev: PhotoQueueItem[]) => PhotoQueueItem[]) => {
-        const next = updater(queueRef.current);
+        const prev = queueRef.current;
+        const next = updater(prev);
         queueRef.current = next;
-        if (isMountedRef.current) setPhotoQueue(next);
+
+        console.log('[useFoodBatchAnalysis] setQueueSync:', {
+            prevLength: prev.length,
+            nextLength: next.length,
+            isMounted: isMountedRef.current,
+            statuses: next.map(p => `${p.id.slice(0, 4)}:${p.status}`).join(', '),
+        });
+
+        // P0 FIX: Always sync UI state - React 18 handles unmounted updates gracefully
+        // The isMountedRef guard was preventing final SUCCESS updates from reaching FoodLogPage
+        setPhotoQueue(next);
     }, []);
 
     const updatePhoto = useCallback(
         (id: string, patch: Partial<PhotoQueueItem>) => {
-            if (cancelledRef.current) return;
-            setQueueSync((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+            if (cancelledRef.current) {
+                console.log('[useFoodBatchAnalysis] updatePhoto BLOCKED by cancelled flag:', { id, patch });
+                return;
+            }
+            console.log('[useFoodBatchAnalysis] updatePhoto:', { id: id.slice(0, 4), patch: Object.keys(patch) });
+            setQueueSync((prev) => prev.map((p) => {
+                if (p.id !== id) return p;
+                // P1.2: Protect cancelled status from being overwritten by late results
+                // This prevents race condition: cancel -> backend returns SUCCESS -> overwrite cancelled
+                if (p.status === 'cancelled') {
+                    console.log('[useFoodBatchAnalysis] updatePhoto BLOCKED - item already cancelled:', { id });
+                    return p;
+                }
+                return { ...p, ...patch };
+            }));
         },
         [setQueueSync]
     );
@@ -448,22 +490,24 @@ export const useFoodBatchAnalysis = (options: BatchAnalysisOptions): UseFoodBatc
         const taskIdsToCancel: string[] = [];
         const mealIdsToDelete: number[] = [];
         queueRef.current.forEach((p) => {
-            // Cancel tasks that are in-flight (uploading/processing with taskId)
-            if (p.taskId && p.status !== 'success' && p.status !== 'error') {
+            // P1.2: Cancel tasks that are in-flight using unified helper
+            if (p.taskId && isInFlightStatus(p.status)) {
                 taskIdsToCancel.push(p.taskId);
             }
-            // Also try to delete meals (best effort)
-            if (p.mealId && p.status !== 'success' && p.status !== 'error') {
+            // Also try to delete meals (best effort) for non-terminal items
+            if (p.mealId && isInFlightStatus(p.status)) {
                 mealIdsToDelete.push(p.mealId);
             }
         });
 
         setQueueSync((prev) =>
             prev.map((p) => {
-                if (p.status === 'success' || p.status === 'error') return p;
+                // P1.2: Keep terminal states as-is using unified helper
+                if (isTerminalStatus(p.status)) return p;
+                // P1: Use 'cancelled' status instead of 'error' for user cancellation
                 return {
                     ...p,
-                    status: 'error' as const,
+                    status: 'cancelled' as const,
                     errorCode: AI_ERROR_CODES.CANCELLED,
                     error: getAiErrorMessage(AI_ERROR_CODES.CANCELLED),
                 };

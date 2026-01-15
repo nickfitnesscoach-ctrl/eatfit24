@@ -5,4 +5,10 @@
 export { useTaskPolling } from './useTaskPolling';
 export type { PollingStatus } from './useTaskPolling';
 
-export { useFoodBatchAnalysis } from './useFoodBatchAnalysis';
+export {
+    useFoodBatchAnalysis,
+    // P1.2: Unified status helpers
+    isInFlightStatus,
+    isResultStatus,
+    isTerminalStatus,
+} from './useFoodBatchAnalysis';

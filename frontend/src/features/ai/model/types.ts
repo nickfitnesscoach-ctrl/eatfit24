@@ -21,7 +21,7 @@ export interface FileWithComment {
 // ============================================================
 
 /**
- * Status of individual photo in upload queue (6 states)
+ * Status of individual photo in upload queue (7 states)
  */
 export type PhotoUploadStatus =
     | 'pending'      // Ожидает в очереди
@@ -29,7 +29,8 @@ export type PhotoUploadStatus =
     | 'uploading'    // Загружаю…
     | 'processing'   // В обработке…
     | 'success'      // Готово ✅
-    | 'error';       // Ошибка
+    | 'error'        // Ошибка
+    | 'cancelled';   // Отменено пользователем
 
 /**
  * Extended state for individual photo in queue

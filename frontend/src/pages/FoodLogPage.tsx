@@ -14,13 +14,20 @@ import {
     BatchProcessingScreen,
     LimitReachedModal,
     UploadDropzone,
+    DebugPhotoControls,
+    DebugStatusPanel,
     isHeicFile,
     convertHeicToJpeg,
     MEAL_TYPE_OPTIONS,
     AI_LIMITS,
     useAIProcessing,
+    // P1.2: Unified status helpers
+    isInFlightStatus,
+    isResultStatus,
+    isTerminalStatus,
 } from '../features/ai';
 import type { FileWithComment } from '../features/ai';
+import { IS_DEBUG } from '../shared/config/debug';
 
 const FoodLogPage: React.FC = () => {
     const navigate = useNavigate();
@@ -40,6 +47,9 @@ const FoodLogPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
 
+    // DEBUG: Prevent auto-reopen after user manually closes the modal
+    const userClosedResultsRef = React.useRef(false);
+
     // P0: Retry context from location state
     const retryMealId = (location.state as any)?.retryMealId;
     const retryMealPhotoId = (location.state as any)?.retryMealPhotoId;
@@ -48,6 +58,7 @@ const FoodLogPage: React.FC = () => {
     const {
         photoQueue,
         showResults, // from context
+        isProcessing,
         startBatch,
         retryPhoto,
         retrySelected,
@@ -55,8 +66,15 @@ const FoodLogPage: React.FC = () => {
         cleanup,
         openResults,
         closeResults,
-        hasInFlight
     } = useAIProcessing();
+
+    // P1.2: Calculate inFlight/terminal using unified helpers
+    const hasQueueInFlight = photoQueue.some(p => isInFlightStatus(p.status));
+    const allDone = photoQueue.length > 0 && !hasQueueInFlight;
+    // P1.2: hasAnyResult = success or error (things worth showing in results modal)
+    const hasAnyResult = photoQueue.some(p => isResultStatus(p.status));
+    // P1.2: hasAnyTerminal includes cancelled (for queue state checks)
+    const hasAnyTerminal = photoQueue.some(p => isTerminalStatus(p.status));
 
     // Listen to global limit event if needed, or handle errors locally via context.
     useEffect(() => {
@@ -76,13 +94,26 @@ const FoodLogPage: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-open results when all photos are done (success OR error, including cancelled)
+    // P0 FIX: Auto-open results when queue reaches terminal state
+    // Uses allDone + hasAnyResult (computed from queue statuses directly)
+    // NOT dependent on isProcessing flag which can lag behind
     useEffect(() => {
-        const allDone = photoQueue.length > 0 &&
-            photoQueue.every((p) => p.status === 'success' || p.status === 'error');
+        if (IS_DEBUG) {
+            console.log('[FoodLogPage] Auto-open check:', {
+                queueLength: photoQueue.length,
+                allDone,
+                hasAnyResult,
+                hasAnyTerminal,
+                hasQueueInFlight,
+                showResults,
+                statuses: photoQueue.map(p => p.status).join(','),
+            });
+        }
 
-        if (allDone && !hasInFlight && !showResults) {
-            // Auto-open results modal
+        // P1: Auto-open only if there are actual results (success/error)
+        // Don't open for cancelled-only batches - nothing to show user
+        if (!showResults && allDone && hasAnyResult && !userClosedResultsRef.current) {
+            if (IS_DEBUG) console.log('[FoodLogPage] Opening results modal');
             openResults();
             // Clear selected files if any
             if (selectedFiles.length > 0) {
@@ -91,7 +122,7 @@ const FoodLogPage: React.FC = () => {
             // Refresh billing to update limits
             billing.refresh();
         }
-    }, [photoQueue, hasInFlight, showResults, openResults, selectedFiles, billing]);
+    }, [showResults, allDone, hasAnyResult, hasAnyTerminal, hasQueueInFlight, photoQueue, openResults, selectedFiles, billing]);
 
     const buildFileWithComment = async (file: File): Promise<FileWithComment> => {
         if (isHeicFile(file)) {
@@ -144,6 +175,13 @@ const FoodLogPage: React.FC = () => {
     const handleAnalyze = () => {
         if (selectedFiles.length === 0) return;
 
+        // Check if user has reached daily limit BEFORE starting batch
+        // В debug режиме лимиты не проверяются — для тестирования AI-пайплайна
+        if (!IS_DEBUG && !billing.isPro && billing.isLimitReached) {
+            setShowLimitModal(true);
+            return;
+        }
+
         startBatch(selectedFiles, {
             date: selectedDate.toISOString().split('T')[0],
             mealType: mealType,
@@ -151,10 +189,18 @@ const FoodLogPage: React.FC = () => {
             mealPhotoId: retryMealPhotoId
         });
 
+        // Reset "user closed" flag for new batch
+        userClosedResultsRef.current = false;
         setSelectedFiles([]);
     };
 
     const handleCloseResults = () => {
+        // DEBUG: Stay on page, don't cleanup - for repeated testing
+        if (IS_DEBUG) {
+            userClosedResultsRef.current = true; // Prevent auto-reopen
+            closeResults();
+            return;
+        }
         cleanup();
         closeResults();
         const dateStr = selectedDate.toISOString().split('T')[0];
@@ -165,7 +211,10 @@ const FoodLogPage: React.FC = () => {
 
     const handleBackToCamera = () => {
         closeResults();
-        cleanup();
+        // DEBUG: Don't cleanup - preserve queue state for inspection
+        if (!IS_DEBUG) {
+            cleanup();
+        }
     };
 
     if (!isReady) {
@@ -189,7 +238,9 @@ const FoodLogPage: React.FC = () => {
         );
     }
 
-    const showProcessing = hasInFlight && !showResults;
+    // P0 FIX: Show processing screen only when there are actual in-flight items
+    // Not when queue has items but all are terminal (success/error)
+    const showProcessing = hasQueueInFlight && !showResults;
 
     return (
         <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -244,13 +295,40 @@ const FoodLogPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Debug Mode: Photo Controls + Status Panel */}
+                {IS_DEBUG && (
+                    <div className="space-y-4">
+                        <DebugPhotoControls
+                            selectedFiles={selectedFiles}
+                            onFilesSelected={handleFilesSelected}
+                            onClearFiles={clearSelectedFiles}
+                            onAnalyze={handleAnalyze}
+                            onCancel={cancelBatch}
+                            isProcessing={isProcessing}
+                            hasActiveQueue={hasQueueInFlight}
+                            isLimitReached={false}
+                        />
+                        <DebugStatusPanel
+                            photoQueue={photoQueue}
+                            isProcessing={isProcessing}
+                        />
+                    </div>
+                )}
+
                 {showProcessing ? (
-                    <BatchProcessingScreen
-                        photoQueue={photoQueue}
-                        onRetry={retryPhoto}
-                        onShowResults={openResults}
-                        onCancel={cancelBatch}
-                    />
+                    photoQueue.length > 0 ? (
+                        <BatchProcessingScreen
+                            photoQueue={photoQueue}
+                            onRetry={retryPhoto}
+                            onShowResults={openResults}
+                            onCancel={cancelBatch}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                            <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                            <p className="text-gray-600 font-medium">Подготовка фото...</p>
+                        </div>
+                    )
                 ) : selectedFiles.length > 0 ? (
                     <div className="space-y-[var(--section-gap)] animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="bg-white rounded-[var(--radius-card)] p-[var(--card-p)] shadow-sm border border-gray-100">
@@ -269,11 +347,22 @@ const FoodLogPage: React.FC = () => {
                                 maxFiles={AI_LIMITS.MAX_PHOTOS_PER_UPLOAD}
                             />
 
-                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
-                                <p className="text-blue-800 text-sm">
-                                    💡 <strong>Совет:</strong> Комментарий к каждому фото повышает точность распознавания
-                                </p>
-                            </div>
+                            {!billing.isPro && billing.isLimitReached ? (
+                                <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
+                                    <p className="text-red-800 text-sm font-medium">
+                                        ⚠️ <strong>Лимит исчерпан:</strong> Вы использовали все {billing.data?.daily_photo_limit} фото за сегодня.{' '}
+                                        <button onClick={() => navigate('/subscription')} className="underline hover:no-underline">
+                                            Купить PRO
+                                        </button>
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                                    <p className="text-blue-800 text-sm">
+                                        💡 <strong>Совет:</strong> Комментарий к каждому фото повышает точность распознавания
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="mt-6 grid grid-cols-2 gap-3">
                                 <button
@@ -284,7 +373,11 @@ const FoodLogPage: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleAnalyze}
-                                    className="py-3 px-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    disabled={!IS_DEBUG && !billing.isPro && billing.isLimitReached}
+                                    className={`py-3 px-4 rounded-xl font-bold text-white transition-colors flex items-center justify-center gap-2 ${!IS_DEBUG && !billing.isPro && billing.isLimitReached
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
                                 >
                                     <Send size={18} />
                                     Отправить
@@ -328,7 +421,7 @@ const FoodLogPage: React.FC = () => {
                     </div>
                 )}
 
-                {showLimitModal && (
+                {!IS_DEBUG && showLimitModal && (
                     <LimitReachedModal
                         dailyLimit={billing.data?.daily_photo_limit || 3}
                         onClose={() => {
@@ -351,7 +444,7 @@ const FoodLogPage: React.FC = () => {
                     />
                 )}
 
-                {billing.data && !billing.loading && (
+                {billing.data && !billing.loading && selectedFiles.length === 0 && !showProcessing && (
                     <div
                         className={`mt-4 rounded-[var(--radius-card)] p-[var(--card-p)] text-sm ${billing.isPro ? 'bg-purple-50 border border-purple-100' : billing.isLimitReached ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
                             }`}

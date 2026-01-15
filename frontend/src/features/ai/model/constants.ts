@@ -26,8 +26,8 @@ export const POLLING_CONFIG = {
     SLOW_PHASE_MAX_DELAY_MS: 5000,
     /** Backoff multiplier for slow phase */
     BACKOFF_MULTIPLIER: 1.3,
-    /** Maximum client-side polling duration (ms) */
-    CLIENT_TIMEOUT_MS: 60000,
+    /** Maximum client-side polling duration (ms) - 120s to match typical AI processing time */
+    CLIENT_TIMEOUT_MS: 120000,
     /** Server-side Celery timeout (for reference) */
     SERVER_TIMEOUT_MS: 90000,
 } as const;
@@ -43,6 +43,7 @@ export const PHOTO_STATUS_LABELS: Record<PhotoUploadStatus, string> = {
     processing: 'В обработке…',
     success: 'Готово ✅',
     error: 'Ошибка',
+    cancelled: 'Отменено',
 };
 
 // ============================================================

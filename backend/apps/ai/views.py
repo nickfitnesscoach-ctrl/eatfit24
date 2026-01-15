@@ -80,10 +80,13 @@ class AIRecognitionView(APIView):
 
         # P1-4: Проверяем лимит ДО создания Meal (избегаем orphan meals)
         # НО: при retry (meal_photo_id передан) не проверяем лимит — это повтор, не новый запрос
+        # В debug режиме (X-Debug-Mode: true) лимиты не проверяются — для тестирования AI-пайплайна
         from apps.billing.services import get_effective_plan_for_user
         from apps.billing.usage import DailyUsage
 
-        if not client_meal_photo_id:  # Only check limit for NEW photos
+        is_debug_mode = settings.DEBUG and request.headers.get("X-Debug-Mode") == "true"
+
+        if not client_meal_photo_id and not is_debug_mode:  # Only check limit for NEW photos (not retry, not debug)
             plan = get_effective_plan_for_user(request.user)
             limit = plan.daily_photo_limit  # None = безлимит
 

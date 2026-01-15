@@ -10,3 +10,6 @@ export { BatchResultsModal } from './Result';
 
 // State components
 export { BatchProcessingScreen, LimitReachedModal } from './States';
+
+// Debug components (only render in debug mode)
+export { DebugPhotoControls, DebugStatusPanel } from './Debug';

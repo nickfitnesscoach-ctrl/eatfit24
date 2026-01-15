@@ -430,6 +430,9 @@ def recognize_food_async(
     finalize_meal_if_complete(meal)
 
     # 4) P0-1: Инкрементируем usage ТОЛЬКО после успешного сохранения
+    # NOTE: В debug режиме (X-Debug-Mode: true) лимит не проверяется в views.py,
+    #       но usage всё равно инкрементится здесь — это нормально (bypass check ≠ bypass accounting).
+    #       Если нужна полная изоляция debug трафика, можно добавить проверку is_debug_mode здесь.
     if user_id:
         try:
             from django.contrib.auth import get_user_model

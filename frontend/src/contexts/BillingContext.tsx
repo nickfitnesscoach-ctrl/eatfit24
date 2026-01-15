@@ -11,6 +11,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { api } from '../services/api';
 import { SubscriptionDetails, BillingMe } from '../types/billing';
 import { useAuth } from './AuthContext';
+import { IS_DEBUG } from '../shared/config/debug';
 
 interface BillingContextType {
     // Subscription details
@@ -169,9 +170,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [state.subscription]);
 
     const isLimitReached = useMemo(() => {
+        // В debug режиме лимиты не применяются — для тестирования AI-пайплайна
+        if (IS_DEBUG) return false;
+
         const remaining = state.billingMe?.remaining_today;
         return remaining !== null && remaining !== undefined && remaining <= 0;
-    }, [state.billingMe]);
+    }, [state.billingMe, IS_DEBUG]); // IS_DEBUG в deps для защиты от hot-reload и разных бандлов
 
     const value = useMemo(() => ({
         ...state,

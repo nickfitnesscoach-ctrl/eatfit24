@@ -1,4 +1,4 @@
-import { fetchWithTimeout, getHeadersWithoutContentType, log } from '../../../services/api/client';
+import { fetchWithTimeout, getHeaders, getHeadersWithoutContentType, log } from '../../../services/api/client';
 import { URLS } from '../../../services/api/urls';
 import type {
     RecognizeResponse,
@@ -34,14 +34,6 @@ const mapMealTypeToApi = (mealType?: MealType | string): string | undefined => {
     const normalized = String(mealType).trim();
     const lower = normalized.toLowerCase();
     return MEAL_TYPE_MAP[lower] || MEAL_TYPE_MAP[normalized] || 'SNACK';
-};
-
-const getAuthHeaders = () => {
-    const initData = (window as any).Telegram?.WebApp?.initData || '';
-    return {
-        Authorization: `Bearer ${initData}`,
-        'X-Telegram-Init-Data': initData,
-    };
 };
 
 const safeJson = async (res: Response) => {
@@ -132,10 +124,7 @@ export const getTaskStatus = async (taskId: string, signal?: AbortSignal): Promi
 
     const res = await fetch(`${URLS.taskStatus(taskId)}`, {
         method: 'GET',
-        headers: {
-            ...getAuthHeaders(),
-            'Content-Type': 'application/json',
-        },
+        headers: getHeaders(),
         signal,
     });
 
@@ -148,7 +137,12 @@ export const getTaskStatus = async (taskId: string, signal?: AbortSignal): Promi
         throw new Error(data.message || 'Ошибка при получении статуса');
     }
 
-    return (await safeJson(res)) as TaskStatusResponse;
+    const data = (await safeJson(res)) as TaskStatusResponse;
+
+    // Debug logging: show actual status values from backend
+    log(`Task ${taskId} status: state=${data.state}, status=${data.status}`);
+
+    return data;
 };
 
 /**
@@ -160,10 +154,7 @@ export const cancelAiTask = async (taskId: string): Promise<void> => {
     try {
         await fetch(`${URLS.cancelTask(taskId)}`, {
             method: 'POST',
-            headers: {
-                ...getAuthHeaders(),
-                'Content-Type': 'application/json',
-            },
+            headers: getHeaders(),
         });
     } catch (err) {
         // Fire-and-forget: don't throw on network errors

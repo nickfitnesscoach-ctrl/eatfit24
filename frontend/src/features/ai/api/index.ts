@@ -5,7 +5,7 @@
 // API functions
 export { recognizeFood, getTaskStatus, cancelAiTask, mapToAnalysisResult } from './ai.api';
 
-// Types
+// Types and helpers
 export type {
     // Request
     MealType,
@@ -22,4 +22,8 @@ export type {
     RecognizedItem,
     AnalysisResult,
     BatchResult,
+    // Normalized status
+    NormalizedTaskStatus,
 } from './ai.types';
+
+export { normalizeTaskStatus } from './ai.types';

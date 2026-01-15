@@ -5,6 +5,7 @@ import { api } from '../../../services/api';
 import { useBilling } from '../../../contexts/BillingContext';
 import { showToast } from '../utils/notify';
 import { setPollingFlagForPayment } from './usePaymentPolling';
+import { IS_DEBUG } from '../../../shared/config/debug';
 
 interface UseSubscriptionActionsParams {
     plans: SubscriptionPlan[];
@@ -123,8 +124,8 @@ export const useSubscriptionActions = ({
     const handleSelectPlan = useCallback(
         async (planCode: PlanCode) => {
             // В debug-режимах оплату блокируем, чтобы случайно не провести реальный платеж.
-            if (isBrowserDebug || webAppBrowserDebug) {
-                showToast('Платежи недоступны в режиме отладки браузера');
+            if (IS_DEBUG || isBrowserDebug || webAppBrowserDebug) {
+                showToast('Платежи недоступны в режиме отладки');
                 return;
             }
 

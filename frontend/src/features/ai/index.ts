@@ -41,7 +41,11 @@ export type {
 
 export {
     useTaskPolling,
-    useFoodBatchAnalysis
+    useFoodBatchAnalysis,
+    // P1.2: Unified status helpers
+    isInFlightStatus,
+    isResultStatus,
+    isTerminalStatus,
 } from './hooks';
 
 export type { PollingStatus } from './hooks';
@@ -101,4 +105,7 @@ export {
     // States
     BatchProcessingScreen,
     LimitReachedModal,
+    // Debug (only renders in debug mode)
+    DebugPhotoControls,
+    DebugStatusPanel,
 } from './ui';
