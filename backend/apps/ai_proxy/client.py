@@ -163,6 +163,8 @@ class AIProxyClient:
         if request_id:
             # AI Proxy middleware читает X-Request-ID и добавляет его в ответ
             headers["X-Request-ID"] = request_id
+            # AI Proxy gate логирует по X-Trace-Id (2026-01-16)
+            headers["X-Trace-Id"] = request_id
 
         # multipart/form-data:
         # image — файл, user_comment/locale — поля формы
