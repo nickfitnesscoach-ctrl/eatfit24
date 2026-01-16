@@ -11,19 +11,33 @@ class TestAITasksExtra:
 
         # Case 1: Unsupported Image
         from apps.ai.tasks import recognize_food_async
+        from apps.nutrition.models import Meal, MealPhoto
 
-        out = recognize_food_async.run(image_bytes=b"bad", mime_type="video/mp4", user_id=user.id)
-        assert out["error"] == "UNSUPPORTED_IMAGE_TYPE"
+        meal = Meal.objects.create(user=user, meal_type="SNACK", date="2025-12-01")
+        photo = MealPhoto.objects.create(meal=meal)
+
+        out = recognize_food_async.run(
+            meal_id=meal.id,
+            meal_photo_id=photo.id,
+            image_bytes=b"bad",
+            mime_type="video/mp4",
+            user_id=user.id,
+        )
+        assert out["error_code"] == "UNSUPPORTED_IMAGE_TYPE"
         assert out["owner_id"] == user.id
 
-        # Case 2: Invalid Date
+        # Case 2: Invalid Date (defense-in-depth, normally caught by serializer)
+        meal2 = Meal.objects.create(user=user, meal_type="SNACK", date="2025-12-01")
+        photo2 = MealPhoto.objects.create(meal=meal2)
         out = recognize_food_async.run(
+            meal_id=meal2.id,
+            meal_photo_id=photo2.id,
             image_bytes=b"\x89PNG\r\n\x1a\n",
             mime_type="image/png",
             date="invalid-date",
             user_id=user.id,
         )
-        assert out["error"] == "INVALID_DATE_FORMAT"
+        assert out["error_code"] == "UNKNOWN_ERROR"  # Internal validation error
         assert out["owner_id"] == user.id
 
     def test_retry_on_timeout(self, django_user_model):
@@ -52,9 +66,18 @@ class TestAITasksExtra:
                 # In eager/test mode, retry() often re-raises the exception.
                 # Let's catch BOTH and verify logic flow via logs or side_effects.
 
+                from apps.nutrition.models import Meal, MealPhoto
+
+                meal = Meal.objects.create(user=user, meal_type="SNACK", date="2025-12-01")
+                photo = MealPhoto.objects.create(meal=meal)
+
                 try:
                     recognize_food_async.run(
-                        image_bytes=b"\x89PNG\r\n\x1a\n", mime_type="image/png", user_id=user.id
+                        meal_id=meal.id,
+                        meal_photo_id=photo.id,
+                        image_bytes=b"\x89PNG\r\n\x1a\n",
+                        mime_type="image/png",
+                        user_id=user.id,
                     )
                 except (AIProxyTimeoutError, Retry):
                     # If we got here, it didn't crash with something else.

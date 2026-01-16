@@ -16,6 +16,7 @@ import logging
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import Throttled
 
 from apps.core.exceptions import (
     FoodMindException,
@@ -35,6 +36,10 @@ def custom_exception_handler(exc, context):
     Custom exception handler for DRF.
     Returns unified error format for all exceptions.
     """
+    # Special handling for Throttled exception (rate limiting)
+    if isinstance(exc, Throttled):
+        return _handle_throttled_exception(exc, context)
+
     # Let DRF handle its own exceptions first
     response = exception_handler(exc, context)
 
@@ -61,6 +66,44 @@ def custom_exception_handler(exc, context):
         },
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
+
+
+def _handle_throttled_exception(exc: Throttled, context):
+    """
+    Handle DRF Throttled exception with AI Error Contract.
+    Returns structured error response for rate limiting.
+    """
+    from apps.ai.error_contract import AIErrorRegistry
+    import uuid
+
+    # Get wait time from exception
+    wait_seconds = int(exc.wait) if exc.wait else 60
+
+    # Get request_id from context if available
+    request = context.get('request')
+    request_id = request.headers.get('X-Request-ID') if request else None
+    if not request_id:
+        request_id = uuid.uuid4().hex
+
+    error_def = AIErrorRegistry.RATE_LIMIT
+
+    # Override retry_after_sec with actual wait time from throttle
+    error_data = error_def.to_dict(trace_id=request_id)
+    error_data['retry_after_sec'] = wait_seconds
+
+    logger.warning(
+        "[Throttle] Rate limit exceeded: user=%s wait=%s request_id=%s",
+        getattr(request, 'user', None),
+        wait_seconds,
+        request_id,
+    )
+
+    response = Response(error_data, status=status.HTTP_429_TOO_MANY_REQUESTS)
+    response['X-Request-ID'] = request_id
+    if wait_seconds:
+        response['Retry-After'] = str(wait_seconds)
+
+    return response
 
 
 def _convert_drf_error(response, exc):

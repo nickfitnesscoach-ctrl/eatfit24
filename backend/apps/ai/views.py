@@ -100,13 +100,12 @@ class AIRecognitionView(APIView):
                         limit,
                         request_id,
                     )
+
+                    from .error_contract import AIErrorRegistry
+
+                    error_def = AIErrorRegistry.DAILY_PHOTO_LIMIT_EXCEEDED
                     resp = Response(
-                        {
-                            "error": "DAILY_PHOTO_LIMIT_EXCEEDED",
-                            "message": "Вы исчерпали дневной лимит фото",
-                            "used": usage.photo_ai_requests,
-                            "limit": limit,
-                        },
+                        error_def.to_dict(trace_id=request_id),
                         status=status.HTTP_429_TOO_MANY_REQUESTS,
                     )
                     resp["X-Request-ID"] = request_id
@@ -123,14 +122,17 @@ class AIRecognitionView(APIView):
 
         # RETRY MODE: Re-use existing MealPhoto instead of creating new
         if client_meal_photo_id:
+            from .error_contract import AIErrorRegistry
+
             try:
                 meal_photo = MealPhoto.objects.select_related("meal").get(
                     id=client_meal_photo_id,
                     meal__user=request.user,  # Security: verify ownership
                 )
             except MealPhoto.DoesNotExist:
+                error_def = AIErrorRegistry.PHOTO_NOT_FOUND
                 resp = Response(
-                    {"error": "PHOTO_NOT_FOUND", "message": "Фото не найдено"},
+                    error_def.to_dict(trace_id=request_id),
                     status=status.HTTP_404_NOT_FOUND,
                 )
                 resp["X-Request-ID"] = request_id
@@ -138,11 +140,9 @@ class AIRecognitionView(APIView):
 
             # Only allow retry on FAILED/CANCELLED photos
             if meal_photo.status not in ("FAILED", "CANCELLED"):
+                error_def = AIErrorRegistry.INVALID_STATUS
                 resp = Response(
-                    {
-                        "error": "INVALID_STATUS",
-                        "message": "Можно повторить только неудавшиеся фото",
-                    },
+                    error_def.to_dict(trace_id=request_id),
                     status=status.HTTP_400_BAD_REQUEST,
                 )
                 resp["X-Request-ID"] = request_id
@@ -311,9 +311,17 @@ class TaskStatusView(APIView):
                 task_id,
                 request_id,
             )
-            return Response(
-                {"error": "Task not found or access denied"}, status=status.HTTP_404_NOT_FOUND
+
+            from .error_contract import AIErrorRegistry
+
+            # Use PHOTO_NOT_FOUND for unauthorized access (don't reveal task existence)
+            error_def = AIErrorRegistry.PHOTO_NOT_FOUND
+            resp = Response(
+                error_def.to_dict(trace_id=request_id),
+                status=status.HTTP_404_NOT_FOUND
             )
+            resp["X-Request-ID"] = request_id
+            return resp
 
         # res is already defined above in fallback block or needs to be
         if "res" not in locals():
@@ -351,11 +359,15 @@ class TaskStatusView(APIView):
         if state == "FAILURE":
             # Клиенту — безопасно и кратко. В логи — подробнее.
             logger.warning("AI task failed: task_id=%s error=%r", task_id, res.result)
+
+            from .error_contract import AIErrorRegistry
+
+            error_def = AIErrorRegistry.INTERNAL_ERROR
             data = {
                 "task_id": task_id,
                 "status": "failed",
                 "state": state,
-                "error": "Произошла ошибка при обработке. Попробуйте ещё раз.",
+                "result": error_def.to_dict(trace_id=request_id),
             }
             resp = Response(data, status=status.HTTP_200_OK)
             resp["X-Request-ID"] = request_id

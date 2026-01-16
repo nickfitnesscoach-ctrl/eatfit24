@@ -199,7 +199,7 @@ class TestAIAsyncFlow:
         # Should return 429
         assert resp.status_code == 429
         body = resp.json()
-        assert body["error"] == "DAILY_PHOTO_LIMIT_EXCEEDED"
+        assert body["error_code"] == "DAILY_PHOTO_LIMIT_EXCEEDED"
 
         # No new Meal should be created
         meal_count_after = Meal.objects.filter(user=user).count()

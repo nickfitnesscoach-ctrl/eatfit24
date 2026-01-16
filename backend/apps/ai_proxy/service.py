@@ -100,12 +100,16 @@ class AIProxyService:
             # 2. Check action: if reject → controlled error, NO client call
             if norm_metrics.get("action") == "reject":
                 reason = norm_metrics.get("reason", "unknown")
+
+                # Import Error Contract для нормализации ошибок
+                from apps.ai.error_contract import AIErrorRegistry
+
                 # Unified error_code mapping by reason only
                 if reason == "unsupported_format":
-                    error_code = "UNSUPPORTED_IMAGE_FORMAT"
+                    error_def = AIErrorRegistry.UNSUPPORTED_IMAGE_FORMAT
                 else:
                     # decode_failed, save_failed, too_slow, unknown → IMAGE_DECODE_FAILED
-                    error_code = "IMAGE_DECODE_FAILED"
+                    error_def = AIErrorRegistry.IMAGE_DECODE_FAILED
 
                 return RecognizeFoodResult(
                     items=[],
@@ -113,8 +117,7 @@ class AIProxyService:
                     meta={
                         "request_id": request_id,
                         "is_error": True,
-                        "error_code": error_code,
-                        "error_message": "Не удалось обработать фото. Отправь как JPEG или сделай скриншот.",
+                        **error_def.to_dict(trace_id=request_id),
                     },
                 )
 
@@ -127,14 +130,17 @@ class AIProxyService:
             logger.exception(
                 "Unexpected normalization error: request_id=%s, error=%s", request_id, e
             )
+
+            from apps.ai.error_contract import AIErrorRegistry
+            error_def = AIErrorRegistry.IMAGE_DECODE_FAILED
+
             return RecognizeFoodResult(
                 items=[],
                 totals={},
                 meta={
                     "request_id": request_id,
                     "is_error": True,
-                    "error_code": "IMAGE_PROCESSING_ERROR",
-                    "error_message": "Ошибка обработки изображения. Попробуй ещё раз.",
+                    **error_def.to_dict(trace_id=request_id, debug_details={"exception": str(e)}),
                 },
             )
 
@@ -148,14 +154,23 @@ class AIProxyService:
                 content_type,
                 normalized_longest,
             )
+
+            from apps.ai.error_contract import AIErrorRegistry
+            error_def = AIErrorRegistry.INVALID_IMAGE
+
             return RecognizeFoodResult(
                 items=[],
                 totals={},
                 meta={
                     "request_id": request_id,
                     "is_error": True,
-                    "error_code": "IMAGE_VALIDATION_FAILED",
-                    "error_message": "Ошибка подготовки изображения. Попробуй другое фото.",
+                    **error_def.to_dict(
+                        trace_id=request_id,
+                        debug_details={
+                            "content_type": content_type,
+                            "longest_side": normalized_longest,
+                        },
+                    ),
                 },
             )
 

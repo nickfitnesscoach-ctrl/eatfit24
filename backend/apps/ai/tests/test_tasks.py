@@ -193,7 +193,7 @@ class TestAITasks:
                 )
 
                 # EXPECTED: Returns error payload, NOT raises
-                assert out["error"] == "AI_ERROR"
+                assert out["error_code"] == "UNKNOWN_ERROR"  # AIProxyValidationError maps to UNKNOWN_ERROR
                 # EXPECTED: NOT called on error
                 mock_inc.assert_not_called()
                 # EXPECTED: Meal now stays as FAILED instead of deleted (or keeps existing items)
@@ -225,7 +225,7 @@ class TestAITasks:
                 user_id=user.id,
             )
 
-            assert out["error"] == "EMPTY_RESULT"
+            assert out["error_code"] == "EMPTY_RESULT"
             assert Meal.objects.get(id=meal.id).status == "FAILED"
 
     def test_meal_failed_on_controlled_error(self, django_user_model):
@@ -252,7 +252,7 @@ class TestAITasks:
                 user_id=user.id,
             )
 
-            assert out["error"] == "BLURRY"
+            assert out["error_code"] == "BLURRY"  # Controlled error from AI server meta.error_code
             assert Meal.objects.get(id=meal.id).status == "FAILED"
 
     def test_security_meal_ownership_isolation(self, django_user_model):

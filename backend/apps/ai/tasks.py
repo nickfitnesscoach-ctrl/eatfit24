@@ -35,6 +35,8 @@ from apps.ai_proxy import (
 )
 from apps.common.nutrition_utils import clamp_grams
 
+from .error_contract import AIErrorDefinition, AIErrorRegistry
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,8 +90,49 @@ def _json_safe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return safe
 
 
-def _update_meal_photo_failed(meal_photo_id: int | None, error_code: str, error_message: str):
-    """Update MealPhoto to FAILED status and trigger finalization check."""
+def _error_response(
+    error_def: AIErrorDefinition,
+    meal_id: int,
+    meal_photo_id: Optional[int],
+    user_id: Optional[int],
+    trace_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Создать error response для Celery task.
+
+    Args:
+        error_def: AIErrorDefinition с полным контрактом ошибки
+        meal_id: ID приёма пищи
+        meal_photo_id: ID фото (может быть None)
+        user_id: ID пользователя (для owner_id)
+        trace_id: Опциональный trace_id
+
+    Returns:
+        Словарь с error response (готов для return из task)
+    """
+    return {
+        **error_def.to_dict(trace_id=trace_id),
+        "items": [],
+        "totals": {},
+        "meal_id": meal_id,
+        "meal_photo_id": meal_photo_id,
+        "owner_id": user_id,
+    }
+
+
+def _update_meal_photo_failed(
+    meal_photo_id: int | None,
+    error_def: AIErrorDefinition,
+    trace_id: Optional[str] = None,
+):
+    """
+    Update MealPhoto to FAILED status with Error Contract data.
+
+    Args:
+        meal_photo_id: ID MealPhoto для обновления
+        error_def: AIErrorDefinition с полным контрактом ошибки
+        trace_id: Опциональный trace_id для корреляции логов
+    """
     if not meal_photo_id:
         # Legacy/bot call without pre-created photo - nothing to update
         return
@@ -102,20 +145,22 @@ def _update_meal_photo_failed(meal_photo_id: int | None, error_code: str, error_
             photo = MealPhoto.objects.select_for_update().get(id=meal_photo_id)
             # Only update if not already in terminal state
             if photo.status not in ("SUCCESS", "FAILED", "CANCELLED"):
-                photo.status = "CANCELLED" if error_code == "CANCELLED" else "FAILED"
-                photo.error_code = error_code  # P1.5: Store structured code
-                photo.error_message = error_message
-                photo.recognized_data = {"error": error_code, "error_message": error_message}
+                photo.status = "CANCELLED" if error_def.code == "CANCELLED" else "FAILED"
+                photo.error_code = error_def.code  # P1.5: Store structured code
+                photo.error_message = error_def.user_message
+                # Store full error contract in recognized_data
+                photo.recognized_data = error_def.to_dict(trace_id=trace_id)
                 photo.save(
                     update_fields=["status", "error_code", "error_message", "recognized_data"]
                 )
 
                 # P1.5: Structured logging for observability (grep-friendly)
                 logger.warning(
-                    "[AI:FAILED] photo_id=%s user_id=%s error_code=%s meal_id=%s",
+                    "[AI:FAILED] photo_id=%s user_id=%s error_code=%s category=%s meal_id=%s",
                     meal_photo_id,
                     photo.meal.user_id if photo.meal else None,
-                    error_code,
+                    error_def.code,
+                    error_def.category,
                     photo.meal_id,
                 )
 
@@ -213,14 +258,10 @@ def recognize_food_async(
         "image/heic",
         "image/heif",
     ]:
-        _update_meal_photo_failed(
-            meal_photo_id,
-            "UNSUPPORTED_IMAGE_TYPE",
-            "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP.",
-        )
+        error_def = AIErrorRegistry.UNSUPPORTED_IMAGE_TYPE
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
         return {
-            "error": "UNSUPPORTED_IMAGE_TYPE",
-            "error_message": "Пожалуйста, загрузите изображение в формате JPEG, PNG или WEBP.",
+            **error_def.to_dict(trace_id=rid),
             "items": [],
             "meal_id": meal_id,
             "meal_photo_id": meal_photo_id,
@@ -234,17 +275,9 @@ def recognize_food_async(
 
     # For HEIC we rely on client MIME as signatures are complex (ftyp)
     if not detected and mime_type not in ["image/heic", "image/heif"]:
-        _update_meal_photo_failed(
-            meal_photo_id, "INVALID_IMAGE", "Файл поврежден или не является изображением."
-        )
-        return {
-            "error": "INVALID_IMAGE",
-            "error_message": "Файл поврежден или не является изображением.",
-            "items": [],
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "owner_id": user_id,
-        }
+        error_def = AIErrorRegistry.INVALID_IMAGE
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+        return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
 
     # 2) Safely parse date
     import datetime
@@ -255,18 +288,9 @@ def recognize_food_async(
             parsed_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         except ValueError:
             logger.warning("[AI] Invalid date format: %s rid=%s", date, rid)
-            _update_meal_photo_failed(
-                meal_photo_id, "INVALID_DATE_FORMAT", "Некорректный формат даты."
-            )
-            return {
-                "meal_id": meal_id,
-                "meal_photo_id": meal_photo_id,
-                "items": [],
-                "totals": {},
-                "error": "INVALID_DATE_FORMAT",
-                "error_message": "Некорректный формат даты.",
-                "owner_id": user_id,
-            }
+            error_def = AIErrorRegistry.UNKNOWN_ERROR  # Date format is internal error
+            _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+            return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
     else:
         parsed_date = date or datetime.date.today()
 
@@ -276,15 +300,9 @@ def recognize_food_async(
         logger.warning(
             "[AI] Meal not found or ownership mismatch: meal_id=%s user_id=%s", meal_id, user_id
         )
-        _update_meal_photo_failed(meal_photo_id, "MEAL_NOT_FOUND", "Приём пищи не найден.")
-        return {
-            "error": "MEAL_NOT_FOUND",
-            "error_message": "Приём пищи не найден.",
-            "items": [],
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "owner_id": user_id,
-        }
+        error_def = AIErrorRegistry.UNKNOWN_ERROR
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+        return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
 
     # P0-Cancel: Check if task was cancelled
     if _is_task_cancelled(task_id, user_id):
@@ -294,15 +312,9 @@ def recognize_food_async(
             user_id,
             rid,
         )
-        _update_meal_photo_failed(meal_photo_id, "CANCELLED", "Отменено")
-        return {
-            "error": "CANCELLED",
-            "error_message": "Отменено",
-            "items": [],
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "owner_id": user_id,
-        }
+        error_def = AIErrorRegistry.CANCELLED
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+        return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
 
     service = AIProxyService()
 
@@ -318,56 +330,45 @@ def recognize_food_async(
     except Exception as e:
         logger.error("[AI] Proxy error: %r rid=%s", e, rid)
 
-        # Определяем сообщение в зависимости от типа ошибки
+        # Определяем ошибку в зависимости от типа exception
         if isinstance(e, AIProxyTimeoutError):
-            error_code = "AI_TIMEOUT"
-            error_message = "Сервер не ответил вовремя. Попробуйте ещё раз."
+            error_def = AIErrorRegistry.AI_TIMEOUT
         elif isinstance(e, AIProxyServerError):
-            error_code = "AI_SERVER_ERROR"
-            error_message = "Сервер временно недоступен. Попробуйте ещё раз."
+            error_def = AIErrorRegistry.AI_SERVER_ERROR
         else:
-            error_code = "AI_ERROR"
-            error_message = "Произошла ошибка при обработке фото. Попробуйте позже."
+            error_def = AIErrorRegistry.UNKNOWN_ERROR
 
         # Сразу помечаем фото как FAILED (без retry — пользователь нажмёт "Повторить" сам)
-        _update_meal_photo_failed(meal_photo_id, error_code, error_message)
-        return {
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "items": [],
-            "totals": {},
-            "error": error_code,
-            "error_message": error_message,
-            "owner_id": user_id,
-        }
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+        return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
 
     items = result.items
     totals = result.totals
     meta = result.meta
 
-    # P0-2: Обрабатываем controlled error
+    # P0-2: Обрабатываем controlled error (meta уже содержит Error Contract)
     if meta.get("is_error"):
-        error_code = meta.get("error_code", "UNKNOWN")
-        error_message = meta.get(
-            "error_message", "Не удалось распознать еду на фото. Попробуйте ещё раз."
-        )
+        error_code = meta.get("error_code", "UNKNOWN_ERROR")
+        error_def = AIErrorRegistry.get_by_code(error_code)
+
         logger.warning(
-            "[AI] controlled error task=%s meal_id=%s photo_id=%s rid=%s code=%s",
+            "[AI] controlled error task=%s meal_id=%s photo_id=%s rid=%s code=%s category=%s",
             task_id,
             meal_id,
             meal_photo_id,
             rid,
             error_code,
+            error_def.category,
         )
-        _update_meal_photo_failed(meal_photo_id, error_code, error_message)
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+
+        # Meta уже содержит полный Error Contract, просто добавляем служебные поля
         return {
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
+            **meta,  # Содержит error_code, user_title, user_message, user_actions, etc.
             "items": [],
             "totals": {},
-            "meta": meta,
-            "error": error_code,
-            "error_message": error_message,
+            "meal_id": meal_id,
+            "meal_photo_id": meal_photo_id,
             "owner_id": user_id,
         }
 
@@ -376,17 +377,9 @@ def recognize_food_async(
 
     # P0 Data Integrity: Handle empty results
     if not safe_items:
-        _update_meal_photo_failed(
-            meal_photo_id, "EMPTY_RESULT", "Не удалось распознать еду на фото."
-        )
-        return {
-            "error": "EMPTY_RESULT",
-            "error_message": "Не удалось распознать еду на фото.",
-            "items": [],
-            "meal_id": meal_id,
-            "meal_photo_id": meal_photo_id,
-            "owner_id": user_id,
-        }
+        error_def = AIErrorRegistry.EMPTY_RESULT
+        _update_meal_photo_failed(meal_photo_id, error_def, trace_id=rid)
+        return _error_response(error_def, meal_id, meal_photo_id, user_id, trace_id=rid)
 
     # 3) Сохраняем в БД атомарно
     with transaction.atomic():
