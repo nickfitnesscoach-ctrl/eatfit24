@@ -27,12 +27,30 @@ The AI Proxy serves as a security and normalization bridge between the main Djan
 
 ## 2. Environment Configuration
 
-The following variables are required in the Django backend:
+### SSOT: Environment Variables
 
-| Variable | Description | Default / Example |
-|----------|-------------|-------------------|
-| `AI_PROXY_URL` | Base URL of the AI Proxy service | `http://100.84.210.65:8001` |
-| `AI_PROXY_SECRET` | Authentication secret | `Authorization: Bearer <SECRET>` |
+**RU Backend (85.198.81.133)** — `/opt/eatfit24/.env`:
+- `AI_PROXY_URL` — Base URL of AI Proxy service (e.g., `http://185.171.80.128:8001`)
+- `AI_PROXY_SECRET` — Authentication secret (MUST match NL proxy)
+
+**NL AI Proxy (185.171.80.128)** — `/opt/eatfit24-ai-proxy/.env`:
+- `API_PROXY_SECRET` — Authentication secret (MUST match RU backend)
+- `OPENROUTER_API_KEY` — OpenRouter credentials
+- `OPENROUTER_MODEL` — Model ID (e.g., `openai/gpt-5-image-mini`)
+
+**Critical:** `AI_PROXY_SECRET` (backend) MUST equal `API_PROXY_SECRET` (proxy). Header used: `X-API-Key`.
+
+### Quick Verification
+
+```bash
+# RU: Check secret is in container
+ssh deploy@85.198.81.133
+docker compose exec backend env | grep AI_PROXY_SECRET | head -c 20
+
+# NL: Check secret is in container
+ssh root@185.171.80.128
+docker compose exec ai-proxy env | grep API_PROXY_SECRET | head -c 20
+```
 
 ---
 
@@ -46,7 +64,9 @@ To prevent worker exhaustion while allowing for slow LLM generation, we use spec
 
 ### Authentication
 Requests must include the secret in the header:
-`Authorization: Bearer <AI_PROXY_SECRET>`
+**Header:** `X-API-Key: <AI_PROXY_SECRET>`
+
+See [backend/apps/ai_proxy/client.py:102](../backend/apps/ai_proxy/client.py#L102) for implementation.
 
 ---
 
@@ -114,13 +134,36 @@ The `ai_proxy` module normalizes all AI responses into a unified structure:
 ## 7. Operational Runbook
 
 ### Health Check
-Verify the proxy is alive:
-`curl -H "Authorization: Bearer <SECRET>" http://<AI_PROXY_URL>/health`
+```bash
+# Backend health
+curl -s -k https://eatfit24.ru/health/ | jq .
+
+# AI Proxy health
+curl -i http://185.171.80.128:8001/health
+```
+
+### Secret Verification (Post-Deploy)
+```bash
+# RU Backend
+ssh deploy@85.198.81.133
+cd /opt/eatfit24
+docker compose exec backend env | grep AI_PROXY_SECRET
+# Expected: AI_PROXY_SECRET=<64-char hex>
+
+# NL AI Proxy
+ssh root@185.171.80.128
+cd /opt/eatfit24-ai-proxy
+docker compose exec ai-proxy env | grep API_PROXY_SECRET
+# Expected: API_PROXY_SECRET=<64-char hex>
+
+# Secrets MUST match!
+```
 
 ### Troubleshooting
-- **"401 Unauthorized"**: Check that `AI_PROXY_SECRET` matches on both sides.
+- **"401 Unauthorized"**: Check that `AI_PROXY_SECRET` (RU) = `API_PROXY_SECRET` (NL). Header must be `X-API-Key`.
 - **"Empty Result"**: LLM failed to identify food. Check if image normalization stripped the content.
-- **"Connection Refused"**: Check VPN (Tailscale) status and UFW firewall on the Proxy server.
+- **"Connection Refused"**: Check network RU→NL: `curl -i http://185.171.80.128:8001/health` from RU server.
+- **"UPSTREAM_ERROR"**: OpenRouter credentials invalid or model unavailable. Check `OPENROUTER_API_KEY` on NL proxy.
 
 ---
 

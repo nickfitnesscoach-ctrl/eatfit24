@@ -53,6 +53,34 @@ docker compose up -d --build
 curl -H "Host: eatfit24.ru" http://localhost:8000/health/
 ```
 
+**CRITICAL: Environment Variable Synchronization Rule**
+
+When `.env` is modified (secrets, API keys, feature flags), you MUST restart all services that read environment variables:
+
+```bash
+# After .env changes, restart ALL affected services
+docker compose up -d --force-recreate backend celery-worker celery-beat bot
+```
+
+**Why this matters:**
+- `docker compose restart` does NOT reload `.env` changes
+- Partial restarts (e.g., only `backend`) leave other services (e.g., `celery-worker`) with stale environment
+- This causes subtle bugs like 401/403 errors when workers can't authenticate with updated secrets
+
+**Affected services:**
+- `backend` — Django API (reads all env vars)
+- `celery-worker` — Async tasks (reads AI_PROXY_SECRET, OPENROUTER_API_KEY, etc.)
+- `celery-beat` — Scheduled tasks (reads admin notifications config)
+- `bot` — Telegram bot (reads TELEGRAM_BOT_TOKEN, DJANGO_API_URL, etc.)
+
+**Verification after env changes:**
+```bash
+# Verify specific secret is present in all services
+docker compose exec backend env | grep AI_PROXY_SECRET
+docker compose exec celery-worker env | grep AI_PROXY_SECRET
+docker compose exec bot env | grep TELEGRAM_BOT_TOKEN
+```
+
 ## Quick Commands
 
 ### Backend (Django)
@@ -234,6 +262,31 @@ Detailed documentation in `backend/apps/billing/docs/`:
 - `webhooks.md` — Webhook handling
 - `security.md` — Security constraints
 - `operations.md` — Operational procedures
+
+### AI Proxy Authentication (SSOT)
+**Critical:** Backend ↔ AI Proxy communication requires matching secrets.
+
+**RU Backend** (`/opt/eatfit24/.env`):
+- `AI_PROXY_URL=http://185.171.80.128:8001`
+- `AI_PROXY_SECRET=<64-char-hex>` — MUST match NL proxy
+
+**NL AI Proxy** (`/opt/eatfit24-ai-proxy/.env`):
+- `API_PROXY_SECRET=<64-char-hex>` — MUST match RU backend
+- `OPENROUTER_API_KEY=sk-or-v1-***`
+- `OPENROUTER_MODEL=openai/gpt-5-image-mini`
+
+**Header used:** `X-API-Key` (see [backend/apps/ai_proxy/client.py:102](backend/apps/ai_proxy/client.py#L102))
+
+**Quick verification:**
+```bash
+# RU: Check secret loaded in container
+docker compose exec backend env | grep AI_PROXY_SECRET
+
+# NL: Check secret loaded in container
+docker compose exec ai-proxy env | grep API_PROXY_SECRET
+```
+
+Detailed docs: [docs/AI_PROXY.md](docs/AI_PROXY.md)
 
 ### Time & Timezone
 **"If it runs on the server — it's UTC."**
@@ -466,6 +519,17 @@ Manual verification (if script not available):
    curl -k https://eatfit24.ru/health/ | jq .         # Health endpoint OK
    ```
 
+4. **Environment synchronization** (if `.env` was modified):
+   ```bash
+   # Verify all services have the latest environment variables
+   docker compose exec backend env | grep AI_PROXY_SECRET
+   docker compose exec celery-worker env | grep AI_PROXY_SECRET
+   docker compose exec bot env | grep TELEGRAM_BOT_TOKEN
+
+   # If any service shows stale/missing vars, recreate affected services:
+   docker compose up -d --force-recreate backend celery-worker celery-beat bot
+   ```
+
 ## Deployment Invariants
 
 These rules MUST be enforced to prevent production issues:
@@ -612,6 +676,60 @@ docker exec eatfit24-backend python manage.py shell -c "from django.conf import 
 # Celery timezone config
 docker logs eatfit24-celery-worker --tail 50 | grep -i timezone
 # Expected: timezone: Europe/Moscow, enable_utc: True
+```
+
+### 6. Environment Synchronization
+
+**Rule**: When `.env` is modified, ALL services that read environment variables MUST be recreated.
+
+**Problem**: `docker compose restart` does NOT reload `.env` changes. Partial restarts (e.g., only `backend`) leave other services (e.g., `celery-worker`) with stale environment variables.
+
+**Example failure case** (2026-01-16):
+- Backend restarted with new `AI_PROXY_SECRET` → works fine ✅
+- Celery worker NOT restarted → still has old/missing secret → 401/403 errors ❌
+- User-visible symptom: Photo upload fails with "Ошибка обработки"
+
+**Enforcement**:
+- ✅ **Manual protocol**: After `.env` changes, recreate all affected services
+- ✅ **Pre-deploy checklist**: Step 4 verifies env synchronization (added 2026-01-16)
+- ✅ **Documentation**: This rule documented in "Production Deployment" section
+
+**Affected services**:
+- `backend` — Django API (reads all env vars)
+- `celery-worker` — Async tasks (reads `AI_PROXY_SECRET`, `OPENROUTER_API_KEY`, etc.)
+- `celery-beat` — Scheduled tasks (reads admin notifications config)
+- `bot` — Telegram bot (reads `TELEGRAM_BOT_TOKEN`, `DJANGO_API_URL`, etc.)
+
+**Standard workflow** (after `.env` changes):
+```bash
+# 1. Recreate all affected services
+docker compose up -d --force-recreate backend celery-worker celery-beat bot
+
+# 2. Verify env vars are present in all services
+docker compose exec backend env | grep AI_PROXY_SECRET
+docker compose exec celery-worker env | grep AI_PROXY_SECRET
+docker compose exec bot env | grep TELEGRAM_BOT_TOKEN
+```
+
+**Verification**:
+```bash
+# Check if services have matching env vars (example: AI_PROXY_SECRET)
+for service in backend celery-worker; do
+  echo "=== $service ==="
+  docker compose exec $service env | grep AI_PROXY_SECRET | head -c 20
+  echo "..."
+done
+# Both should show the same secret prefix
+```
+
+**Recovery** (if stale env detected in production):
+```bash
+# Recreate affected service immediately
+docker compose up -d --force-recreate celery-worker
+
+# Verify
+docker compose exec celery-worker env | grep AI_PROXY_SECRET
+docker compose logs --tail 50 celery-worker  # Check for startup errors
 ```
 
 ## CI/CD Pipeline

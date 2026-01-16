@@ -2,7 +2,7 @@
 
 Operational procedures, triggers, and decision trees for infrastructure maintenance.
 
-**Last updated:** 2026-01-14
+**Last updated:** 2026-01-16
 **Owner:** DevOps / Infrastructure
 
 ---
@@ -105,7 +105,10 @@ All automated tasks have logrotate configured:
 **Actions:**
 1. Check service status: `docker compose ps`
 2. Check logs: `docker compose logs --tail 100 [service]`
-3. Restart if needed: `docker compose restart [service]`
+3. Restart if needed:
+   - **Without env changes:** `docker compose restart [service]`
+   - **After env changes:** `docker compose up -d --force-recreate [service]`
+   - **Critical:** If restarting backend/celery-worker/celery-beat/bot after `.env` changes, ALWAYS use `--force-recreate` for ALL affected services to avoid env desync
 4. Verify: `curl -H "Host: eatfit24.ru" http://localhost:8000/health/`
 
 ---
@@ -304,9 +307,49 @@ tail -100 /var/log/health-monitor.log 2>/dev/null
 ### Service Health Degradation
 1. Check container logs for errors
 2. Check disk I/O and memory usage: `docker stats`
-3. Restart affected services: `docker compose restart [service]`
+3. Restart affected services:
+   - **Without env changes:** `docker compose restart [service]`
+   - **After env changes:** `docker compose up -d --force-recreate [service]`
+   - **Critical:** If `.env` was modified recently, recreate ALL services that read env vars (backend, celery-worker, celery-beat, bot) to avoid desync
 4. If persistent, check for resource exhaustion or application bugs
 5. Escalate to development team if application-level issue
+
+---
+
+## 🔧 Known Issues & Solutions
+
+### Environment Desync (AI Tasks Failing with 401/403)
+
+**Symptom:** Photo upload fails with "Ошибка обработки", Celery logs show `401 Unauthorized` or `403 Forbidden` when calling AI Proxy.
+
+**Root cause:** `celery-worker` container has stale/missing `AI_PROXY_SECRET` after backend restart with updated `.env`.
+
+**Why it happens:** `docker compose restart` does NOT reload `.env` changes. Partial restarts (only `backend`) leave other services with old environment.
+
+**Quick fix:**
+```bash
+cd /opt/eatfit24
+docker compose up -d --force-recreate celery-worker
+docker compose exec celery-worker env | grep AI_PROXY_SECRET  # Verify
+docker compose logs --tail 50 celery-worker  # Check startup
+```
+
+**Prevention:** After ANY `.env` modification, recreate ALL affected services:
+```bash
+docker compose up -d --force-recreate backend celery-worker celery-beat bot
+```
+
+**Verification:**
+```bash
+# All services should have matching secrets
+for service in backend celery-worker; do
+  echo "=== $service ==="
+  docker compose exec $service env | grep AI_PROXY_SECRET | head -c 20
+  echo "..."
+done
+```
+
+**First occurrence:** 2026-01-16 (documented in [CLAUDE.md](../CLAUDE.md) Deployment Invariant #6)
 
 ---
 
