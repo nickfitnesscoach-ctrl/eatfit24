@@ -88,6 +88,7 @@ Thumbs.db
 
 # Claude/Cursor temp cwd markers
 tmpclaude-*
+**/tmpclaude-*
 
 # =========================
 # Testing
@@ -136,3 +137,4 @@ admin-credentials.txt
 # =========================
 # Если ai-proxy живёт отдельным репо — держим его вне основного git
 eatfit24-ai-proxy/
+**/tmpclaude-*
