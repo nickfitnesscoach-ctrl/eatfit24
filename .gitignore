@@ -125,9 +125,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # =========================
-# Explicit trash
+# Explicit trash / artifacts
 # =========================
 admin-credentials.txt
+*_results.txt
+*_results.json
 
 # =========================
 # Separate repositories (not tracked in main repo)
