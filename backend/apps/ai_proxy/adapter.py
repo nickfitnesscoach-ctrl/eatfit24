@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from apps.common.nutrition_utils import clamp_grams as _clamp_grams
+
 
 def _to_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -39,10 +41,6 @@ def _to_int(value: Any, default: int = 1) -> int:
         return int(round(float(value)))
     except (TypeError, ValueError):
         return default
-
-
-# P2-2: Используем общую функцию из common module
-from apps.common.nutrition_utils import clamp_grams as _clamp_grams
 
 
 def _pick_name(item: Dict[str, Any]) -> str:
@@ -181,7 +179,16 @@ def normalize_proxy_response(raw: Any, *, request_id: str = "") -> Dict[str, Any
             "meta": {"request_id": request_id, "warning": "non-object-json"},
         }
 
-    raw_items = raw.get("items") or []
+    # AI Proxy API wraps recognition payload in "result" key
+    # Unwrap it, with fallback to root level for backward compatibility (old proxy / tests)
+    payload = raw.get("result")
+    if isinstance(payload, dict):
+        data = payload
+    else:
+        # Backward-compatible fallback: old proxy / direct LLM-shaped responses
+        data = raw
+
+    raw_items = data.get("items") or []
     if not isinstance(raw_items, list):
         raw_items = []
 
@@ -190,20 +197,24 @@ def normalize_proxy_response(raw: Any, *, request_id: str = "") -> Dict[str, Any
         if isinstance(it, dict):
             items.append(_normalize_item(it))
 
-    # totals: берём из raw["total"], иначе считаем сами
-    totals = _normalize_total(raw.get("total"))
+    # totals: берём из data["total"], иначе считаем сами
+    totals = _normalize_total(data.get("total"))
     if totals == {"calories": 0.0, "protein": 0.0, "fat": 0.0, "carbohydrates": 0.0} and items:
         totals = compute_totals_from_items(items)
 
     # Meta: extract all relevant fields for LOW_CONFIDENCE vs EMPTY_RESULT decision
+    # model_notes can be in data (unwrapped) or raw (root-level for some responses)
     meta: Dict[str, Any] = {
         "request_id": request_id,
-        "model_notes": raw.get("model_notes"),
+        "model_notes": data.get("model_notes") or raw.get("model_notes"),
         # AI Proxy gate/confidence metadata (P1: for LOW_CONFIDENCE detection)
         "confidence": raw.get("confidence") or raw.get("gate_confidence"),
         "zone": raw.get("zone") or raw.get("final_zone"),
         "final_status": raw.get("final_status") or raw.get("status"),
         "reason_code": raw.get("reason_code"),
+        # Debug fields from root level
+        "is_food": raw.get("is_food"),
+        "trace_id": raw.get("trace_id"),
     }
     # Remove None values
     meta = {k: v for k, v in meta.items() if v is not None}
