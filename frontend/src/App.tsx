@@ -26,6 +26,8 @@ import WeeklyStatsPage from './pages/WeeklyStatsPage';
 import { SubscriptionPage, SubscriptionDetailsPage, PaymentHistoryPage } from './features/billing';
 // AI Context
 import { AIProcessingProvider } from './features/ai/context/AIProcessingContext';
+// Training Program
+import { AnketaPage, ProgramPage } from './features/training-program';
 
 function App() {
   const [isReady, setIsReady] = useState(false);
@@ -107,6 +109,10 @@ function App() {
                           <Route path="settings/subscription" element={<SubscriptionDetailsPage />} />
                           <Route path="settings/history" element={<PaymentHistoryPage />} />
                         </Route>
+
+                        {/* Training Program Routes */}
+                        <Route path="/anketa" element={<AnketaPage />} />
+                        <Route path="/p/:id" element={<ProgramPage />} />
 
                         {/* Trainer Panel Routes - панель тренера /panel */}
                         <Route path="/panel" element={<Layout />}>

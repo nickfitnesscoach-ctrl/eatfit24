@@ -30,6 +30,7 @@ from django.conf import settings
 
 if TYPE_CHECKING:
     from apps.billing.models import Subscription, SubscriptionPlan
+    from apps.telegram.models import TelegramUser
     from apps.users.models import Profile
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,104 @@ def send_pro_subscription_notification(
         )
 
     return success
+
+
+# -----------------------------------------------------------------------------
+# Уведомление о новом пользователе
+# -----------------------------------------------------------------------------
+
+def send_new_user_notification(telegram_user: "TelegramUser") -> bool:
+    """
+    Отправляет уведомление админам о новом пользователе.
+
+    Аргументы:
+        telegram_user: объект TelegramUser (только что созданный)
+
+    Возвращает:
+        True — если хотя бы одному админу успешно отправлено
+        False — если отправка не удалась или нет конфигурации
+    """
+    bot_token = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
+    admin_ids = getattr(settings, "TELEGRAM_ADMINS", None)
+
+    if not bot_token or not admin_ids:
+        logger.warning(
+            "[NEW_USER_NOTIFICATION] Пропущено: TELEGRAM_BOT_TOKEN или TELEGRAM_ADMINS не настроены"
+        )
+        return False
+
+    admin_list = _parse_admin_ids(admin_ids)
+    if not admin_list:
+        logger.warning("[NEW_USER_NOTIFICATION] Пропущено: пустой список TELEGRAM_ADMINS")
+        return False
+
+    # Формируем данные
+    tg_id = telegram_user.telegram_id
+    tg_username = telegram_user.username
+    full_name = f"{telegram_user.first_name} {telegram_user.last_name}".strip()
+    if not full_name:
+        full_name = f"@{tg_username}" if tg_username else "Пользователь"
+
+    # Формируем карточку
+    message = _build_new_user_card(
+        tg_id=tg_id,
+        tg_username=tg_username,
+        full_name=full_name,
+    )
+
+    # Inline-кнопка для открытия профиля
+    inline_keyboard = _build_inline_keyboard(tg_id)
+
+    # Отправляем всем админам
+    success = False
+    for admin_id in admin_list:
+        if _send_telegram_message(
+            bot_token=bot_token,
+            chat_id=admin_id,
+            text=message,
+            inline_keyboard=inline_keyboard,
+        ):
+            success = True
+
+    if success:
+        logger.info(
+            f"[NEW_USER_NOTIFICATION] Отправлено уведомление: telegram_id={tg_id}, "
+            f"username={tg_username}, name={full_name}"
+        )
+    else:
+        logger.error(
+            f"[NEW_USER_NOTIFICATION] Не удалось отправить ни одному админу: telegram_id={tg_id}"
+        )
+
+    return success
+
+
+def _build_new_user_card(
+    tg_id: int,
+    tg_username: Optional[str],
+    full_name: str,
+) -> str:
+    """
+    Формирует HTML-карточку уведомления о новом пользователе.
+
+    Структура:
+        👤 НОВЫЙ ПОЛЬЗОВАТЕЛЬ
+        ━━━━━━━━━━━━━━━━━━
+        📝 Имя: {full_name}
+        🆔 Telegram ID: {tg_id}
+        📧 Username: @{tg_username}
+    """
+    username_display = f"@{tg_username}" if tg_username else "—"
+
+    card = (
+        "👤 <b>НОВЫЙ ПОЛЬЗОВАТЕЛЬ</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <b>Имя:</b> {_escape_html(full_name)}\n"
+        f"🆔 <b>Telegram ID:</b> <code>{tg_id}</code>\n"
+        f"📧 <b>Username:</b> {_escape_html(username_display)}"
+    )
+
+    return card
 
 
 # -----------------------------------------------------------------------------

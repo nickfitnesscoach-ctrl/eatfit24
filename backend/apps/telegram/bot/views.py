@@ -33,6 +33,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.billing.notifications import send_new_user_notification
 from apps.nutrition.models import DailyGoal
 from apps.telegram.models import PersonalPlan, PersonalPlanSurvey, TelegramUser
 from apps.telegram.serializers import (
@@ -110,13 +111,21 @@ def _get_or_create_telegram_user(
         first_name = parts[0]
         last_name = parts[1] if len(parts) > 1 else ""
 
-    return TelegramUser.objects.create(
+    telegram_user = TelegramUser.objects.create(
         user=user,
         telegram_id=telegram_id,
         username=username or None,
         first_name=first_name,
         last_name=last_name,
     )
+
+    # Отправляем уведомление админам о новом пользователе
+    try:
+        send_new_user_notification(telegram_user)
+    except Exception as e:
+        logger.warning(f"[NEW_USER] Не удалось отправить уведомление: {e}")
+
+    return telegram_user
 
 
 def _today_start_dt() -> datetime:
