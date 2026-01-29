@@ -33,9 +33,6 @@ FROM nginx:alpine
 # Копируем собранное React приложение в подпапку /app
 COPY --from=builder /app/dist /usr/share/nginx/html/app
 
-# Копируем лендинг (статические HTML страницы)
-COPY public/landing /usr/share/nginx/html/landing
-
 # Копируем конфигурацию nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
